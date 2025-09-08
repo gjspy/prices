@@ -10,3 +10,4 @@ P = ParamSpec("P") # P FOR PARAMS
 QP = tuple[Any, ...] # QP FOR QUERY PARAMS
 DSA = dict[str, Any] # DSA FOR DICT: STRING, ANY
 DST = dict[str, type]
+DSS = dict[str, str]

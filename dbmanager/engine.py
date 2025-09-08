@@ -5,17 +5,20 @@ from functools import wraps
 from copy import copy
 from os import getenv
 
-from typing import Any, Callable
+from typing import Any, Callable, Self
 
 import mysql.connector
 from mysql.connector import Error as MySQLError
 
-from mysql.connector.abstracts import MySQLConnectionAbstract, MySQLCursorAbstract
+from mysql.connector.abstracts import (
+	MySQLConnectionAbstract, MySQLCursorAbstract)
+from mysql.connector.types import RowType as MySQLRowType
 from mysql.connector.pooling import PooledMySQLConnection
 
-from dbmanager.misc import Errors, ExecutionException, ASCENDING_SQL, DESCENDING_SQL, \
-ENVStrucutre
-from dbmanager.types import O, P, QP, DSA, DST
+from dbmanager.misc import (
+	Errors, ExecutionException, ASCENDING_SQL, DESCENDING_SQL, ENVStrucutre,
+	flatten)
+from dbmanager.types import O, P, QP, DSA, DST, DSS
 
 
 FATAL_ERROR_CODES: list[int] = [2006, 2013, 2055]
@@ -27,20 +30,26 @@ SQL_DATETIME_FMT = "%Y-%m-%d %H:%M:%S"
 
 # ERROR CATCHING FOR VARIOUS DB METHODS, TO SAVE REWRITING TRY/EXCEPT
 # EVERY TIME.
-def error_handling(self: "Database", e: Exception | MySQLError, rethrow: bool = False):
+def error_handling(
+		self: "Database", e: Exception | MySQLError, rethrow: bool = False):
 	is_fatal: bool = type(e) == MySQLError and e.errno in FATAL_ERROR_CODES
 	fatal_str: str = "[FATAL] " if is_fatal else ""
 
-	if (self.connection and self.connection.in_transaction):
+	connection: MySQLConnectionAbstract | None = None
+
+	try: connection = getattr(self, "connection")
+	except: pass
+
+	if (connection and connection.in_transaction):
 		self.logger.exception(
 			f"{fatal_str}EXCEPTION WITH DB WHILE TRANSACTING")
-		self.connection.rollback()
+		connection.rollback()
 		self.close_cursor()
 		
 	else: self.logger.exception(f"{fatal_str}EXCEPTION WITH DB")
 
-	if (is_fatal):
-		self.disconnect()
+	#if (is_fatal):
+	#	self.disconnect()
 	
 	if (rethrow): raise ExecutionException(e, is_fatal)
 
@@ -53,7 +62,7 @@ def db_error_safe_catcher(func: Callable[P, O]) ->  Callable[P, O | None]:
 		try:
 			return func(self, *args, **kwargs) # type: ignore
 
-		except MySQLError as e:
+		except Exception as e: # CATCH ERROR CAUSED BY func, HANDLE IT NOW.
 			error_handling(self, e)
 
 	return wrapper # type: ignore
@@ -62,13 +71,14 @@ def db_error_safe_catcher(func: Callable[P, O]) ->  Callable[P, O | None]:
 def db_error_catcher_rethrows(func: Callable[P, O]) ->  Callable[P, O | None]:
 
 	@wraps(func)
-	def wrapper(self: "Database", *args: P.args, **kwargs: P.kwargs) -> O | None:
+	def wrapper(
+		self, *args: P.args, **kwargs: P.kwargs) -> O | None: # type: ignore
 
 		try:
 			return func(self, *args, **kwargs) # type: ignore
 
-		except MySQLError as e:
-			error_handling(self, e, True)
+		except Exception as e: # CATCH ERROR CAUSED BY func, HANDLE IT NOW.
+			error_handling(self, e, True) # type: ignore
 
 	return wrapper # type: ignore
 
@@ -86,34 +96,41 @@ class CMP():
 		a = self.a
 		b = self.b
 
-		if (isinstance(a, datetime)): a = f"\'{a.strftime(SQL_DATETIME_FMT)}\'"
-		if (isinstance(b, datetime)): b = f"\'{b.strftime(SQL_DATETIME_FMT)}\'"
+		if (isinstance(a, datetime)): a = f"{a.strftime(SQL_DATETIME_FMT)}"
+		if (isinstance(b, datetime)): b = f"{b.strftime(SQL_DATETIME_FMT)}"
+
+		if (not isinstance(a, TableColumn) and not isinstance(a, CMP)):
+			a = f"\'{a}\'"
+		if (not isinstance(b, TableColumn) and not isinstance(b, CMP)):
+			b = f"\'{b}\'"
 		
 		# int, str, float, TableColumn
-		return f"{a}{self.symbol}{b}"
+		return f"({a}{self.symbol}{b})"
 	
 	# BITWISE OPERATIONS BEING OVERWRITTEN!
 	# DO THIS SO CAN WRITE Table1.uid == Table2.uid & Table1.name != "Jim"
 	def __and__(self, value: object) -> "CMP": # type: ignore
-		return CMP(str(self), value, " AND ")
+		return CMP(self, value, " AND ")
 	
 	def __or__(self, value: object) -> "CMP": # type: ignore
-		return CMP(str(self), value, " OR ")
+		return CMP(self, value, " OR ")
 
 
 class Join():
 	""" ## Simple class to help define a JOIN statement. ## """
 
 	def __init__(
-			self, joining_table_name: str,
-			condition: CMP | str, join_type: str = ""):
+			self, joining_table_row_model: type["TableRow"], 
+			condition: CMP | str, join_type: str = "LEFT",
+			):
 		"""
 		## Define a JOIN statement. ##
 		
 		Args
 		--------
-		joining_table_name: str
-			db name of the table you-re joining into your statement.
+		joining_table_row_model: type[TableRow]
+			typr object of the TableRow of the table
+			you're joining into this statement.
 		
 		condition: CMP | str
 			Query str to define how the joined table relates to this.
@@ -121,17 +138,18 @@ class Join():
 
 		join_type: str
 			Optional, can be INNER, LEFT, RIGHT, CROSS.
+			Default is LEFT
 		"""
 
 		self.join_type = join_type
-		self.joining_table_name = joining_table_name
+		self.joining_table_row_model = joining_table_row_model
 		self.condition = condition
 
 	def __str__(self) -> str:
 		join_type: str = self.join_type
 		if (join_type): join_type += " "
 
-		return f"{join_type}JOIN {self.joining_table_name} ON {self.condition}"
+		return f"{join_type}JOIN {self.joining_table_row_model.table_name} ON {self.condition}"
 
 
 
@@ -142,30 +160,42 @@ class Join():
 # ATTRS EVALUATE FIRST, SO THEY'RE CREATED FOR US
 # TO UPDATE.
 class TableRowMeta(type):
-	def __new__(cls, name: str, bases: tuple[type, ...], attrs: DSA):
-		new = super().__new__(cls, name, bases, attrs)
+	table_name: str
+	pkeys: list[str]
+	
+	def __new__(cls, name: str, bases: tuple[type, ...], attrs: DSA) -> "TableRow":
+		# cls = TableRowMeta
+		# new = TableRow!
+		new: TableRow = super().__new__(cls, name, bases, attrs) # type: ignore
 
 		table_name = attrs.get("table_name")
-		if (not table_name): return new
+		pkeys = attrs.get("pkeys")
+		if (not table_name or not pkeys): return new
 
 		# DEFINE ALL PROPERTIES HERE
-		cls.table_name: str = ""
-		cls.pkeys: list[str] = []
+		new.table_name = table_name
+		new.pkeys = pkeys
 
 		# BASED ON DEFINED PROPERTIES WITH TableColumn VALUES,
 		# POPULATE DICTIONARIES WHICH DESCRIBE ALL FIELDS AND DATATYPES.
-		cls.py_fields: DST = {} 
-		cls.db_fields: DST = {}
+		new._py_fields = {} # type: ignore
+		new._db_fields = {} # type: ignore
+		new._autoincrement_keys = [] # type: ignore
 
 		v: Any
 		for k, v in attrs.items():
 			if (not isinstance(v, TableColumn)): continue
 
-			v._table_name = table_name # type: ignore
+			# SLIGHTLY POOR DESIGN, AS IS CIRCULAR:
+			# COLUMN.TABLE.COLUMN.TABLE....
+			v._table_row_model = new # type: ignore
 
-			cls.py_fields[k] = v.py_type
-			cls.db_fields[v.db_field] = v.py_type
-		
+			new._py_fields[k] = v.py_type # type: ignore
+			new._db_fields[v.db_field] = k # type: ignore
+
+			if (v.autoincrement):
+				new._autoincrement_keys.append(v.db_field) # type: ignore
+
 		return new
 
 
@@ -194,17 +224,21 @@ class TableRow(metaclass = TableRowMeta):
 	"""
 
 	def __init__(self):
+		# NOT PRIVATE BECAUSE USER DEFINED IT IN THEIR SUBCLASS
 		self.table_name: str
-		self.pkeys: list[str]
+		self.pkeys: list[str] # LIST OF DB KEYS
 
-		self._changes: DSA
-		self.py_fields: DST # FIELD -> TYPE MAP WITH PYTHON KEYS (EG user_name)
-		self.db_fields: DST # FIELD -> TYPE MAP WITH DB KEYS. (EG USERNAME)
+		# PRIVATE
+		self._py_fields: DST # FIELD -> PY TYPE MAP WITH PYTHON KEYS (EG user_name)
+		self._db_fields: DSS # FIELD -> PY PROPERTY MAP WITH DB KEYS (EG USERNAME)
+
+		self._autoincrement_keys: list[str]
+		
+		self._changes: DSA = {}
+		self._load_status = "intialised"
 
 		assert self.table_name, Errors.TBNMissing
 		assert self.pkeys, Errors.PKMissing
-
-		self._changes = {}
 
 		# __init__ RUNNING, SO IS INSTANTIATED.
 		# CLEAR AWAY TableColumn VALUES.
@@ -215,7 +249,12 @@ class TableRow(metaclass = TableRowMeta):
 			v: Any = getattr(self, k)
 			if (not isinstance(v, TableColumn)): continue
 
-			setattr(self, k, None) # COULD USE PALCEHOLDER? EG 0, ""?
+			if (v.joins):
+				setattr(self, k, Join(
+					v.joins.table_row_model, v == v.joins))
+				continue
+
+			setattr(self, k, None) # TODO: COULD USE PLCAEHOLDER? EG 0, ""?
 
 
 
@@ -224,21 +263,76 @@ class TableRow(metaclass = TableRowMeta):
 
 		super().__setattr__(name, value)
 
-		if (not hasattr(self, "db_fields")): return
-		if (self.py_fields.get(name) == None): return
+		if (not hasattr(self, "_py_fields")): return
+		if (self._py_fields.get(name) == None): return # type: ignore
+		
+		if (not hasattr(self, "_autoincrement_keys")): return
+		if (name in self._autoincrement_keys): return
 
 		self._changes[name] = value
 
 
+	# MAKE THE FOLLOWING PROPERTIES REQUIRE METHODS TO ACCESS
+	# TO DISTINGUISH PROPERTIES WITH TableColumn VALUES FROM
+	# BUILTIN ONES.
 
-	# NO GETTERS FOR db_fields AND py_fields BECAUSE WE WANT TO USE
-	# THEM WITHOUT INSTANTIATING THE CLASS.
+	# WE WANT TO USE THEM WITHOUT INSTANTIATING THE CLASS.
+	# CLASSMETHODS STILL WORK WHEN INSTANTIATED TOO!
 	# NO SETTERS BECAUSE THEY'RE READ-ONLY.
+	@classmethod
+	def get_db_fields(cls) -> DSA:
+		""" db_fields is a dict[db_column_name: py_property_name] """
 
-	# USE @property BECAUSE IS INSTANTIATED.
-	@property # KEEP WRITE ACCESS PRIVATE
-	def changes(self): return self._changes
+		try: return cls._db_fields # type: ignore
+		except: return {}
+	
+	@classmethod
+	def get_py_fields(cls) -> DSA:
+		""" py_fields is a dict[py_property_name: required_type] """
 
+		try: return cls._py_fields # type: ignore
+		except: return {}
+	
+	@classmethod
+	def get_autoincrement_keys(cls) -> list[str]:
+		return cls._autoincrement_keys # type: ignore
+	
+
+	@classmethod
+	def list_column_objs(cls) -> list["TableColumn"]:
+		return [
+			getattr(cls, v) for v in cls.get_py_fields() if hasattr(cls, v)]
+	
+	@classmethod
+	def get_column(cls, py_field: str) -> "TableColumn":
+		return getattr(cls, py_field)
+
+
+	# IS INSTANTIATED NOW.
+	# KEEP WRITE ACCESS PRIVATE
+	def get_changes(self): return self._changes
+	def commit(self): self._changes = {}
+
+	def is_loaded(self): return self._load_status == "complete"
+	def is_partial(self): return self._load_status == "partial"
+	def is_only_initial(self):
+		"""Equivalent of `not self.is_loaded() and not self.is_partial()`"""
+		return self._load_status == "initialised"
+
+	def get_primary_key_value(self) -> list[Any]:
+		db_fields = self.get_db_fields()
+		pkeys = self.pkeys # list ALLOWS FOR COMPOSITE KEYS
+
+		primary_key: list[Any] = []
+
+		for key in pkeys:
+			py_prop = db_fields.get(key)
+			assert py_prop, \
+				f"PRIMARY KEY {key} DOES NOT HAVE PYTHON PROPERTY"
+			
+			primary_key.append(getattr(self, py_prop))
+
+		return primary_key
 
 
 	def to_dict(self) -> DSA:
@@ -258,47 +352,131 @@ class TableRow(metaclass = TableRowMeta):
 
 
 
-	def to_storable_tuple(self) -> QP:
+	def to_storable_tuple(self, db_keys: list[str]) -> QP:
 		"""
 		Convert object into `tuple` ready to store in the database.
 		"""
 		result: list[Any] = []
 
-		for k,v in vars(self):
-			if (not k.startswith("_")): continue
+		db_fields = self.get_db_fields()
+		autoincrement_keys = self.get_autoincrement_keys()
+
+		for k in db_keys:
+			if (k in autoincrement_keys): continue
+
+			py_field: str | None = db_fields.get(k)
+
+			if (not py_field):
+				result.append(None)
+			
+			if (not py_field or py_field.startswith("_")): continue
+
+			v: Any = None
+
+			try: v = getattr(self, py_field)
+			except: pass
 
 			# TODO: handle joined tables
 
 			result.append(v)
+		
+		print(result)
 
 		return tuple(result)
+	
+
+
+	def set_autoincrement_value(self, db_field: str, id_: int):
+		assert db_field in self.get_autoincrement_keys(), Errors.NotAI
+		
+		py_prop = self.get_db_fields().get(db_field)
+		assert py_prop, Errors.PKNoPy
+
+		setattr(self, py_prop, id_)
+
+	
+
+	@classmethod
+	def partial_from_id(cls, id_: Any, column: "TableColumn") -> Self:
+		this = cls()
+
+		db_fields = cls.get_db_fields()
+		py_prop = db_fields[column.db_field]
+
+		setattr(this, py_prop, id_)
+
+		this._load_status = "partial"
+
+		this.commit() # CLEAR changes, BECAUSE WE'VE JUST SET INITIAL VALUES.
+
+		return this
 
 
 
 	@classmethod
-	def from_dict(cls, data: DSA) -> "TableRow":
+	def from_dict(cls, data: DSA) -> Self:
 		"""
 		Load values into object from dictionary provided by `mysql-connector`.
 		Works by iterating through all annotated types of `self`, any which have
-		values in `data` are written.
+		values in `data` are written to.
 		"""
 
+		# INSTANTIATION. TableColumns REMOVED HERE.
 		this = cls()
 
-		k: str
-		for k, required_type in this.py_fields.items():
-			if (k.startswith("_")): continue
+		col_types = this.get_py_fields()
+		print("making", cls.table_name)
 
-			v: Any = data.get(k)
-			if (not v): continue
+		db_col: str
+		py_prop: str
+		for db_col, py_prop in this.get_db_fields().items():
+			existing_value: Join | None = None
+
+			try: existing_value = getattr(this, py_prop)
+			except: pass
+
+			# GET VALUE IN data WHICH WILL BE USED TO FILL OBJ.
+			# DO THIS BEFORE CHECKING FOR JOIN, ROW MAY NOT HAVE
+			# VALUE TO REFERENCE.
+			key = f"{cls.table_name}.{db_col}"
+
+			v: Any = data.get(key)
+			if (not v):
+				# REMOVE JOIN OBJ.
+				if (existing_value): setattr(this, py_prop, None)
+
+				continue
+
+			required_type = col_types[py_prop]
 			
 			# STRICT TYPE CONTROL, RAISE EXCEPTION
 			assert required_type == Any or type(v) == required_type, \
-				f"dict key {k} value type {type(v)} does not match required {required_type}"
+				f"dict key {db_col} value type {type(v)} does not match required {required_type}"
+			
+			del data[key] # PREVENTS CIRCULAR REFERENCES
 
-			# TODO: handle joined tables
+			if (existing_value):
+				# CREATES OBJECT FOR JOINED COLUMN
+				# IF DATA DOESN'T EXIST (CIRCULAR, OR WASNT JOINED)
+				# IN SELECT, CREATES PARTIAL OBJ WITH JUST THE ID.
 
-			setattr(this, k, v)
+				joining_model = existing_value.joining_table_row_model
+
+				child = joining_model.from_dict(data)
+				child_primary_key = child.get_primary_key_value()
+
+				if (len(child_primary_key) == 0 or None in child_primary_key):
+					this_column = cls.get_column(py_prop)
+					assert this_column and this_column.joins
+
+					child = joining_model.partial_from_id(v, this_column.joins)
+
+				v = child
+
+			setattr(this, py_prop, v)
+
+		this._load_status = "complete"
+		this.commit() # CLEAR changes, BECAUSE WE'VE JUST SET INITIAL VALUES.
 		
 		return this
 
@@ -306,36 +484,38 @@ class TableRow(metaclass = TableRowMeta):
 
 
 class TableColumn():
-	def __init__(self, db_field: str, py_type: type):
+	def __init__(
+			self, db_field: str, py_type: type,
+			required: bool = False, autoincrement: bool = False):
 		self._db_field: str = db_field
 		self._py_type: type = py_type
+		self.required = required
+		self.autoincrement = autoincrement
 
-		self._table_name: str
-		self._sort_order: str
+		self._table_row_model: type[TableRow]
+		self._relationship: TableColumn | None = None
 	
 
 
-	@property
+	@property # READ-ONLY
 	def db_field(self): return self._db_field
 
-	@property
+	@property # READ-ONLY
 	def py_type(self): return self._py_type
 
-	@property
-	def table_name(self): return self._table_name
+	@property # NO PRIVATE PROPERTY, READ-ONLY
+	def table_name(self): return self._table_row_model.table_name
 
-	@property
-	def sort_order(self): return self._sort_order
+	@property # READ-ONLY
+	def table_row_model(self): return self._table_row_model
+	
+	@property # FOR USER TO DEFINE LATER, READ AND WRITE
+	def joins(self): return self._relationship
 
-	@sort_order.setter
-	def sort_order(self, new: str):
-		if (type(new) != str):
-			raise TypeError("sort_order must be of type str")
-		
-		if (new != ASCENDING_SQL and new != DESCENDING_SQL):
-			raise ValueError(Errors.InvalidSortOrder)
-		
-		self._sort_order = new
+	@joins.setter
+	def joins(self, other: "TableColumn"):
+		self._relationship = other
+
 
 
 
@@ -365,13 +545,16 @@ class TableColumn():
 	def __str__(self) -> str:
 		return f"{self.table_name}.{self.db_field}"
 	
-	def ascending(self):
-		self.sort_order = ASCENDING_SQL
-		return self
+
+	@property
+	def ascending(self) -> str:
+		""" Returns ORDER_BY query for this column, ascending. """
+		return str(self) + " " + ASCENDING_SQL
 	
-	def descending(self):
-		self.sort_order = DESCENDING_SQL
-		return self
+	@property
+	def descending(self) -> str:
+		""" Returns ORDER_BY query for this column, descending. """
+		return str(self) + " " + DESCENDING_SQL
 
 
 
@@ -381,6 +564,8 @@ class Table():
 		self.name: str
 		self._row_model: type[TableRow]
 		self._db_keys: list[str]
+		#self._joins: dict[str, TableColumn]
+		self._joins: list[Join]
 
 		self.name = db_name
 
@@ -394,85 +579,155 @@ class Table():
 	def db_keys(self): return self._db_keys
 
 
-	# COULD USER SETTER, BUT WANT TO BE EXPLICIT METH
+	# COULD USE SETTER, BUT WANT TO BE EXPLICIT METH
 	# BECAUSE IT CHANGES MORE THAN ONE PROPERTY. DB_KEYS
 	# DOESN'T HAVE A SETTER.
 	def set_row_model(self, new_row_model: type[TableRow]):
 		self._row_model = new_row_model
-		self._db_keys = list(new_row_model.db_fields.keys())
+		self._db_keys = list(new_row_model.get_db_fields().keys())
+
+		self._joins = []
+
+		for field in new_row_model.get_py_fields().keys():
+			column: TableColumn | None = None
+
+			try: column = getattr(new_row_model, field)
+			except: pass
+
+			if ((not column) or (not column.joins)): continue
+
+			#if (joins): self._joins[field] = joins
+			self._joins.append(Join(
+				column.joins.table_row_model, column == column.joins))
 
 
 	def select(
-			self, condition: CMP, join_on: list[Join] = [],
-			order_by: list[TableColumn] = []) -> DSA:
-		""" ### Build `SELECT` STATEMENT. ### """
+			self, condition: CMP | None = None, join_all: bool = False,
+			join_on: list[Join] = [], limit: int = 1000,
+			order_by: list[str | TableColumn] = []) -> DSA:
+		"""
+		### Build `SELECT` STATEMENT. ###
 
-		sql: str = f"SELECT * FROM {self.name}"
+		Args
+		--------
+		condition: CMP
+			Comparison object used to build the statement.
+		
+		join_all: bool
+			Whether to join all tables as pre-defined. (True)
+			Else, only joins relationships defined with `join_on`
+
+		join_on: list[Join]
+			Defining any joins required for the query.
+			If `join_all` is True, this should be empty.
+		
+		limit: int
+			Maximum rows to return. Default = 1000
+		
+		order_by: list[str | TableColumn]
+			Which columns to order by. May be `TableColumn`,
+			`TableColumn.ascending`, `TableColumn.descending` or any manually
+			created string.
+
+		Example:
+		--------
+		>>> select(
+		>>> 	(Table1.value1 == Table1.value2) & (Table1.value3 == datetime(2025, 8, 1)),
+		>>> 	order_by = [Table1.value1, Table1.value2.ascending])
+		"""
+
+		if (join_all): join_on.extend(self._joins)
+		tables_involved: list[type[TableRow]] = [
+			self.row_model, *( v.joining_table_row_model for v in join_on )]
+		
+		all_columns = flatten( v.list_column_objs() for v in tables_involved )
+		what_to_select = ", ".join( f"{v} AS \'{v}\'" for v in all_columns )
+
+		sql: str = f"SELECT {what_to_select} FROM {self.name}"
+		
 		
 		for join in join_on: sql += " " + str(join)
-		sql += " WHERE " + str(condition)
 
-		order_by_strs: list[str] = []
+		if (condition): sql += " WHERE " + str(condition)
 
-		for v in order_by:
-			if (hasattr(v, "sort_order")):
-				order_by_strs.append(str(v) + " " + v.sort_order)
-				continue
-
-			order_by_strs.append(str(v))
-
-		if (len(order_by_strs) > 0): sql += " "+ ", ".join(order_by_strs)
+		order_by_strs: list[str] = [ str(v) for v in order_by]
+		if (len(order_by_strs) > 0):
+			sql += " ORDER BY " + ", ".join(order_by_strs)
+		
+		if (limit): sql += " LIMIT " + str(limit)
 
 		return {
 			"query": sql + ";",
-			"expect_response": True,
+			"expect_response": "fetchall",
 			"objectify_from_table": self.name,
 			"debug": ("select", "from " + self.name)
 		}
 
 
-	def insert(self, rows: list[TableRow]) -> DSA:
+	def insert(self, *rows: TableRow) -> DSA:
 		""" ### Build `INSERT` STATEMENT. ### """
-		keys_str: str = ", ".join(self.db_keys)
+
+		autoincrement_keys = self.row_model.get_autoincrement_keys()
+		keys_str: str = ", ".join(k for k in self.db_keys if (not k in autoincrement_keys))
 		
 		# "%s" FOR EVERY KEY, THEN [: -2] TO REMOVE TRAILING ", "
-		placeholder_str: str = ("%s, " * len(self.db_keys))[: -2]
-		values: list[QP] = [ v.to_storable_tuple() for v in rows ]
+		n_values = len(self.db_keys) - len(autoincrement_keys)
+		placeholder_str: str = ("%s, " * n_values)[: -2]
+		values: list[QP] = [ v.to_storable_tuple(self.db_keys) for v in rows ]
 
-		sql: str = f"INSERT INTO {self.name} ({keys_str}) VALUES {placeholder_str};"
+		sql: str = f"INSERT INTO {self.name} ({keys_str}) VALUES ({placeholder_str});"
 
 		payload: DSA = {
 			"query": sql,
-			"expect_response": False,
+			"expect_response": "lastrowid",
 			"debug": ("insert", [ type(v).__name__ for v in rows ])
 		}
 
-		if (len(values) == 1): payload["values"] = values[0]
-		else: payload["many_values"] = values
+		if (len(values) == 1): payload["params"] = values[0]
+		else: payload["many_params"] = values
+
+		for row in rows:
+			row.commit() # CLEAR changes.
 
 		return payload
 
 	
-	def update(self, data: list[TableRow]) -> DSA:
+	def update(self, *rows: TableRow) -> DSA:
 		""" ### Build `UPDATE` STATEMENT. ### """
 
 		sqls: list[str] = []
+		valueses: list[QP] = []
 
-		for row in data:
-			set_str = ( f"{k} = %s, " for k in row.changes.keys() )
+		for row in rows:
+			changes = row.get_changes()
+
+			py_fields = changes.keys()
+			db_keys_changed = [
+				k for k,v in row.get_db_fields().items() if v in py_fields ]
+
+			set_str = ", ".join( f"{k} = %s" for k in db_keys_changed )
+			values = tuple(changes.values())
+
 			where_str = ""
+
+			db_fields = self.row_model.get_db_fields()
 
 			pk: str
 			for pk in row.pkeys:
-				assert hasattr(row, pk), Errors.PKMissing
+				py_field = db_fields.get(pk)
+				assert py_field and hasattr(row, py_field), Errors.PKNoPy
 
-				where_str += f" {row.table_name}.{pk}={getattr(row, pk)}" # TODO: joined tables
+				where_str += f" {row.table_name}.{pk}={getattr(row, py_field)}"
+				# TODO: joined tables
 
-			sqls.append(f"UPDATE {self.name} SET {set_str} WHERE {where_str};")
+			sqls.append(f"UPDATE {self.name} SET {set_str} WHERE{where_str};")
+			valueses.append(values)
+			row.commit() # CLEAR changes.
 		
 		return {
 			"queries": sqls,
-			"debug": ("update", [ type(v).__name__ for v in data ])
+			"paramses": valueses,
+			"debug": ("update", [ type(v).__name__ for v in rows ])
 		}
 
 
@@ -490,22 +745,22 @@ class Database():
 
 		Args
 		--------
-			host, port, schema, user, passwd: str, int, str, str, str
-				Credentials for connection.
-			
-			logger: Logger
-				Logger to write to.
+		host, port, schema, user, passwd: str, int, str, str, str
+			Credentials for connection.
+		
+		logger: Logger
+			Logger to write to.
 
-			init_command: str
-				SQL query to run immediately after successful connection
+		init_command: str
+			SQL query to run immediately after successful connection
 
-			autocommit: bool
-				Whether to automatically commit operations after each
-				SQL statement
+		autocommit: bool
+			Whether to automatically commit operations after each
+			SQL statement
 
-			time_zone_description: str
-				Define the session's time_zone at connection time.
-				Example: "+00:00", "UTC"
+		time_zone_description: str
+			Define the session's time_zone at connection time.
+			Example: "+00:00", "UTC"
 		"""
 
 		self._config: dict[str, str | int | bool]
@@ -556,8 +811,8 @@ class Database():
 
 	@property # NO SETTER, KEEP WRITE ACCESS PRIVATE
 	def connection(self):
-		if (not self._connection):
-			self.connect()
+		# DON'T TRY TO CONNECT HERE.
+		# SHOULD BE EXPLICIT TASK.
 		
 		return self._connection
 
@@ -631,8 +886,12 @@ class Database():
 		if (self._active_cursor): self.close_cursor()
 
 		self._active_cursor = self.connection.cursor(
-			dictionary = True,
+			#dictionary = True,
 			buffered = buffered)
+		
+		# can't use dict, as it doesnt allow for
+		# duplicate column names, eg Table1.ID and Table2.ID,
+		# dict key ID only points to Table2.ID.
 
 	
 
@@ -663,35 +922,47 @@ class Database():
 
 	@db_error_catcher_rethrows
 	def execute(
-			self, query: str, params: QP  = (),
-			many_params: list[QP] = [], expect_response: bool = False,
-			buffered: bool = True, objectify_from_table: str = ""):
+			self, query: str, params: QP  = (), many_params: list[QP] = [],
+			expect_response: str = "", buffered: bool = True,
+			objectify_from_table: str = "", **kwargs: Any):
 		"""
 		Execute SQL Statement
 
 		Cursor/Session is encapsulated here. If you want to run multiple
 		queries before committing, use execute_many()
 
+		`**kwargs` is included, so this function will ignore extra
+		params in your payload.
+
 		Args
 		--------
-			query: str or list[str]
-				SQL statement(s) to run.
-			
-			params: tuple | None
-				Parameters to insert into SQL statement
-			
-			expect_response: bool
-				Whether to run cursor.fetchall() or not.
-				Should be True for any select statement.
-			
-			buffered: bool
-				Whether result of a query is read from server immediately,
-				by execute() [True], or is read when fetchall() [False] is run.
+		query: str or list[str]
+			SQL statement(s) to run.
+		
+		params: tuple | None
+			Parameters to insert into SQL statement
+		
+		expect_response: str
+			Optional, provide if a response is expected, using:\n
+			`"fetchall"`: returns results of cursor.fetchall() [helpful for SELECT]\n
+			`"lastrowid"`: returns cursor.lastrowid [helpful for INSERT]
+		
+		buffered: bool
+			Whether result of a query is read from server immediately,
+			by execute() [True], or is read when fetchall() [False] is run.
+
+		objectify_from_table: bool
+			Whether to use the database's `table_row_models` to return
+			the response as objects [True], or just return the `dict` as
+			provided from cursor.fetchall()
 		"""
 
 		assert self.connection, "The database is not connected"
+		if (kwargs):
+			ignored: list[Any] = list(kwargs.keys())
+			self.logger.debug(f"Ignoring {ignored} kwargs..")
 
-		result: list[Any]
+		result: list[Any] = []
 
 		self._init_cursor(buffered)
 		assert self._active_cursor, "Cursor unsuccessfully initialised"
@@ -699,9 +970,17 @@ class Database():
 		# THERE WILL ONLY EVER BE ONE OF params, many_params
 		self._execute_one(query, params, many_params)
 
-		result = self._active_cursor.fetchall() if (expect_response) else []
+		match expect_response:
+			case "fetchall": result = self._active_cursor.fetchall()
+			case "lastrowid": result = [ self._active_cursor.lastrowid, ]
+			case _: pass
+			
 		if (objectify_from_table):
-			result = self.objectify_results(result, objectify_from_table)
+			column_names: list[str] = [
+				col[0] for col in (self._active_cursor.description or []) ]
+
+			result = self.objectify_results(
+				result, objectify_from_table, column_names)
 
 		self.connection.commit()
 		self.close_cursor()
@@ -717,16 +996,23 @@ class Database():
 	def execute_multiple(
 			self, queries: list[str], paramses: list[QP | list[QP]] = [],
 			expect_response: bool = False, buffered: bool = True,
-			objectify_from_table: str = ""):
+			objectify_from_table: str = "", **kwargs: Any):
 		"""
 		Execute multiple SQL statements.
 		If you want to execute one statement for multiple params,
 		call execute() with a list[tuple] params.
 		
-		Call execute_multiple() for multiple SQL statements"""
+		Call execute_multiple() for multiple SQL statements
+
+		`**kwargs` is included, so this function will ignore extra
+		params in your payload.
+		"""
 
 		assert len(queries) == len(paramses)
 		assert self.connection, "The database is not connected"
+		if (kwargs):
+			ignored: list[Any] = list(kwargs.keys())
+			self.logger.debug(f"Ignoring {ignored} kwargs..")
 
 		result: list[Any]
 
@@ -748,7 +1034,11 @@ class Database():
 
 		result = self._active_cursor.fetchall() if (expect_response) else []
 		if (objectify_from_table):
-			result = self.objectify_results(result, objectify_from_table)
+			column_names: list[str] = [
+				col[0] for col in (self._active_cursor.description or []) ]
+
+			result = self.objectify_results(
+				result, objectify_from_table, column_names)
 
 		self.connection.commit()
 		self.close_cursor()
@@ -756,24 +1046,53 @@ class Database():
 		# WAS SUCCESSFUL! DECLARE SO!
 		self.reset_time_idle()
 		return result
+	
+	def execute_payload(self, payload: DSA) -> list[Any]:
+		""" Execute SQL Statement from `dict` payload. """
+
+		routine: Callable[..., Any]
+		
+		if (payload.get("queries")):
+			routine = self.execute_multiple
+		else:
+			routine = self.execute
+
+		return routine(**payload)
 
 
 
-	def objectify_result(self, result: DSA, table_name: str) -> TableRow:
+
+
+	def objectify_result(
+			self, ms_result: MySQLRowType, table_name: str,
+			fetched_column_names: list[str]) -> TableRow:
 		""" ### Convert one dictionary result to the object of its table. """
 		model: type[TableRow] | None = self._table_row_models.get(table_name)
 
 		assert model, f"objectify: no model for table_name {table_name}"
+		assert len(ms_result) == len(fetched_column_names), \
+			f"length of results not equal to amount of column names"
+
+		result = dict(
+			(fetched_column_names[i], ms_result[i])
+			for i in range(len(fetched_column_names)) )
+		print(fetched_column_names)
+		print(result)
 
 		return model.from_dict(result)
 
 
 
 	def objectify_results(
-			self, results: list[DSA], table_name: str) -> list[TableRow]:
+			self, results: list[MySQLRowType],
+			table_name: str, column_names: list[str]) -> list[TableRow]:
 		""" ### Objectify a list of results easily. """
 
-		return [ self.objectify_result(v, table_name) for v in results ]
+		print(results)
+
+		return [
+			self.objectify_result(v, table_name, column_names)
+			for v in results ]
 	
 
 

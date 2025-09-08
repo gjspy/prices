@@ -1,5 +1,7 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Iterable
+
+from dbmanager.types import DSA
 
 ASCENDING_SQL = "ASC"
 DESCENDING_SQL = "DESC"
@@ -14,8 +16,10 @@ class ENVStrucutre():
 
 class Errors():
 	PKMissing = "You must define the primary key structure."
+	PKNoPy = "PK is missing a python property."
 	TBNMissing = "You must define the table name."
 	InvalidSortOrder = "sort_order must be {ASCENDING_SQL} or {DESCENDING_SQL} only."
+	NotAI = "Must be an autoincrement value."
 
 class Queue():
 	def __init__(self):
@@ -74,3 +78,12 @@ def get_placeholder(field_type: type) -> Any:
 		return datetime.fromtimestamp(0)
 	
 	raise TypeError(f"get_placeholder: What is this? {field_type}")
+
+
+def get_k_from_v(d: DSA, value: Any):
+	for k,v in d.items():
+		if (v == value): return k
+
+
+def flatten(ls: Iterable[list[Any]]) -> list[Any]:
+	return [vv for v in ls for vv in v]

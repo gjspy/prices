@@ -1,5 +1,5 @@
 from threading import Thread
-from typing import Any, Callable
+from typing import Any
 from logging import Logger
 
 from asyncio import Future, AbstractEventLoop
@@ -115,14 +115,8 @@ class DBThread(Thread):
 			return (False, "no payload", [])
 
 		result: list[Any] = []
-		subroutine: Callable[..., Any]
-		
-		if (payload and payload.get("queries")):
-			subroutine = self._engine.execute_multiple
 
-		else: subroutine = self._engine.execute
-
-		try: result = subroutine(**payload)
+		try: result = self._engine.execute_payload(payload)
 		except:
 			# HAS ALREADY BEEN CAUGHT, LOGGED & RETHROWN
 			# NO NEED TO LOG AGAIN.
