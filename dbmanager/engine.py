@@ -45,12 +45,12 @@ def error_handling(
 			f"{fatal_str}EXCEPTION WITH DB WHILE TRANSACTING")
 		connection.rollback()
 		self.close_cursor()
-		
+
 	else: self.logger.exception(f"{fatal_str}EXCEPTION WITH DB")
 
 	#if (is_fatal):
 	#	self.disconnect()
-	
+
 	if (rethrow): raise ExecutionException(e, is_fatal)
 
 
@@ -103,15 +103,15 @@ class CMP():
 			a = f"\'{a}\'"
 		if (not isinstance(b, TableColumn) and not isinstance(b, CMP)):
 			b = f"\'{b}\'"
-		
+
 		# int, str, float, TableColumn
 		return f"({a}{self.symbol}{b})"
-	
+
 	# BITWISE OPERATIONS BEING OVERWRITTEN!
 	# DO THIS SO CAN WRITE Table1.uid == Table2.uid & Table1.name != "Jim"
 	def __and__(self, value: object) -> "CMP": # type: ignore
 		return CMP(self, value, " AND ")
-	
+
 	def __or__(self, value: object) -> "CMP": # type: ignore
 		return CMP(self, value, " OR ")
 
@@ -120,18 +120,18 @@ class Join():
 	""" ## Simple class to help define a JOIN statement. ## """
 
 	def __init__(
-			self, joining_table_row_model: type["TableRow"], 
+			self, joining_table_row_model: type["TableRow"],
 			condition: CMP | str, join_type: str = "LEFT",
 			):
 		"""
 		## Define a JOIN statement. ##
-		
+
 		Args
 		--------
 		joining_table_row_model: type[TableRow]
 			typr object of the TableRow of the table
 			you're joining into this statement.
-		
+
 		condition: CMP | str
 			Query str to define how the joined table relates to this.
 			Usually linking primary / foreign keys.
@@ -162,7 +162,7 @@ class Join():
 class TableRowMeta(type):
 	table_name: str
 	pkeys: list[str]
-	
+
 	def __new__(cls, name: str, bases: tuple[type, ...], attrs: DSA) -> "TableRow":
 		# cls = TableRowMeta
 		# new = TableRow!
@@ -212,15 +212,15 @@ class TableRow(metaclass = TableRowMeta):
 	--------
 	>>> class User(TableRow):
 	>>>		# DEFINE TABLE NAME.
-	>>> 	table_name = "USERS" 
-	>>> 	
+	>>> 	table_name = "USERS"
+	>>>
 	>>> 	# DEFINE ALL COLUMNS
 	>>> 	user_id = TableColumn("ID", int)
 	>>> 	name = TableColumn("NAME", str)
 	>>> 	email = TableColumn("EMAIL", str)
-	>>> 	
+	>>>
 	>>> 	# DEFINE PRIMARY/COMPOSITE KEY
-	>>> 	pkeys = ["ID"]	
+	>>> 	pkeys = ["ID"]
 	"""
 
 	def __init__(self):
@@ -233,7 +233,7 @@ class TableRow(metaclass = TableRowMeta):
 		self._db_fields: DSS # FIELD -> PY PROPERTY MAP WITH DB KEYS (EG USERNAME)
 
 		self._autoincrement_keys: list[str]
-		
+
 		self._changes: DSA = {}
 		self._load_status = "intialised"
 
@@ -265,7 +265,7 @@ class TableRow(metaclass = TableRowMeta):
 
 		if (not hasattr(self, "_py_fields")): return
 		if (self._py_fields.get(name) == None): return # type: ignore
-		
+
 		if (not hasattr(self, "_autoincrement_keys")): return
 		if (name in self._autoincrement_keys): return
 
@@ -285,24 +285,24 @@ class TableRow(metaclass = TableRowMeta):
 
 		try: return cls._db_fields # type: ignore
 		except: return {}
-	
+
 	@classmethod
 	def get_py_fields(cls) -> DSA:
 		""" py_fields is a dict[py_property_name: required_type] """
 
 		try: return cls._py_fields # type: ignore
 		except: return {}
-	
+
 	@classmethod
 	def get_autoincrement_keys(cls) -> list[str]:
 		return cls._autoincrement_keys # type: ignore
-	
+
 
 	@classmethod
 	def list_column_objs(cls) -> list["TableColumn"]:
 		return [
 			getattr(cls, v) for v in cls.get_py_fields() if hasattr(cls, v)]
-	
+
 	@classmethod
 	def get_column(cls, py_field: str) -> "TableColumn":
 		return getattr(cls, py_field)
@@ -329,7 +329,7 @@ class TableRow(metaclass = TableRowMeta):
 			py_prop = db_fields.get(key)
 			assert py_prop, \
 				f"PRIMARY KEY {key} DOES NOT HAVE PYTHON PROPERTY"
-			
+
 			primary_key.append(getattr(self, py_prop))
 
 		return primary_key
@@ -368,7 +368,7 @@ class TableRow(metaclass = TableRowMeta):
 
 			if (not py_field):
 				result.append(None)
-			
+
 			if (not py_field or py_field.startswith("_")): continue
 
 			v: Any = None
@@ -379,22 +379,22 @@ class TableRow(metaclass = TableRowMeta):
 			# TODO: handle joined tables
 
 			result.append(v)
-		
+
 		print(result)
 
 		return tuple(result)
-	
+
 
 
 	def set_autoincrement_value(self, db_field: str, id_: int):
 		assert db_field in self.get_autoincrement_keys(), Errors.NotAI
-		
+
 		py_prop = self.get_db_fields().get(db_field)
 		assert py_prop, Errors.PKNoPy
 
 		setattr(self, py_prop, id_)
 
-	
+
 
 	@classmethod
 	def partial_from_id(cls, id_: Any, column: "TableColumn") -> Self:
@@ -448,11 +448,11 @@ class TableRow(metaclass = TableRowMeta):
 				continue
 
 			required_type = col_types[py_prop]
-			
+
 			# STRICT TYPE CONTROL, RAISE EXCEPTION
 			assert required_type == Any or type(v) == required_type, \
 				f"dict key {db_col} value type {type(v)} does not match required {required_type}"
-			
+
 			del data[key] # PREVENTS CIRCULAR REFERENCES
 
 			if (existing_value):
@@ -477,7 +477,7 @@ class TableRow(metaclass = TableRowMeta):
 
 		this._load_status = "complete"
 		this.commit() # CLEAR changes, BECAUSE WE'VE JUST SET INITIAL VALUES.
-		
+
 		return this
 
 
@@ -494,7 +494,7 @@ class TableColumn():
 
 		self._table_row_model: type[TableRow]
 		self._relationship: TableColumn | None = None
-	
+
 
 
 	@property # READ-ONLY
@@ -508,7 +508,7 @@ class TableColumn():
 
 	@property # READ-ONLY
 	def table_row_model(self): return self._table_row_model
-	
+
 	@property # FOR USER TO DEFINE LATER, READ AND WRITE
 	def joins(self): return self._relationship
 
@@ -540,17 +540,17 @@ class TableColumn():
 
 	def __ge__(self, value: object) -> CMP:
 		return CMP(self, value, ">=")
-	
-	
+
+
 	def __str__(self) -> str:
 		return f"{self.table_name}.{self.db_field}"
-	
+
 
 	@property
 	def ascending(self) -> str:
 		""" Returns ORDER_BY query for this column, ascending. """
 		return str(self) + " " + ASCENDING_SQL
-	
+
 	@property
 	def descending(self) -> str:
 		""" Returns ORDER_BY query for this column, descending. """
@@ -612,7 +612,7 @@ class Table():
 		--------
 		condition: CMP
 			Comparison object used to build the statement.
-		
+
 		join_all: bool
 			Whether to join all tables as pre-defined. (True)
 			Else, only joins relationships defined with `join_on`
@@ -620,10 +620,10 @@ class Table():
 		join_on: list[Join]
 			Defining any joins required for the query.
 			If `join_all` is True, this should be empty.
-		
+
 		limit: int
 			Maximum rows to return. Default = 1000
-		
+
 		order_by: list[str | TableColumn]
 			Which columns to order by. May be `TableColumn`,
 			`TableColumn.ascending`, `TableColumn.descending` or any manually
@@ -639,13 +639,13 @@ class Table():
 		if (join_all): join_on.extend(self._joins)
 		tables_involved: list[type[TableRow]] = [
 			self.row_model, *( v.joining_table_row_model for v in join_on )]
-		
+
 		all_columns = flatten( v.list_column_objs() for v in tables_involved )
 		what_to_select = ", ".join( f"{v} AS \'{v}\'" for v in all_columns )
 
 		sql: str = f"SELECT {what_to_select} FROM {self.name}"
-		
-		
+
+
 		for join in join_on: sql += " " + str(join)
 
 		if (condition): sql += " WHERE " + str(condition)
@@ -653,7 +653,7 @@ class Table():
 		order_by_strs: list[str] = [ str(v) for v in order_by]
 		if (len(order_by_strs) > 0):
 			sql += " ORDER BY " + ", ".join(order_by_strs)
-		
+
 		if (limit): sql += " LIMIT " + str(limit)
 
 		return {
@@ -669,7 +669,7 @@ class Table():
 
 		autoincrement_keys = self.row_model.get_autoincrement_keys()
 		keys_str: str = ", ".join(k for k in self.db_keys if (not k in autoincrement_keys))
-		
+
 		# "%s" FOR EVERY KEY, THEN [: -2] TO REMOVE TRAILING ", "
 		n_values = len(self.db_keys) - len(autoincrement_keys)
 		placeholder_str: str = ("%s, " * n_values)[: -2]
@@ -691,7 +691,7 @@ class Table():
 
 		return payload
 
-	
+
 	def update(self, *rows: TableRow) -> DSA:
 		""" ### Build `UPDATE` STATEMENT. ### """
 
@@ -723,7 +723,7 @@ class Table():
 			sqls.append(f"UPDATE {self.name} SET {set_str} WHERE{where_str};")
 			valueses.append(values)
 			row.commit() # CLEAR changes.
-		
+
 		return {
 			"queries": sqls,
 			"paramses": valueses,
@@ -735,7 +735,7 @@ class Table():
 
 class Database():
 	""" # Database Engine # """
-	
+
 	def __init__(
 			self, host: str, port: int, schema: str, user: str, passwd: str,
 			logger: Logger, init_command: str = "", autocommit: bool = False,
@@ -747,7 +747,7 @@ class Database():
 		--------
 		host, port, schema, user, passwd: str, int, str, str, str
 			Credentials for connection.
-		
+
 		logger: Logger
 			Logger to write to.
 
@@ -784,7 +784,7 @@ class Database():
 			"time_zone": time_zone_description
 		}
 
-		
+
 		self._connection = None
 		self._active_cursor = None
 		self._logger = logger
@@ -797,7 +797,7 @@ class Database():
 		# BE USED FOR execute() HERE.
 
 
-	
+
 	@property # NO SETTER, READ-ONLY.
 	def config(self): return self._config
 
@@ -813,7 +813,7 @@ class Database():
 	def connection(self):
 		# DON'T TRY TO CONNECT HERE.
 		# SHOULD BE EXPLICIT TASK.
-		
+
 		return self._connection
 
 
@@ -852,7 +852,7 @@ class Database():
 			self._is_connected = success
 
 			if (success): self.reset_time_idle()
-		
+
 		return self._is_connected
 
 
@@ -888,12 +888,12 @@ class Database():
 		self._active_cursor = self.connection.cursor(
 			#dictionary = True,
 			buffered = buffered)
-		
+
 		# can't use dict, as it doesnt allow for
 		# duplicate column names, eg Table1.ID and Table2.ID,
 		# dict key ID only points to Table2.ID.
 
-	
+
 
 	def close_cursor(self):
 		if (not self._active_cursor): return
@@ -909,9 +909,9 @@ class Database():
 		"""
 		Execute a single SQL Statement.
 
-		MANY = REPEAT query FOR EACH tuple IN params.
+		MANY = ONE QUERY, USED FOR MULTIPLE VALUES.
 		NOT MULTIPLE STATEMENTS.
-		"""		
+		"""
 
 		assert self._active_cursor, "There is no active cursor"
 
@@ -938,15 +938,15 @@ class Database():
 		--------
 		query: str or list[str]
 			SQL statement(s) to run.
-		
+
 		params: tuple | None
 			Parameters to insert into SQL statement
-		
+
 		expect_response: str
 			Optional, provide if a response is expected, using:\n
 			`"fetchall"`: returns results of cursor.fetchall() [helpful for SELECT]\n
 			`"lastrowid"`: returns cursor.lastrowid [helpful for INSERT]
-		
+
 		buffered: bool
 			Whether result of a query is read from server immediately,
 			by execute() [True], or is read when fetchall() [False] is run.
@@ -974,7 +974,7 @@ class Database():
 			case "fetchall": result = self._active_cursor.fetchall()
 			case "lastrowid": result = [ self._active_cursor.lastrowid, ]
 			case _: pass
-			
+
 		if (objectify_from_table):
 			column_names: list[str] = [
 				col[0] for col in (self._active_cursor.description or []) ]
@@ -986,10 +986,10 @@ class Database():
 		self.close_cursor()
 
 		# WAS SUCCESSFUL! DECLARE SO!
-		self.reset_time_idle() 
-		
+		self.reset_time_idle()
+
 		return result
-	
+
 
 
 	@db_error_catcher_rethrows
@@ -1001,7 +1001,7 @@ class Database():
 		Execute multiple SQL statements.
 		If you want to execute one statement for multiple params,
 		call execute() with a list[tuple] params.
-		
+
 		Call execute_multiple() for multiple SQL statements
 
 		`**kwargs` is included, so this function will ignore extra
@@ -1030,7 +1030,7 @@ class Database():
 
 			self._execute_one(
 				query, many_params = these_params) # type: ignore
-		
+
 
 		result = self._active_cursor.fetchall() if (expect_response) else []
 		if (objectify_from_table):
@@ -1046,12 +1046,12 @@ class Database():
 		# WAS SUCCESSFUL! DECLARE SO!
 		self.reset_time_idle()
 		return result
-	
+
 	def execute_payload(self, payload: DSA) -> list[Any]:
 		""" Execute SQL Statement from `dict` payload. """
 
 		routine: Callable[..., Any]
-		
+
 		if (payload.get("queries")):
 			routine = self.execute_multiple
 		else:
@@ -1076,6 +1076,7 @@ class Database():
 		result = dict(
 			(fetched_column_names[i], ms_result[i])
 			for i in range(len(fetched_column_names)) )
+
 		print(fetched_column_names)
 		print(result)
 
@@ -1093,7 +1094,7 @@ class Database():
 		return [
 			self.objectify_result(v, table_name, column_names)
 			for v in results ]
-	
+
 
 
 	@classmethod
@@ -1106,13 +1107,13 @@ class Database():
 		pswd: str | None = getenv(ENVStrucutre.pswd)
 		schm: str | None = getenv(ENVStrucutre.schm)
 
-		to_assert: list[str | None] = [host, prt_, user, pswd, schm]	
-		
+		to_assert: list[str | None] = [host, prt_, user, pswd, schm]
+
 		assert (host and prt_ and user and pswd and schm), (
 			"Load from env missing params: "
 			",".join(str(v) for v in to_assert if not v))
-			
-		
+
+
 		port: int = -1
 		try: port = int(prt_)
 		except: ValueError("Port must be convertable to int.")

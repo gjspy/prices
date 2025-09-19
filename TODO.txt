@@ -1,0 +1,19 @@
+make an interface for the parsers of api responses. define waht methods exist and are ready to be overwritten from the superclass.
+
+class ParserInterface():
+	def load_data():
+		"""This is the llading data"""
+
+
+class Parser(parserInterface):
+	def __init__():
+
+
+class GraphQLParser(Parser):
+	...
+
+
+for CMP: User.name in ("Bob", "James")
+and NOT keyword, look at other dunder methods. (__invert__?)
+
+LIKE keyword: eg Name LIKE '%i%' = any record including the letter i.
