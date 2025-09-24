@@ -1,0 +1,52 @@
+{
+	"requests": [
+		{
+			"query": "cheese",
+			"indexName": "ASDA_PRODUCTS",
+			"clickAnalytics": false,
+			"analytics": false,
+			"hitsPerPage": 100,
+			"page": 0,
+			"typoTolerance": true,
+			"removeWordsIfNoResults": "allOptional",
+			"attributesToRetrieve": [
+				"STATUS",
+				"BRAND",
+				"CIN",
+				"NAME",
+				"AVG_RATING",
+				"RATING_COUNT",
+				"ICONS",
+				"PRICES.EN",
+				"SALES_TYPE",
+				"MAX_QTY",
+				"STOCK.4565",
+				"IS_FROZEN",
+				"IS_BWS",
+				"PROMOS.EN",
+				"LABEL",
+				"LABEL_START_DATE",
+				"LABEL_END_DATE",
+				"IS_SPONSORED",
+				"PRODUCT_TYPE",
+				"CIN_ID",
+				"PRIMARY_TAXONOMY",
+				"IMAGE_ID",
+				"PACK_SIZE",
+				"PHARMACY_RESTRICTED",
+				"CS_YES",
+				"CS_TEXT",
+				"IS_FTO",
+				"PURCHASE_START_DATE_FTO",
+				"PURCHASE_END_DATE_FTO",
+				"DELIVERY_SLOT_START_DATE_FTO",
+				"END_DATE",
+				"START_DATE",
+				"SIZE_DESC",
+				"REWARDS",
+				"SHOW_PRICE_CS",
+				"ID"
+			]
+		}
+	]
+}
