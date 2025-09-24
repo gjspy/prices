@@ -82,7 +82,7 @@ class BaseCollector:
 
 
 class AlgoliaCollector(BaseCollector):
-	def __init__(self, config: dict[str, str], algolia_index_name: str):
+	def __init__(self, config: dict[str, str], algolia_index_name: str, store: str):
 
 		super().__init__(config)
 
@@ -93,6 +93,7 @@ class AlgoliaCollector(BaseCollector):
 			"x-algolia-application-id": config["ASDA_ALGOLIA_API_APP"]
 		}
 
+		self.store = store
 		self.algolia_index_name = algolia_index_name
 		self._base_search_request = {
 			"requests": [
@@ -159,6 +160,54 @@ class AlgoliaCollector(BaseCollector):
 
 		return v
 
+
+	def process_promo(self, result: dict[str, Any]) -> dict[str, Any]:
+		prices_data: dict[str, str] | None = safe_deepget(result, self.prices_from_result)
+
+		if (prices_data):
+			offer_type = prices_data.get("OFFER")
+
+			if (offer_type and offer_type != "List"):
+				# Rollback, Dropped
+				return {
+					"offer_type": prices_data["OFFER"],
+					"was_price": prices_data["WASPRICE"] * 100
+				}
+		
+		# TODO CAN THEY DO ROLLBACK AND ANY X FOR????
+		promo_data: dict[str, str] | None = safe_deepget(result, self.promo_from_result)
+
+		if (not promo_data): return {}
+		
+		offer_value = promo_data["NAME"]
+
+		# IS "Any X for £X"
+		match = re.match(r"Any (\d+) for ((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p))", offer_value) # TYPE 15
+
+		if (match):
+			groups = match.groups()
+
+			return {
+				"offer_type": "_AnyFor",
+				"any_count": int(groups[0]),
+				"for_price": convert_str_to_pence(groups[1]),
+				"store_given_id": promo_data["ID"] # CAN MIX AND MATCH OTHER PRODUCTS
+			}
+		
+		# TODO: REFER BY TYPE
+		# PROMOS.EN.TYPE
+		#	= 15 -> Any X
+		#	= 12 -> Meal Deal
+		
+		# TODO: LOG THIS
+		return {
+			"offer_type": offer_value,
+			"start_date": promo_data.get("START_DATE"),
+			"end_date": promo_data.get("END_DATE"), # TODO: THESE ARE UNIX STAMPS.
+			"store_given_id": promo_data.get("ID")
+		}
+
+
 	def parse_packsize(self, packsize: str) -> tuple[int, int | float, str]:
 		packsize = packsize.upper()
 
@@ -166,9 +215,11 @@ class AlgoliaCollector(BaseCollector):
 		if (multi):
 			count, size_each, unit = multi.groups()
 
-			if (unit): # THEY GIVE "2L" OR "8X330". NO UNIT ON MULTIs. IN ADMIN PANEL, WRITE THEM.
+			if (unit): # TODO THEY GIVE "2L" OR "8X330". NO UNIT ON MULTIs. IN ADMIN PANEL, WRITE THEM.
 				size_, unit_ = split_packsize(size_each, unit)
 				return (int(count), size_, unit_)
+			
+			return (int(count), float(size_each), "")
 
 
 		size, unit = split_packsize(packsize)
@@ -179,50 +230,34 @@ class AlgoliaCollector(BaseCollector):
 
 
 	def get_storable_from_result(self, result: dict[str, Any]) -> dict[str, Any]:
-		prices_data: dict[str, str] | None = safe_deepget(result, self.prices_from_result)
-		promo_data: dict[str, str] | None = safe_deepget(result, self.promo_from_result)
-		offer = {}
-
-		if (prices_data):
-			offer_type = prices_data.get("OFFER")
-
-			if (offer_type and offer_type != "List"):
-				# Rollback, Dropped
-				offer = {
-					"offer": prices_data["OFFER"],
-					"was_price": prices_data["WASPRICE"]
-				}
-
-		elif (promo_data):
-			offer_value = promo_data["NAME"]
-			match = re.match(r"Any (\d+) for ((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p))", offer_value)
-
-			if (match):
-				groups = match.groups()
-
-				offer = {
-					"offer": "_AnyFor",
-					"any_count": int(groups[0]),
-					"for_price": convert_str_to_pence(groups[1]),
-					"id": promo_data["ID"] # CAN MIX AND MATCH OTHER PRODUCTS
-				}
-			else: print("NO MATCH FOR ANY X FOR X", offer_value)
-
-
+		count, size_each, unit = self.parse_packsize(result["PACKSIZE"])
+		image_id = result["IMAGE_ID"]
 
 		return {
 			"product": {
-				"upc": int_safe(result["IMAGE_ID"]),
 				"brand_name": result["BRAND"],
 				"name": result["NAME"],
-				"pack_size": result["PACK_SIZE"],
+				"packsize": {
+					"count": count,
+					"sizeeach": size_each,
+					"unit": unit
+				}
+			},
+			"image": {
+				"url": f"https://asdagroceries.scene7.com/is/image/asdagroceries/{image_id}"
+				# ASDA IMAGES DO NOT HAVE ICONS!!
+			},
+			"link": {
+				"upc": int_safe(image_id),
+				"store": self.store,
+				"cin": int_safe(result["CIN"])
 			},
 			"price": {
-				"price_pence": int(result["PRICES"]["EN"]["Price"]) * 100,
-				"was_price": result["PRICES"]["EN"].get("WASPRICE"),
+				"price_pence": int(result["PRICES"]["EN"]["PRICE"]) * 100,
+				#"was_price": result["PRICES"]["EN"].get("WASPRICE"), now in offer
 				"available": result["STATUS"] == "A" # NOT STOCK LEVELS. THEY'RE PER STORE.
 			},
-			"offer": offer,
+			"offer": self.process_promo(result),
 			"rating": {
 				"avg": result["AVG_RATING"],
 				"count": result["RATING_COUNT"]
@@ -239,17 +274,17 @@ class AlgoliaCollector(BaseCollector):
 	def parse_data(self, data: dict[str, Any]) -> list[dict[str, Any]]:
 		results: list[dict[str, Any]] | None
 		results = safe_deepget(data, self.results_path)
-
-		if (not results): return ...
+		print(results,"RESIL")
+		if (not results): return []
 
 		clean_datas: list[dict[str, Any]] = []
 
 		for result in results:
-			try:
+			#try:
 				clean_datas.append(self.get_storable_from_result(result))
-			except Exception as err:
-				... # LOG, FIGURE LOGGING OUT
-				print(err)
+			#except Exception as err:
+				#... # LOG, FIGURE LOGGING OUT
+			#	print(err,"err")
 			
 		return clean_datas
 			
@@ -262,6 +297,7 @@ class AlgoliaCollector(BaseCollector):
 
 		result = await self._post(body = req_body)
 		data = result.json()
+		print(data)
 
 		storables = self.parse_data(data)
 

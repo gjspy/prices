@@ -75,6 +75,10 @@ def int_safe(value: Any) -> int | None:
 
 
 def convert_str_to_pence(value: str) -> int:
+	if type(value) == int: # type: ignore [JUST IN CASE]
+		print(f"assuming int value is £ {value}")
+		return value * 100 # pence
+	
 	if ("£" in value): return int(float(value.replace("£", "")) * 100)
 	if ("p" in value): return int(value.replace("p", ""))
 

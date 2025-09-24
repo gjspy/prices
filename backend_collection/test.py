@@ -1,5 +1,6 @@
-#from dbmanager.DBManager.engine import Database, Table, TableRow, TableColumn
-#from dbmanager.DBManager.process import DBThread
+from collectors.basecollector import AlgoliaCollector
+from dotenv import dotenv_values
+import asyncio
 import logging
 from dotenv import load_dotenv
 from datetime import datetime
@@ -8,8 +9,10 @@ import os, sys
 
 sys.path.insert(0, r"C:\Users\ABC\CThings\prices")
 
-from dbmanager.engine import TableRow, TableColumn, Database, Table
-from dbmanager.misc import flatten
+from dbmanager.engine import Database
+from dbmanager.process import DBThread
+import dbclasses as objs
+from collectors.storagemanager import StorageManager
 
 load_dotenv()
 
@@ -34,70 +37,73 @@ logger.setLevel(logging.DEBUG)
 console = logging.StreamHandler()
 logger.addHandler(console)
 
-class Transaction(TableRow):
-	table_name = "Transactions"
 
-	db_id = TableColumn("ID", int, autoincrement = True)
-	user = TableColumn("UID", int, True)
-	cost = TableColumn("Cost", float, True)
-
-	pkeys = ["ID"]
-
-
-class User(TableRow):
-	table_name = "Test"
-
-	db_id = TableColumn("ID", int, autoincrement = True)
-	name = TableColumn("UName", str, True)
-	age = TableColumn("Age", int, True)
-	balance = TableColumn("BankBalance", float)
-	created = TableColumn("AccountCreated", datetime)
-	most_recent_transaction = TableColumn("MostRecentTransaction", int)
-
-	pkeys = ["ID"]
+# TODO: categories
+# TODO: logging and error catching
+# TODO: check todos
+# TODO: look at more product cases, see how code responds, different offer types
+# TODO: check stability
+# TODO: PARTIAL DB OBJECTS
 
 
-User.most_recent_transaction.joins = Transaction.db_id
-Transaction.user.joins = User.db_id
+CONFIG = dotenv_values(".config")
 
 
-Users = Table("Test", User)
-Transactions = Table("Transactions", Transaction)
+async def main(tunnel: sshtunnel.SSHTunnelForwarder):
+	db = Database(
+		DB_HOST, tunnel.local_bind_port, DB_SCHM, DB_USER, DB_PASS, logger # type: ignore
+	)
+
+	db.declare_table_row_models(
+		objs.Product, objs.ProductLink, objs.PriceEntry, objs.Offer,
+		objs.Rating, objs.Image
+	)
+
+	db.connect()
+	print("connected:", db.is_connected)
+
+	DB_PROCESS = DBThread(logger, db, asyncio.get_event_loop())
+	DB_PROCESS.start()
+
+	this_manager = StorageManager(DB_PROCESS, {
+		"link": {
+			"upc": 1010101
+		}
+	})
+
+	await this_manager.query_product_exists()
+
+	db.disconnect()
+
+	return
+
+	collector = AlgoliaCollector(CONFIG, "ASDA_PRODUCTS", "ASDA")
+
+	storables = await this.search("cheese")
+	print("res",storables)
+
+	print("\n\n\n\n")
+
+	for r in storables:
+		print(r)
 
 
-new_user: User = User.from_dict({
-	"name": "Bob",
-	"age": 12,
-	"balance": 1.1,
-	"created": datetime(2025, 7, 1)
-})
 
 
-creation_payload = Users.insert(new_user)
 
-print(creation_payload)
 
-select = Users.select(
-	((User.db_id == 1) & (User.name == "Bob")) | (User.created >= datetime(2025, 6, 2)),
-	True, limit = 5000,
-	order_by = [User.age, User.created.ascending]
-) # TODO: TEST THIS SELECT, THEN CLEAN IT? THEN DONE?
-
-print(select)
 
 
 with sshtunnel.SSHTunnelForwarder(
 		(SSH_HOST, int(SSH_PORT)), ssh_username = SSH_USER, ssh_pkey = SSH_KEY,
 		remote_bind_address = (DB_HOST, int(DB_PORT))) as tunnel:
+
+	assert tunnel
 	print("tunnel active: ", tunnel and tunnel.is_active)
+
+	asyncio.run(main(tunnel))
 	
-	db = Database(
-		DB_HOST, tunnel.local_bind_port, DB_SCHM, DB_USER, DB_PASS, logger
-	)
-
-	db.declare_table_row_model(User)
-	db.declare_table_row_model(Transaction)
-
+	"""
 	print(db.config)
 
 	db.connect()
@@ -146,8 +152,4 @@ with sshtunnel.SSHTunnelForwarder(
 
 	db.disconnect()
 
-
-
-
-
-
+	"""

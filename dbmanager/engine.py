@@ -5,7 +5,7 @@ from functools import wraps
 from copy import copy
 from os import getenv
 
-from typing import Any, Callable, Self
+from typing import Any, Callable, Self, Type
 
 import mysql.connector
 from mysql.connector import Error as MySQLError
@@ -18,7 +18,7 @@ from mysql.connector.pooling import PooledMySQLConnection
 from dbmanager.misc import (
 	Errors, ExecutionException, ASCENDING_SQL, DESCENDING_SQL, ENVStrucutre,
 	flatten)
-from dbmanager.types import O, P, QP, DSA, DST, DSS
+from dbmanager.types import O, P, T, QP, DSA, DST, DSS
 
 
 FATAL_ERROR_CODES: list[int] = [2006, 2013, 2055]
@@ -361,7 +361,7 @@ class TableRow(metaclass = TableRowMeta):
 		"""
 		result: DSA = vars(self)
 
-		for k in copy(result.keys()):
+		for k in copy(list(result.keys())): # IS .keys() A GENERATOR? MIGHT CHANGE WHILE ITERATING
 			if (not k.startswith("_")): continue
 
 			# TODO: handle joined tables
@@ -432,6 +432,8 @@ class TableRow(metaclass = TableRowMeta):
 		return this
 
 
+	def _db_value_to_py(self, db_value: Any, required_type: type) -> Any:
+		if (required_type == bool and (db_value == 1 or db_value == 0)): ... # TODO
 
 	@classmethod
 	def from_dict(cls, data: DSA) -> Self:
@@ -468,10 +470,20 @@ class TableRow(metaclass = TableRowMeta):
 				continue
 
 			required_type = col_types[py_prop]
+			got_type: type[Any] = type(v) # type: ignore
+
+			print(required_type, got_type)
+
+			if (got_type != required_type):
+				try:
+					print(got_type(v))
+					v = required_type(v)
+					got_type = type(v) # type: ignore
+				except: pass
 
 			# STRICT TYPE CONTROL, RAISE EXCEPTION
-			assert required_type == Any or type(v) == required_type, \
-				f"dict key {db_col} value type {type(v)} does not match required {required_type}"
+			assert required_type == Any or got_type == required_type, \
+				f"dict key {db_col} value type {got_type} does not match required {required_type}"
 
 			del data[key] # PREVENTS CIRCULAR REFERENCES
 
@@ -847,9 +859,9 @@ class Database():
 	def declare_table_row_model(self, table_row: type[TableRow]):
 		self._table_row_models[table_row.table_name] = table_row
 
-	def declare_table_row_models(self, *rows: list[type[TableRow]]):
+	def declare_table_row_models(self, *rows: type[TableRow]):
 		for row in rows:
-			self.declare_table_row_models(row)
+			self.declare_table_row_model(row)
 
 
 
