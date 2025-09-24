@@ -33,18 +33,11 @@ class StorageManager():
 			return
 
 		self._db_thread.stage(query, future)
-		async with asyncio.timeout(5): # SEE ABT THIS! JUST FOR TESTING RN? TODO
-			result = await future
+		#async with asyncio.timeout(5): # SEE ABT THIS! JUST FOR TESTING RN? TODO
+		db_response = await future
 
-		a = result[0]
-		a: objs.ProductLink
+		if (len(db_response))
 
-		a.cin
-
-		print("HELLO")
-		print(a.to_dict())
-		print(a.product_id)
-		print("EEEEE")
 
 
 

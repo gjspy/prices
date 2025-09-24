@@ -44,6 +44,16 @@ logger.addHandler(console)
 # TODO: look at more product cases, see how code responds, different offer types
 # TODO: check stability
 # TODO: PARTIAL DB OBJECTS
+# TODO: typechecking errors around Product().name = "hi", how does this work btw?
+# TODO fix joins
+
+"""
+class Product(TableRow):
+	product_id = tablecol..
+
+Product.product = Product.product_id.joins ? or smth?
+
+"""
 
 
 CONFIG = dotenv_values(".config")

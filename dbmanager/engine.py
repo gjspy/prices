@@ -5,7 +5,7 @@ from functools import wraps
 from copy import copy
 from os import getenv
 
-from typing import Any, Callable, Self, Type
+from typing import Any, Callable, Self, Type, Generic
 
 import mysql.connector
 from mysql.connector import Error as MySQLError
@@ -91,15 +91,15 @@ class CMP():
 		self.b = b
 		self.symbol = symbol
 	
-	def _convert_to_str(self, v: Any) -> str:
+	def _convert_to_str(self, v: Any | "TableColumn[Any]") -> str:
 		if (isinstance(v, datetime)):
 			v = f"{v.strftime(SQL_DATETIME_FMT)}"
 		
 		if (not isinstance(v, TableColumn) and not isinstance(v, CMP)):
 			v = f"\'{v}\'" # MUST RUN FOR DATETIME TOO.
 		
-		if (not type(v) == str): # int, str, float, TableColumn
-			v = str(v)
+		if (not isinstance(v, str)): # int, str, float, TableColumn
+			v = str(v) # type: ignore
 		
 		return v
 	
@@ -319,12 +319,12 @@ class TableRow(metaclass = TableRowMeta):
 
 
 	@classmethod
-	def list_column_objs(cls) -> list["TableColumn"]:
+	def list_column_objs(cls) -> list["TableColumn[Any]"]:
 		return [
 			getattr(cls, v) for v in cls.get_py_fields() if hasattr(cls, v)]
 
 	@classmethod
-	def get_column(cls, py_field: str) -> "TableColumn":
+	def get_column(cls, py_field: str) -> "TableColumn[Any]":
 		return getattr(cls, py_field)
 
 
@@ -417,7 +417,7 @@ class TableRow(metaclass = TableRowMeta):
 
 
 	@classmethod
-	def partial_from_id(cls, id_: Any, column: "TableColumn") -> Self:
+	def partial_from_id(cls, id_: Any, column: "TableColumn[Any]") -> Self:
 		this = cls()
 
 		db_fields = cls.get_db_fields()
@@ -515,9 +515,9 @@ class TableRow(metaclass = TableRowMeta):
 
 
 
-class TableColumn():
+class TableColumn(Generic[T]):
 	def __init__(
-			self, db_field: str, py_type: type,
+			self, db_field: str, py_type: Type[T],
 			required: bool = False, autoincrement: bool = False):
 		self._db_field: str = db_field
 		self._py_type: type = py_type
@@ -525,7 +525,7 @@ class TableColumn():
 		self.autoincrement = autoincrement
 
 		self._table_row_model: type[TableRow]
-		self._relationship: TableColumn | None = None
+		self._relationship: TableColumn[Any] | None = None
 
 
 
@@ -545,7 +545,7 @@ class TableColumn():
 	def joins(self): return self._relationship
 
 	@joins.setter
-	def joins(self, other: "TableColumn"):
+	def joins(self, other: "TableColumn[Any]"):
 		self._relationship = other
 
 
@@ -624,7 +624,7 @@ class Table():
 		self._joins = []
 
 		for field in new_row_model.get_py_fields().keys():
-			column: TableColumn | None = None
+			column: TableColumn[Any] | None = None
 
 			try: column = getattr(new_row_model, field)
 			except: pass
@@ -639,7 +639,7 @@ class Table():
 	def select(
 			self, condition: CMP | None = None, join_all: bool = False,
 			join_on: list[Join] = [], limit: int = 1000,
-			order_by: list[str | TableColumn] = []) -> DSA:
+			order_by: list[str | TableColumn[Any]] = []) -> DSA:
 		"""
 		### Build `SELECT` STATEMENT. ###
 
