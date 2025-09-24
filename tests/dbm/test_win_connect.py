@@ -116,7 +116,7 @@ with sshtunnel.SSHTunnelForwarder(
 	# actual work.
 	
 	db.disconnect()
-	raise
+
 	response = db.execute_payload(creation_payload)
 
 	print(response)

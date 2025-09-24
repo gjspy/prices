@@ -83,7 +83,6 @@ def db_error_catcher_rethrows(func: Callable[P, O]) ->  Callable[P, O | None]:
 	return wrapper # type: ignore
 
 
-
 class CMP():
 	""" Class used to help define query statements. """
 
@@ -91,20 +90,25 @@ class CMP():
 		self.a = a
 		self.b = b
 		self.symbol = symbol
+	
+	def _convert_to_str(self, v: Any) -> str:
+		if (isinstance(v, datetime)):
+			v = f"{v.strftime(SQL_DATETIME_FMT)}"
+		
+		if (not isinstance(v, TableColumn) and not isinstance(v, CMP)):
+			v = f"\'{v}\'" # MUST RUN FOR DATETIME TOO.
+		
+		if (not type(v) == str): # int, str, float, TableColumn
+			v = str(v)
+		
+		return v
+	
 
 	def __str__(self) -> str:
-		a = self.a
-		b = self.b
+		a = self._convert_to_str(self.a)
+		b = self._convert_to_str(self.b)
 
-		if (isinstance(a, datetime)): a = f"{a.strftime(SQL_DATETIME_FMT)}"
-		if (isinstance(b, datetime)): b = f"{b.strftime(SQL_DATETIME_FMT)}"
-
-		if (not isinstance(a, TableColumn) and not isinstance(a, CMP)):
-			a = f"\'{a}\'"
-		if (not isinstance(b, TableColumn) and not isinstance(b, CMP)):
-			b = f"\'{b}\'"
-
-		# int, str, float, TableColumn
+		
 		return f"({a}{self.symbol}{b})"
 
 	# BITWISE OPERATIONS BEING OVERWRITTEN!
@@ -114,6 +118,22 @@ class CMP():
 
 	def __or__(self, value: object) -> "CMP": # type: ignore
 		return CMP(self, value, " OR ")
+	
+	def __invert__(self) -> "CMP":
+		return NOT(self)
+
+
+
+class NOT(CMP):
+	def __init__(self, value: Any):
+		self.a = value
+	
+	def __str__(self) -> str:
+		a = self._convert_to_str(self.a)
+
+		return f"NOT ({a})"
+
+
 
 
 class Join():
@@ -523,6 +543,9 @@ class TableColumn():
 	# WHEN INSTANTIATED, TableColumn OBJECTS ARE REMOVED.
 	# NEVER COMPARED TOGETHER, ONLY USED TO FORM SELECT STATEMENTS.
 
+	def in_(self, objects: list[Any]) -> CMP:
+		return CMP(self, objects, "IN")
+
 	def __eq__(self, value: object) -> CMP: # type: ignore
 		return CMP(self, value, "=")
 
@@ -824,6 +847,10 @@ class Database():
 	def declare_table_row_model(self, table_row: type[TableRow]):
 		self._table_row_models[table_row.table_name] = table_row
 
+	def declare_table_row_models(self, *rows: list[type[TableRow]]):
+		for row in rows:
+			self.declare_table_row_models(row)
+
 
 
 	def test_connection(self):
@@ -859,7 +886,10 @@ class Database():
 
 	@db_error_safe_catcher
 	def connect(self) -> bool:
-		""" Connect to the database, returning bool of success. """
+		"""
+		Connect to the database, returning bool of success.
+		If already connected, disconnects before reconnecting.
+		"""
 
 		if (self._connection): self.disconnect()
 
@@ -873,10 +903,12 @@ class Database():
 	@db_error_safe_catcher
 	def disconnect(self):
 		""" Disconnect from the database """
-		if (not self._connection): return
+		if (not self._connection):
+			self._is_connected = False
+			return
 
 		self._connection.close()
-		self._is_connected = False
+		self._is_connected = False # ONLY RUNS IF .close() DOES NOT ERROR
 
 
 
@@ -889,9 +921,9 @@ class Database():
 			#dictionary = True,
 			buffered = buffered)
 
-		# can't use dict, as it doesnt allow for
-		# duplicate column names, eg Table1.ID and Table2.ID,
-		# dict key ID only points to Table2.ID.
+		# CAN'T USE DICT MODE, DOESN'T ALLOW FOR
+		# DUPLICATE COLUMN NAMES, EG Table1.ID AND Table2.ID,
+		# DICT KEY PRODUCED = "ID", ONLY PROVIDES Table2.ID
 
 
 
@@ -1105,7 +1137,7 @@ class Database():
 		prt_: str | None = getenv(ENVStrucutre.port)
 		user: str | None = getenv(ENVStrucutre.user)
 		pswd: str | None = getenv(ENVStrucutre.pswd)
-		schm: str | None = getenv(ENVStrucutre.schm)
+		schm: str | None = getenv(ENVStrucutre.schm) # TODO: dotenv_values
 
 		to_assert: list[str | None] = [host, prt_, user, pswd, schm]
 
