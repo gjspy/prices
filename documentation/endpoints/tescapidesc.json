@@ -1,0 +1,3966 @@
+{
+	"description": "Tesco application data schema",
+	"id": "bertie.json",
+	"schema": "http://json-schema.org/draft-07/schema",
+	"title": "bertie",
+	"type": "object",
+	"version": "7.0.5",
+	"definitions": {
+		"bertie": {
+			"event": {
+				"additionalProperties": false,
+				"type": "object",
+				"title": "bertieCore",
+				"description": "Core meta data that should be supplied with all data objects. Identify what the data is.",
+				"required": [
+					"bertieVersion",
+					"ref",
+					"bertieTimeStamp",
+					"atrc"
+				],
+				"allOf": [
+					{
+						"if": {
+							"properties": {
+								"sampleRate": {
+									"maximum": 1
+								}
+							},
+							"required": [
+								"sampleRate"
+							]
+						},
+						"then": {
+							"required": [
+								"sampleReason"
+							]
+						}
+					},
+					{
+						"if": {
+							"properties": {
+								"sampleRate": {
+									"exclusiveMinimum": 0
+								}
+							},
+							"required": [
+								"sampleRate"
+							]
+						},
+						"then": {
+							"required": [
+								"sampleReason"
+							]
+						}
+					}
+				],
+				"properties": {
+					"bertieVersion": {
+						"type": "string",
+						"description": "The version of bertie schema data is compatible with",
+						"examples": [
+							"3.2.3",
+							"7.0.1"
+						]
+					},
+					"bertieTimeStamp": {
+						"$ref": "#/definitions/misc/timeStamp"
+					},
+					"atrc": {
+						"type": "string",
+						"description": "Anonymous cookie identifying this device or browser. Should be created on the server and persisted on the device."
+					},
+					"ref": {
+						"type": "string",
+						"description": "The title of the event"
+					},
+					"contextFragment": {
+						"type": "boolean",
+						"description": "Denotes whether the event is being transmitted singly and required combining with other events downstream for context."
+					},
+					"sourceTraceId": {
+						"type": [
+							"string",
+							"null"
+						],
+						"description": "traceId from originating application which allows for recombination separately transmitted events",
+						"examples": [
+							"09235-sdjnfw-4554635824039302-sdksjd"
+						]
+					},
+					"sampleRate": {
+						"type": [
+							"number",
+							"null"
+						],
+						"exclusiveMinimum": 0,
+						"maximum": 1,
+						"description": "Used alongside sampleReason to describe the rate of sampling used if not the norm for this application",
+						"examples": [
+							0.1,
+							0.5,
+							0.115
+						]
+					},
+					"sampleReason": {
+						"type": [
+							"string",
+							"null"
+						],
+						"description": "Used alongside sampleRate to describe why sample rate is different to the norm for this application"
+					},
+					"country": {
+						"type": [
+							"string",
+							"null"
+						],
+						"description": "Uppercase ISO country code descriptor for country to which this application is served",
+						"examples": [
+							"GB, IE, CZ"
+						]
+					},
+					"accountOp": {
+						"$ref": "#/definitions/bertie/customer/accountOp"
+					},
+					"customerData": {
+						"$ref": "#/definitions/bertie/customer/customerData"
+					},
+					"basicOp": {
+						"$ref": "#/definitions/bertie/action/basicOp"
+					},
+					"pageData": {
+						"$ref": "#/definitions/bertie/page/pageData"
+					},
+					"searchData": {
+						"$ref": "#/definitions/bertie/page/searchData"
+					},
+					"filterOp": {
+						"$ref": "#/definitions/bertie/page/filterOp"
+					},
+					"renderedExperimentOp": {
+						"$ref": "#/definitions/bertie/page/renderedExperimentOp"
+					},
+					"renderedContentOp": {
+						"$ref": "#/definitions/bertie/page/renderedContentOp"
+					},
+					"impressedContentOp": {
+						"$ref": "#/definitions/bertie/page/impressedContentOp"
+					},
+					"contentInteractOp": {
+						"$ref": "#/definitions/bertie/page/contentInteractOp"
+					},
+					"basketOp": {
+						"$ref": "#/definitions/bertie/basket/basketOp"
+					},
+					"basketData": {
+						"$ref": "#/definitions/bertie/basket/basketData"
+					},
+					"orderData": {
+						"$ref": "#/definitions/bertie/basket/orderData"
+					},
+					"couponOp": {
+						"$ref": "#/definitions/bertie/basket/couponOp"
+					},
+					"slotOp": {
+						"$ref": "#/definitions/bertie/basket/slotOp"
+					},
+					"impressedSlotOp": {
+						"$ref": "#/definitions/bertie/basket/impressedSlotOp"
+					},
+					"productOp": {
+						"$ref": "#/definitions/bertie/product/productOp"
+					},
+					"platformData": {
+						"$ref": "#/definitions/bertie/platform/platformData"
+					},
+					"triggerFunction": {
+						"$ref": "#/definitions/bertie/platform/triggerFunction"
+					},
+					"errorOp": {
+						"$ref": "#/definitions/bertie/platform/errorOp"
+					}
+				},
+				"anyOf": [
+					{
+						"required": [
+							"accountOp"
+						]
+					},
+					{
+						"required": [
+							"customerData"
+						]
+					},
+					{
+						"required": [
+							"basicOp"
+						]
+					},
+					{
+						"required": [
+							"pageData"
+						]
+					},
+					{
+						"required": [
+							"searchData"
+						]
+					},
+					{
+						"required": [
+							"filterOp"
+						]
+					},
+					{
+						"required": [
+							"renderedExperimentOp"
+						]
+					},
+					{
+						"required": [
+							"renderedContentOp"
+						]
+					},
+					{
+						"required": [
+							"impressedContentOp"
+						]
+					},
+					{
+						"required": [
+							"contentInteractOp"
+						]
+					},
+					{
+						"required": [
+							"basketOp"
+						]
+					},
+					{
+						"required": [
+							"basketData"
+						]
+					},
+					{
+						"required": [
+							"orderData"
+						]
+					},
+					{
+						"required": [
+							"couponOp"
+						]
+					},
+					{
+						"required": [
+							"slotOp"
+						]
+					},
+					{
+						"required": [
+							"impressedSlotOp"
+						]
+					},
+					{
+						"required": [
+							"productOp"
+						]
+					},
+					{
+						"required": [
+							"platformData"
+						]
+					},
+					{
+						"required": [
+							"triggerFunction"
+						]
+					},
+					{
+						"required": [
+							"errorOp"
+						]
+					}
+				]
+			},
+			"schema-error": {
+				"additionalProperties": false,
+				"type": "object",
+				"title": "bertieCore",
+				"description": "used in cases where the event does not conform to the expected schema",
+				"required": [
+					"bertieType"
+				],
+				"properties": {
+					"bertieType": {
+						"type": "string",
+						"description": "The type name of the data being presented",
+						"enum": [
+							"accountOp",
+							"customerData",
+							"basicOp",
+							"pageData",
+							"searchData",
+							"filterOp",
+							"renderedExperimentOp",
+							"renderedContentOp",
+							"impressedContentOp",
+							"contentInteractOp",
+							"basketOp",
+							"basketData",
+							"orderData",
+							"couponOp",
+							"slotOp",
+							"impressedSlotOp",
+							"productOp",
+							"platformData",
+							"triggerFunction",
+							"errorOp"
+						]
+					}
+				}
+			},
+			"customer": {
+				"accountOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "Actions associated with an account such as loggin in",
+					"examples": [
+						"../examples/accountOp.json"
+					],
+					"required": [
+						"bertieType",
+						"interactionType"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"accountOp"
+							]
+						},
+						"interactionType": {
+							"type": "string",
+							"description": "defines the type of interaction that occurred",
+							"enum": [
+								"authenticated",
+								"validated",
+								"account created",
+								"account updated",
+								"clubcard scanned",
+								"clubcard typed",
+								"booker card scanned",
+								"booker card typed"
+							]
+						},
+						"customer": {
+							"$ref": "#/definitions/bertie/customer/customerData"
+						}
+					}
+				},
+				"customerData": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "Holds data defining a customer or user account",
+					"examples": [
+						"../examples/customerData.json"
+					],
+					"required": [
+						"bertieType"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"customerData"
+							]
+						},
+						"UUID": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "UUID of the customer from Identity service",
+							"examples": [
+								"trn:tesco:uid:uuid:7a97c8ad-421e-41f7-9fad-33f1917e49ch"
+							],
+							"pattern": "^(trn:tesco:[\\\\w]+:uuid:|)(([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+))$"
+						},
+						"legacyId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "ID of a local or legacy system that may be relevant to the digital property",
+							"examples": [
+								"123456788"
+							]
+						},
+						"store": {
+							"$ref": "#/definitions/misc/storeData"
+						},
+						"userRole": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "Description of the users role as interpreted and actioned by the application UI. Only relevant if the UI gives a different experience for different user groups."
+						},
+						"activeOrders": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "The number of orders currently pending delivery/collection that are still able to be amended/altered."
+						},
+						"customerFlag": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"properties": {
+								"authenticatedLogin": {
+									"type": "boolean",
+									"description": "Identifies if user is currently authenticated"
+								},
+								"authenticationMethod": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "Identifies the method used to authenticate",
+									"examples": [
+										"touch id"
+									]
+								},
+								"authenticatedVerified": {
+									"type": [
+										"boolean",
+										"null"
+									],
+									"description": "Identifies if user has completed additional 2 layer verification"
+								},
+								"verificationType": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "Identifies the method used to verify the account",
+									"enum": [
+										"sms otp",
+										"clubcard number",
+										"sso",
+										null
+									]
+								},
+								"amendMode": {
+									"type": [
+										"boolean",
+										"null"
+									],
+									"description": "Identifies if user is currently amending an order"
+								},
+								"amendStart": {
+									"type": [
+										"boolean",
+										"null"
+									],
+									"description": "Identifies the page load/screen load at which a user first enters amend mode"
+								},
+								"firstTimeShopperLocal": {
+									"type": [
+										"boolean",
+										"null"
+									],
+									"description":"Identifies if the user is placing an order for the first time on this business unit. Should remain \'true\' on order confirmation."
+								},
+								"firstTimeShopperGlobal": {
+									"type": [
+										"boolean",
+										"null"
+									],
+									"description":"Identifies if the user is placing an order for the first time across all of Tesco estate. Should remain \'true\' on order confirmation."
+								},
+								"segment": {
+									"type": [
+										"array",
+										"null"
+									],
+									"description": "Defines the customer level segments that this customer is currently part of",
+									"items": {
+										"$ref": "#/definitions/misc/segment"
+									}
+								},
+								"subscription": {
+									"additionalProperties": false,
+									"type": [
+										"object",
+										"null"
+									],
+									"title": "subscription",
+									"description": "Descibes which subscriptions this customer has against their account",
+									"examples": [
+										"../examples/customerData.json#/customerFlag/subscription"
+									],
+									"properties": {
+										"totalSubs": {
+											"type": "integer",
+											"description": "count of the number of subscriptions that this customer has active"
+										},
+										"deliverySaver": {
+											"additionalProperties": false,
+											"type": [
+												"object",
+												"null"
+											],
+											"description": "data about the delivery saver subscription",
+											"properties": {
+												"subscriptionId": {
+													"type": [
+														"string",
+														"null"
+													],
+													"description": "ID for this subscription",
+													"examples": [
+														"abc123def456"
+													]
+												}
+											}
+										},
+										"clubcardPlus": {
+											"additionalProperties": false,
+											"type": [
+												"object",
+												"null"
+											],
+											"description": "data about the Clubcard Plus subscription",
+											"properties": {
+												"subscriptionId": {
+													"type": [
+														"string",
+														"null"
+													],
+													"description": "ID for this subscription",
+													"examples": [
+														"abc123def456"
+													]
+												},
+												"planStatus": {
+													"type": [
+														"string",
+														"null"
+													],
+													"description": "the status of the current plan",
+													"enum": [
+														"no plan",
+														"active",
+														"cancelled",
+														"suspended",
+														null
+													]
+												},
+												"benefit": {
+													"type": [
+														"array",
+														"null"
+													],
+													"description": "contains information about benefits contained in the plan",
+													"items": [
+														{
+															"$ref": "#/definitions/bertie/customer/clubcardPlusBenefit"
+														}
+													]
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						"clubcard": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"description": "holds information about a clubcard account",
+							"properties": {
+								"member": {
+									"type": [
+										"boolean",
+										"null"
+									],
+									"description": "whether the customer is currently enroled in Clubcard"
+								},
+								"voucherBalance": {
+									"description": "the total value of vouchers available to be spent",
+									"$ref": "#/definitions/misc/price"
+								},
+								"totalPoints": {
+									"description": "the total number of Clubcard points against this customers account",
+									"$ref": "#/definitions/misc/points"
+								},
+								"availablePoints": {
+									"description": "the number of Clubcard points available to use on this customers account",
+									"$ref": "#/definitions/misc/points"
+								}
+							}
+						}
+					}
+				},
+				"clubcardPlusBenefit": {
+					"type": [
+						"object",
+						"null"
+					],
+					"additionalProperties": false,
+					"description": "details of this benefit",
+					"properties": {
+						"name": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "benefit name",
+							"examples": [
+								"ghs10percent"
+							]
+						},
+						"status": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "benefit status",
+							"enum": [
+								"active",
+								"inactive",
+								"unavailable",
+								"cancelled",
+								null
+							]
+						},
+						"remainingDays": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "days remaining for this benefit to be redeemed",
+							"examples": [
+								5
+							]
+						}
+					}
+				}
+			},
+			"action": {
+				"basicOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "Used to capture simple interactions of interest or value",
+					"examples": [
+						"../examples/basicOp.json"
+					],
+					"required": [
+						"bertieType",
+						"component",
+						"isDeferred"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"basicOp"
+							]
+						},
+						"feature": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "a low level descriptor for this interaction",
+							"examples": [
+								"missed offers"
+							]
+						},
+						"component": {
+							"type": "string",
+							"description": "a high level descriptor for this interaction",
+							"examples": [
+								"product tile"
+							]
+						},
+						"isDeferred": {
+							"type": "boolean",
+							"description": "identifies whether this interaction needs to be captured in a separate call or rolled into the following page call"
+						},
+						"contextValue": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "allows an additional piece of contextual data to be added e.g. an order ID",
+							"examples": [
+								"09248963-12"
+							]
+						}
+					}
+				}
+			},
+			"page": {
+				"pageData": {
+					"additionalProperties": false,
+					"type": "object",
+					"examples": [
+						"../examples/pageData.json"
+					],
+					"description": "Holds data defining the page/screen the user is currently viewing. Should be called on all page/screen loads or transitions affecting the majority of the screen",
+					"required": [
+						"bertieType",
+						"pageTitle",
+						"pageType"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"pageData"
+							]
+						},
+						"pageTitle": {
+							"type": "string",
+							"description": "Title of the current page/screen. Can be formed from the dynamic portion of url if it is meaningful",
+							"examples": [
+								"Review your basket"
+							]
+						},
+						"pageType": {
+							"type": "string",
+							"description": "Logical or functional group that this page/screen belongs to",
+							"examples": [
+								"checkout"
+							]
+						},
+						"category": {
+							"type": [
+								"array",
+								"null"
+							],
+							"description": "Category info for the current page/screen",
+							"items": [
+								{
+									"$ref": "#/definitions/misc/taxonomyCategory"
+								}
+							]
+						},
+						"pageURL": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "URL or identifying path of the current page/screen including parameters",
+							"examples": [
+								"https://www.tesco.com/groceries/checkout/review-trolley"
+							]
+						},
+						"pageReferer": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "contents of the referer header on browsers",
+							"examples": [
+								"https://www.google.co.uk?sc_cmp=123"
+							]
+						},
+						"preservedReferer": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "stored contents of referrer used to persist referrer for single pageview after cookie preferences are submitted",
+							"examples": [
+								"https://www.google.co.uk?sc_cmp=123"
+							]
+						},
+						"pageLanguage": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "Language of the current page/screen as produced by the site",
+							"examples": [
+								"en-gb"
+							]
+						},
+						"pageNumber": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "Page number of the current page/screen. Only used on listing screens with multiple screens of products",
+							"examples": [
+								2
+							]
+						},
+						"pageIntent": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "Wider level intention behind this page or action. Used in cases where multiple areas of functionality are brought together into a single platform.",
+							"examples": [
+								"loyalty"
+							]
+						},
+						"sortFilter": {
+							"$ref": "#/definitions/bertie/page/filterData"
+						}
+					}
+				},
+				"searchData": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "Holds search related data of the page loaded. Should be called on all search results pageload/screen changes",
+					"examples": [
+						"../examples/searchData.json"
+					],
+					"required": [
+						"bertieType",
+						"searchOutput",
+						"inputType"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"searchData"
+							]
+						},
+						"searchInput": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "keyword that the user entered",
+							"examples": [
+								"aples"
+							]
+						},
+						"searchOutput": {
+							"type": "string",
+							"description": "keyword used by engine to generate results e.g. spelling errors corrected",
+							"examples": [
+								"apples"
+							]
+						},
+						"inputType": {
+							"type": "string",
+							"description": "input method of the search",
+							"examples": [
+								"free text"
+							]
+						},
+						"matchType": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "method used by the engine to return the results",
+							"enum": [
+								"exact",
+								"fuzzy",
+								"manual seo",
+								null
+							]
+						},
+						"engine": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "engine used to generate the search results",
+							"examples": [
+								"athena"
+							]
+						},
+						"engineVersion": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "version of the engine used to generate the search results",
+							"examples": [
+								"v1.2 s3"
+							]
+						},
+						"isActive": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"description": "denotes if this view of a search results page is the result of an active search or just navigational"
+						},
+						"mulitsearchListCount": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "the number of items in the users search list when inputType is multi item"
+						},
+						"mulitsearchListPosition": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "the position of the item the list of searched items when inputType is multi item"
+						}
+					}
+				},
+				"filterOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "captures data about interactions with sort and filters",
+					"examples": [
+						"../examples/filterOp.json"
+					],
+					"required": [
+						"bertieType",
+						"sortFilter"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"filterOp"
+							]
+						},
+						"interactionType": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "captures data about interactions with sort and filters",
+							"enum": [
+								"preset",
+								"manual",
+								null
+							]
+						},
+						"sortFilter": {
+							"description": "Captures info about filters that are currently applied",
+							"$ref": "#/definitions/bertie/page/filterData"
+						}
+					}
+				},
+				"filterData": {
+					"additionalProperties": false,
+					"type": [
+						"object",
+						"null"
+					],
+					"description": "set on page load/screen change or called by another component",
+					"properties": {
+						"sortedBy": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "sort option selected",
+							"examples": [
+								"default"
+							]
+						},
+						"filter": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"description": "Defines a set of state flags for this customer",
+							"properties": {
+								"brand": {
+									"type": [
+										"array",
+										"null"
+									],
+									"description": "Defines a set of brand filters applied to content",
+									"items": {
+										"$ref": "#/definitions/bertie/product/brand"
+									}
+								},
+								"attribute": {
+									"type": [
+										"array",
+										"null"
+									],
+									"description": "Defines a set of attribute filters applied to content",
+									"items": {
+										"$ref": "#/definitions/bertie/product/productAttribute"
+									}
+								},
+								"category": {
+									"type": [
+										"array",
+										"null"
+									],
+									"description": "Defines a set of category filters applied to content",
+									"items": {
+										"$ref": "#/definitions/misc/taxonomyCategory"
+									}
+								},
+								"curated": {
+									"type": [
+										"array",
+										"null"
+									],
+									"description": "Defines a set of customisable filters applied to content.",
+									"items": {
+										"additionalProperties": false,
+										"type": [
+											"object",
+											"null"
+										],
+										"properties": {
+											"groupName": {
+												"type": [
+													"string",
+													"null"
+												],
+												"description": "group name",
+												"examples": [
+													"new products"
+												]
+											},
+											"groupValue": {
+												"type": [
+													"string",
+													"null"
+												],
+												"description": "value selected",
+												"examples": [
+													"new to online"
+												]
+											},
+											"groupId": {
+												"type": [
+													"string",
+													"null"
+												],
+												"description": "group ID",
+												"examples": [
+													"xlf"
+												]
+											}
+										}
+									}
+								},
+								"dietary": {
+									"type": [
+										"array",
+										"null"
+									],
+									"description": "Defines a set of dietary filters applied to content",
+									"items": {
+										"additionalProperties": false,
+										"type": [
+											"object",
+											"null"
+										],
+										"description": "Defines dietary filters applied to content",
+										"properties": {
+											"dietaryName": {
+												"type": [
+													"string",
+													"null"
+												],
+												"description": "dietary name",
+												"examples": [
+													"vegetarian"
+												]
+											},
+											"dietaryId": {
+												"type": [
+													"string",
+													"null"
+												],
+												"description": "dietary ID",
+												"examples": [
+													"12345"
+												]
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				"renderedExperimentOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"examples": [
+						"../examples/renderedExperimentOp.json"
+					],
+					"description": "holds information about mvt experiments that are loaded",
+					"required": [
+						"bertieType",
+						"experiment"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"renderedExperimentOp"
+							]
+						},
+						"experiment": {
+							"type": "array",
+							"items": {
+								"additionalProperties": false,
+								"type": "object",
+								"description": "holds information about a single experiment",
+								"required": [
+									"experimentName",
+									"variationKey"
+								],
+								"properties": {
+									"experimentName": {
+										"type": "string",
+										"description": "identifies the experiment that is running"
+									},
+									"variationKey": {
+										"type": "string",
+										"description": "identifies the variant within the experiment"
+									}
+								}
+							}
+						}
+					}
+				},
+				"renderedContentOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"examples": [
+						"../examples/renderedContentOp.json"
+					],
+					"description": "Holds data defining the contents of the page loaded",
+					"required": [
+						"bertieType"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"renderedContentOp"
+							]
+						},
+						"resultCountForPage": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "The grid size of the page - number of products that can be displayed on this page if all positions are filled",
+							"examples": [
+								24
+							]
+						},
+						"itemsRangeStart": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description":"The start of range of products rendered on this page - based on what is actually there. E.g. second page of 26 results with 24 in view would be \'25\'",
+							"examples": [
+								25
+							]
+						},
+						"itemsRangeEnd": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description":"The end of range of products rendered on this page - based on what is actually there. E.g. second page of 26 results with 24 in view would be \'26\'",
+							"examples": [
+								26
+							]
+						},
+						"listSize": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "The full number of results for this list - If you could view all results on a single page, how many there would be.",
+							"examples": [
+								124
+							]
+						},
+						"media": {
+							"$ref": "#/definitions/misc/mediaData"
+						},
+						"content": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"additionalProperties": false,
+								"type": [
+									"object",
+									"null"
+								],
+								"description": "holds information about a component, contain container or area of content",
+								"properties": {
+									"modulePosition": {
+										"type": [
+											"integer",
+											"null"
+										],
+										"description": "Denotes where on the page the module is positioned. Counted from top to bottom and left to right"
+									},
+									"displayArea": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "short code to describe the type of module",
+										"enum": [
+											"grd",
+											"smp",
+											"smo",
+											"csl",
+											"bnr",
+											"bnn",
+											"bnp",
+											"bns",
+											"btn",
+											"bnb",
+											"pro",
+											"hdr",
+											"ftr",
+											"ttl",
+											"ttb",
+											"tth",
+											"ttv",
+											"sld",
+											"dfp",
+											"div",
+											"tlp",
+											"sch",
+											"ukn",
+											"ptl",
+											"nav",
+											"inf",
+											"vid",
+											"sal",
+											"lnk",
+											"sam",
+											"bin",
+											"isc",
+											"acc",
+											"bnh",
+											"ism",
+											"bnk",
+											"bnc",
+											"btp",
+											null
+										]
+									},
+									"pageType": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "identifies the page that this request is associated with",
+										"enum": [
+											"h",
+											"f",
+											"tr",
+											"tf",
+											"sr",
+											"sd",
+											"d",
+											"a",
+											"s",
+											"bl",
+											"z",
+											"o",
+											"so",
+											"p",
+											"c",
+											"sl",
+											null
+										]
+									},
+									"componentId": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "Id at the level of the component",
+										"examples": [
+											"d284a910-41ef-4469-9602-64e784435367"
+										]
+									},
+									"componentType": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "Denotes the engine powering the content. r = rich relevance, t = trex, c = content (magnolia), d = dunnhumby, s = standard (regular product content), p = personalised",
+										"enum": [
+											"r",
+											"t",
+											"c",
+											"s",
+											"d",
+											"p",
+											null
+										]
+									},
+									"componentName": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "Name for this content where relevant",
+										"examples": [
+											"rsp"
+										]
+									},
+									"buylistId": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "Id for the underlying buylist related to this component",
+										"examples": [
+											"abc-123-efg-000"
+										]
+									},
+									"panel": {
+										"type": [
+											"array",
+											"null"
+										],
+										"items": {
+											"$ref": "#/definitions/bertie/page/contentData"
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				"impressedContentOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"examples": [
+						"../examples/impressedContentOp.json"
+					],
+					"description": "Holds data defining the contents in view",
+					"required": [
+						"bertieType"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"impressedContentOp"
+							]
+						},
+						"itemsRangeStart": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description":"The start of range of products rendered in this view - based on what is actually there. E.g. second page of 26 results with 24 in view would be \'25\'",
+							"examples": [
+								6
+							]
+						},
+						"itemsRangeEnd": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description":"The end of range of products rendered in this view - based on what is actually there. E.g. second page of 26 results with 24 in view would be \'26\'",
+							"examples": [
+								12
+							]
+						},
+						"media": {
+							"$ref": "#/definitions/misc/mediaData"
+						},
+						"content": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"additionalProperties": false,
+								"type": [
+									"object",
+									"null"
+								],
+								"title": "content",
+								"description": "holds information about a component, contain container or area of content",
+								"properties": {
+									"modulePosition": {
+										"type": [
+											"integer",
+											"null"
+										],
+										"description": "Denotes where on the page the module is positioned. Counted from top to bottom and left to right"
+									},
+									"displayArea": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "short code to describe the type of module",
+										"enum": [
+											"grd",
+											"smp",
+											"smo",
+											"csl",
+											"bnr",
+											"bnn",
+											"bnp",
+											"bns",
+											"btn",
+											"bnb",
+											"pro",
+											"hdr",
+											"ftr",
+											"ttl",
+											"ttb",
+											"tth",
+											"ttv",
+											"sld",
+											"dfp",
+											"div",
+											"tlp",
+											"sch",
+											"ukn",
+											"ptl",
+											"nav",
+											"inf",
+											"vid",
+											"sal",
+											"lnk",
+											"sam",
+											"bin",
+											"isc",
+											"acc",
+											"bnh",
+											"ism",
+											"bnk",
+											"bnc",
+											"btp",
+											null
+										]
+									},
+									"pageType": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "identifies the page that this request is associated with",
+										"enum": [
+											"h",
+											"f",
+											"tr",
+											"tf",
+											"sr",
+											"sd",
+											"d",
+											"a",
+											"s",
+											"bl",
+											"z",
+											"o",
+											"so",
+											"p",
+											"c",
+											"sl",
+											null
+										]
+									},
+									"componentId": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "Id at the level of the component",
+										"examples": [
+											"d284a910-41ef-4469-9602-64e784435367"
+										]
+									},
+									"componentType": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "Denotes the engine powering the content. r = rich relevance, t = trex, c = content (magnolia), d = dunnhumby, s = standard (regular product content), , p = personalised",
+										"enum": [
+											"r",
+											"t",
+											"c",
+											"s",
+											"d",
+											"p",
+											null
+										]
+									},
+									"componentName": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "Name for this content where relevant",
+										"examples": [
+											"rsp"
+										]
+									},
+									"buylistId": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "Id for the underlying buylist related to this component",
+										"examples": [
+											"abc-123-efg-000"
+										]
+									},
+									"panel": {
+										"type": [
+											"array",
+											"null"
+										],
+										"items": {
+											"$ref": "#/definitions/bertie/page/contentData"
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				"contentInteractOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"examples": [
+						"../examples/contentInteractOp.json"
+					],
+					"description": "captures data about interactions with page contents",
+					"required": [
+						"bertieType",
+						"interactionType"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"contentInteractOp"
+							]
+						},
+						"interactionType": {
+							"type": "string",
+							"description": "describes the type of interaction",
+							"examples": [
+								"product"
+							]
+						},
+						"contextValue": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "additional value to give context to the interaction",
+							"examples": [
+								"abc-1234-efg-5678"
+							]
+						},
+						"media": {
+							"$ref": "#/definitions/misc/mediaData"
+						},
+						"content": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"description": "details of the content being interacted with",
+							"properties": {
+								"modulePosition": {
+									"type": [
+										"integer",
+										"null"
+									],
+									"description": "Denotes where on the page the module is positioned. Counted from top to bottom and left to right"
+								},
+								"displayArea": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "short code to describe the type of module",
+									"enum": [
+										"grd",
+										"smp",
+										"smo",
+										"csl",
+										"bnr",
+										"bnn",
+										"bnp",
+										"bns",
+										"btn",
+										"bnb",
+										"pro",
+										"hdr",
+										"ftr",
+										"ttl",
+										"ttb",
+										"tth",
+										"ttv",
+										"sld",
+										"dfp",
+										"div",
+										"tlp",
+										"sch",
+										"ukn",
+										"ptl",
+										"nav",
+										"inf",
+										"vid",
+										"sal",
+										"lnk",
+										"sam",
+										"bin",
+										"isc",
+										"acc",
+										"bnh",
+										"ism",
+										"bnk",
+										"bnc",
+										"btp",
+										null
+									]
+								},
+								"pageType": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "identifies the page that this request is associated with",
+									"enum": [
+										"h",
+										"f",
+										"tr",
+										"tf",
+										"sr",
+										"sd",
+										"d",
+										"a",
+										"s",
+										"bl",
+										"z",
+										"o",
+										"so",
+										"p",
+										"c",
+										"sl",
+										null
+									]
+								},
+								"componentId": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "Id at the level of the component",
+									"examples": [
+										"d284a910-41ef-4469-9602-64e784435367"
+									]
+								},
+								"componentType": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "Denotes the engine powering the content. r = rich relevance, t = trex, c = content (magnolia), d = dunnhumby, s = standard (regular product content), , p = personalised",
+									"enum": [
+										"r",
+										"t",
+										"c",
+										"s",
+										"d",
+										"p",
+										null
+									]
+								},
+								"componentName": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "Name for this content where relevant",
+									"examples": [
+										"rsp"
+									]
+								},
+								"buylistId": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "Id for the underlying buylist related to this component",
+									"examples": [
+										"abc-123-efg-000"
+									]
+								},
+								"panel": {
+									"type": [
+										"array",
+										"null"
+									],
+									"items": {
+										"$ref": "#/definitions/bertie/page/contentData"
+									}
+								}
+							}
+						}
+					}
+				},
+				"contentData": {
+					"additionalProperties": false,
+					"type": [
+						"object",
+						"null"
+					],
+					"description": "Holds data defining the contents of the modules and products on a page",
+					"properties": {
+						"campaignId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "Campaign id for this content, kept below 30 characters",
+							"examples": [
+								"SUMR2017Drinks"
+							],
+							"maxLength": 100
+						},
+						"posInModule": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "Denotes the position of this item within the module"
+						},
+						"contentFlag": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "Signals from CMS that are relevant e.g. for personalisation. Comma delimited string if multiple",
+							"examples": [
+								"anon,ios"
+							]
+						},
+						"ruleId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "Denotes the rules in CMS powering the content",
+							"examples": [
+								"rule1"
+							]
+						},
+						"contentSegment": {
+							"type": [
+								"array",
+								"null"
+							],
+							"description": "Defines the customer level segments that this customer is currently part of",
+							"items": {
+								"$ref": "#/definitions/misc/segment"
+							}
+						},
+						"category": {
+							"type": [
+								"array",
+								"null"
+							],
+							"description": "taxonomy data related to this module if relevant",
+							"items": {
+								"$ref": "#/definitions/misc/taxonomyCategory"
+							}
+						},
+						"personalisationModel": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "information related to personalisation of product"
+						},
+						"primaryAdId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "primary id to measure performance of this piece of content"
+						},
+						"secondaryAdId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "secondary id to measure performance of this piece of content"
+						},
+						"product": {
+							"$ref": "#/definitions/bertie/product/productData"
+						}
+					}
+				}
+			},
+			"basket": {
+				"basketOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "carries data surrounding an interaction with the basket",
+					"examples": [
+						"../examples/basketOp.json"
+					],
+					"required": [
+						"bertieType",
+						"interactionType",
+						"product"
+					],
+					"if": {
+						"anyOf": [
+							{
+								"properties": {
+									"interactionType": {
+										"const": "add"
+									}
+								},
+								"required": [
+									"interactionType"
+								]
+							},
+							{
+								"properties": {
+									"interactionType": {
+										"const": "addAttempt"
+									}
+								},
+								"required": [
+									"interactionType"
+								]
+							},
+							{
+								"properties": {
+									"interactionType": {
+										"const": "addAll"
+									}
+								},
+								"required": [
+									"interactionType"
+								]
+							},
+							{
+								"properties": {
+									"interactionType": {
+										"const": "addSelected"
+									}
+								},
+								"required": [
+									"interactionType"
+								]
+							}
+						]
+					},
+					"then": {
+						"required": [
+							"identifier"
+						]
+					},
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"basketOp"
+							]
+						},
+						"interactionType": {
+							"type": "string",
+							"description": "describes the method of interaction",
+							"enum": [
+								"add",
+								"addAttempt",
+								"addAll",
+								"addSelected",
+								"remove",
+								"empty",
+								"save",
+								"list"
+							]
+						},
+						"listInteraction": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "describes the method of interaction with a stored list",
+							"enum": [
+								"add",
+								"remove",
+								"empty",
+								null
+							]
+						},
+						"basketId": {
+							"description": "identifier for the primary basket",
+							"$ref": "#/definitions/bertie/basket/basketId"
+						},
+						"secondBasketId": {
+							"description": "identifier for secondary basket in cases where more than 1 basket is active concurrently",
+							"$ref": "#/definitions/bertie/basket/basketId"
+						},
+						"status": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "status of the basket when there are multiple concurrent baskets",
+							"enum": [
+								"ghs only",
+								"marketplace only",
+								"ghs and marketplace",
+								null
+							]
+						},
+						"basketFullness": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "indicates whether a basket is within limit or in breach of fullness restrictions (weight, volume and similar)",
+							"examples": [
+								"breach:weight exceeded"
+							]
+						},
+						"identifier": {
+							"type": "string",
+							"description": "identifies the part of the page where the interaction occurred.",
+							"examples": [
+								"basket empty, page, side basket, carousel:<carousel name>, substitution, background etc"
+							]
+						},
+						"contextValue": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "a value to give greater additional context to the event, for example an Ad id for a sponsored product.",
+							"examples": [
+								"012345678"
+							]
+						},
+						"position": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "describes the position of the product on the page grid or within the module it is presented in",
+							"examples": [
+								5
+							]
+						},
+						"totalProducts": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "count of the total number of units of all products within the current basket"
+						},
+						"uniqueProducts": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "count of the total number of unique product SKUs within the current basket"
+						},
+						"flag": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"description": "attributes of this basket interaction",
+							"properties": {
+								"anonymous": {
+									"type": [
+										"boolean",
+										"null"
+									],
+									"description": "denotes this interaction was undertaken whilst user was not logged in, and was completed after user successfully logged in"
+								},
+								"isOpen": {
+									"type": [
+										"boolean",
+										"null"
+									],
+									"description": "denotes whether this interaction was the first towards this basketId or first item into the basket"
+								}
+							}
+						},
+						"media": {
+							"$ref": "#/definitions/misc/mediaData"
+						},
+						"product": {
+							"type": "array",
+							"items": {
+								"$ref": "#/definitions/bertie/product/productChange"
+							}
+						}
+					}
+				},
+				"basketData": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "contains all data relating to the currently active basket",
+					"examples": [
+						"../examples/basketData.json"
+					],
+					"required": [
+						"bertieType"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"basketData"
+							]
+						},
+						"basketId": {
+							"description": "identifier for the primary basket",
+							"$ref": "#/definitions/bertie/basket/basketId"
+						},
+						"secondBasketId": {
+							"description": "identifier for secondary basket in cases where more than 1 basket is active concurrently",
+							"$ref": "#/definitions/bertie/basket/basketId"
+						},
+						"guidePrice": {
+							"description": "guide price of current basket restricted to 2 decimal places",
+							"$ref": "#/definitions/misc/price"
+						},
+						"basketFullPrice": {
+							"description": "total price of all items in basket, restricted to 2 decimal places",
+							"$ref": "#/definitions/misc/price"
+						},
+						"totalProducts": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "count of the total number of units of all products within the current basket"
+						},
+						"uniqueProducts": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "count of the total number of unique product SKUs within the current basket"
+						},
+						"product": {
+							"type": [
+								"array",
+								"null"
+							],
+							"description": "Details products in the basket",
+							"items": {
+								"$ref": "#/definitions/bertie/product/productData"
+							}
+						},
+						"basketFullness": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "indicates whether a basket is within limit or in breach of fullness restrictions (weight, volume and similar)",
+							"examples": [
+								"breach:weight exceeded"
+							]
+						},
+						"offerBasket": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"description": "contains information about discounts affecting the entire basket",
+							"properties": {
+								"multibuyOffer": {
+									"type": [
+										"array",
+										"null"
+									],
+									"description": "details of any multi-product offer applied to the basket",
+									"items": {
+										"type": [
+											"object",
+											"null"
+										],
+										"additionalProperties": false,
+										"properties": {
+											"offerId": {
+												"type": [
+													"string",
+													"null"
+												],
+												"description": "ID associated with this offer",
+												"examples": [
+													"012345678"
+												]
+											},
+											"discount": {
+												"description": "savings due to redeeming this offer OR points gained",
+												"anyOf": [
+													{
+														"$ref": "#/definitions/misc/price"
+													},
+													{
+														"$ref": "#/definitions/misc/points"
+													}
+												]
+											},
+											"discountType": {
+												"type": [
+													"string",
+													"null"
+												],
+												"description": "The way in which the offer is applied",
+												"enum": [
+													"sum",
+													"pct",
+													"points",
+													null
+												]
+											},
+											"percentage": {
+												"type": [
+													"number",
+													"null"
+												],
+												"minimum": 0,
+												"maximum": 1,
+												"description": "the numeric value between 0 and 1 denoting the percentage value saved."
+											}
+										}
+									}
+								}
+							}
+						},
+						"coupon": {
+							"type": [
+								"array",
+								"null"
+							],
+							"description": "Details of coupons currently fitted to basket",
+							"items": {
+								"$ref": "#/definitions/bertie/basket/couponData"
+							}
+						},
+						"numberOfSlots": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "number of deliveries this basket will be fulfilled by",
+							"examples": [
+								3
+							]
+						},
+						"status": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "status of the basket when there are multiple concurrent baskets",
+							"enum": [
+								"ghs only",
+								"marketplace only",
+								"ghs and marketplace",
+								null
+							]
+						},
+						"deliverySlot": {
+							"description": "current delivery information",
+							"$ref": "#/definitions/bertie/basket/slotData"
+						}
+					}
+				},
+				"orderData": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "Should be called on all pageload screen load of order or amend confirmation pages",
+					"examples": [
+						"../examples/orderData.json"
+					],
+					"required": [
+						"bertieType",
+						"orderId"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"orderData"
+							]
+						},
+						"orderId": {
+							"type": "string",
+							"description": "purchase Id for this order",
+							"examples": [
+								"012345678"
+							]
+						},
+						"secondaryReference": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "secondary reference for this order for linking to alternative systems",
+							"examples": [
+								"XK1234ABC"
+							]
+						},
+						"status": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "status of this order",
+							"enum": [
+								"delivered",
+								"cancelled",
+								"delivery pending",
+								"approval needed",
+								null
+							]
+						},
+						"supplier": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "the supplier for this delivery if not Tesco",
+							"examples": [
+								"hovis bakery"
+							]
+						},
+						"flag": {
+							"type": "array",
+							"description": "flags associated with this order, used to carry additional relevant contextual info",
+							"items": [
+								{
+									"$ref": "#/definitions/misc/flag"
+								}
+							]
+						},
+						"basketState": {
+							"$ref": "#/definitions/bertie/basket/basketData"
+						},
+						"amendedProducts": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"description": "Contains data relating to the changes made to an order during the latest amendment",
+							"required": [
+								"product"
+							],
+							"properties": {
+								"product": {
+									"type": "array",
+									"items": {
+										"$ref": "#/definitions/bertie/product/productChange"
+									}
+								}
+							}
+						}
+					}
+				},
+				"couponOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "captures data about interactions with coupons",
+					"examples": [
+						"../examples/couponOp.json"
+					],
+					"required": [
+						"bertieType",
+						"coupon"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"couponOp"
+							]
+						},
+						"coupon": {
+							"type": "array",
+							"items": {
+								"additionalProperties": false,
+								"type": "object",
+								"required": [
+									"coupon",
+									"interactionType"
+								],
+								"properties": {
+									"coupon": {
+										"$ref": "#/definitions/bertie/basket/couponData"
+									},
+									"interactionType": {
+										"type": "string",
+										"description": "describes whether the interaction was to add or remove the coupon",
+										"enum": [
+											"add",
+											"remove",
+											"add all",
+											"remove all"
+										]
+									}
+								}
+							}
+						}
+					}
+				},
+				"couponData": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "Holds information about coupons",
+					"required": [
+						"discount",
+						"discountType"
+					],
+					"properties": {
+						"couponType": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "The variety of coupon based on its source",
+							"enum": [
+								"cc voucher",
+								"cc coupon",
+								null
+							]
+						},
+						"discount": {
+							"description": "savings due to redeeming this offer OR points gained",
+							"anyOf": [
+								{
+									"$ref": "#/definitions/misc/price"
+								},
+								{
+									"$ref": "#/definitions/misc/points"
+								}
+							]
+						},
+						"discountType": {
+							"type": "string",
+							"description": "The way in which the coupon is applied - val = fixed value change, pct = percentage change, points = clubcard points",
+							"enum": [
+								"val",
+								"pct",
+								"points"
+							]
+						},
+						"percentage": {
+							"type": [
+								"number",
+								"null"
+							],
+							"minimum": 0,
+							"maximum": 1,
+							"description": "The numeric value between 0 and 1 denoting the percentage value saved to 2 dps - only needed if discountType = pct"
+						}
+					}
+				},
+				"slotOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "Carries data related to interactions with delivery slots",
+					"examples": [
+						"../examples/slotOp.json"
+					],
+					"required": [
+						"bertieType",
+						"interactionType",
+						"currentSlot"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"slotOp"
+							]
+						},
+						"interactionType": {
+							"type": "string",
+							"description": "identifies if the interaction was to book or unbook a slot",
+							"enum": [
+								"book",
+								"unbook"
+							]
+						},
+						"addressId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "psudonymous id for an address"
+						},
+						"store": {
+							"description": "Information about the store or location being displayed",
+							"$ref": "#/definitions/misc/storeData"
+						},
+						"currentSlot": {
+							"description": "carries data about the slot interacted with",
+							"$ref": "#/definitions/bertie/basket/slotData"
+						}
+					}
+				},
+				"impressedSlotOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "contains all data relating the slots grid",
+					"examples": [
+						"../examples/impressedSlotOp.json"
+					],
+					"required": [
+						"bertieType",
+						"store",
+						"slot"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"impressedSlotOp"
+							]
+						},
+						"addressId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "psudonymous id for an address"
+						},
+						"store": {
+							"description": "Information about the store or location being displayed",
+							"$ref": "#/definitions/misc/storeData"
+						},
+						"slot": {
+							"type": "array",
+							"items": {
+								"description": "carries data about the slot in the grid",
+								"allOf": [
+									{
+										"$ref": "#/definitions/bertie/basket/slotData"
+									}
+								]
+							}
+						}
+					}
+				},
+				"slotData": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "contains delivery and charges information applicable to this basket or order",
+					"if": {
+						"properties": {
+							"slotStart": {
+								"$ref": "#/definitions/misc/slotTime"
+							}
+						},
+						"required": [
+							"slotStart"
+						]
+					},
+					"then": {
+						"required": [
+							"slotEnd",
+							"method"
+						]
+					},
+					"properties": {
+						"slotStart": {
+							"description": "date & time of beginning of delivery slot",
+							"$ref": "#/definitions/misc/slotTime"
+						},
+						"slotEnd": {
+							"description": "date & time of end of delivery slot",
+							"$ref": "#/definitions/misc/slotTime"
+						},
+						"method": {
+							"type": "string",
+							"description": "type of delivery slot",
+							"enum": [
+								"delivery",
+								"collection",
+								"standard delivery",
+								"ondemand",
+								"InStore"
+							]
+						},
+						"isExpired": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"description": "denotes whether the current slot has expired"
+						},
+						"isAvailable": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"description": "denotes whether the slot is available to be booked"
+						},
+						"isTradable": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"description": "denotes whether the slot is tradable on this store id"
+						},
+						"daysFromToday": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"description": "describes how many whole calendars days from today the slot is. Today would be 0, tomorrow 1 etc.",
+							"examples": [
+								2
+							]
+						},
+						"deliverySaver": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"description": "holds details relating to delivery saver subscription",
+							"required": [
+								"discount"
+							],
+							"properties": {
+								"discount": {
+									"description": "details of any savings as a result of being a delivery saver subscriber",
+									"$ref": "#/definitions/misc/price"
+								}
+							}
+						},
+						"deliveryCharge": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"description": "details of delivery charges",
+							"required": [
+								"charge"
+							],
+							"properties": {
+								"charge": {
+									"description": "charges for delivery or collection",
+									"$ref": "#/definitions/misc/price"
+								}
+							}
+						}
+					}
+				},
+				"basketId": {
+					"type": [
+						"string",
+						"null"
+					],
+					"description": "ID for this basket from customerOrder (order_id), generated as soon as the basket exists",
+					"examples": [
+						"7a97c8ad-421e-41f7-9fad-33f1917e49ch"
+					],
+					"pattern": "^(trn:tesco:([\\\\w]+:){2,4}|)(([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+))$"
+				}
+			},
+			"product": {
+				"productOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "describes an interaction to query, update, output (or similar) information pertaining to a product",
+					"examples": [
+						"../examples/productOp.json"
+					],
+					"required": [
+						"bertieType",
+						"interactionType",
+						"product"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"productOp"
+							]
+						},
+						"interactionType": {
+							"type": "string",
+							"description": "describes the purpose of the request being made",
+							"enum": [
+								"query",
+								"response",
+								"update",
+								"print"
+							]
+						},
+						"inputType": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "describes the method by which the product was input for the request",
+							"enum": [
+								"scan",
+								"manual entry",
+								"existing",
+								null
+							]
+						},
+						"inputInfoType": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "provides additional information about the data being input",
+							"examples": [
+								"shelf edge label"
+							]
+						},
+						"product": {
+							"type": "array",
+							"items": [
+								{
+									"$ref": "#/definitions/bertie/product/productData"
+								}
+							]
+						},
+						"request": {
+							"type": [
+								"array",
+								"null"
+							],
+							"description": "information sent or returned in relation to the product that is relevant to the interaction",
+							"items": [
+								{
+									"$ref": "#/definitions/misc/attribute"
+								}
+							]
+						}
+					}
+				},
+				"productData": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "Holds data related to products",
+					"anyOf": [
+						{
+							"required": [
+								"primaryId"
+							]
+						},
+						{
+							"required": [
+								"secondaryId"
+							]
+						},
+						{
+							"required": [
+								"tpna"
+							]
+						},
+						{
+							"required": [
+								"tpnb"
+							]
+						},
+						{
+							"required": [
+								"tpnc"
+							]
+						},
+						{
+							"required": [
+								"tpnd"
+							]
+						},
+						{
+							"required": [
+								"gtin"
+							]
+						},
+						{
+							"required": [
+								"barcode"
+							]
+						},
+						{
+							"required": [
+								"uuid"
+							]
+						}
+					],
+					"properties": {
+						"primaryId": {
+							"type": "string",
+							"description": "primary product id used on this digital property",
+							"examples": [
+								"275280804"
+							]
+						},
+						"secondaryId": {
+							"type": "string",
+							"description": "secondary product id used on this digital property",
+							"examples": [
+								"345"
+							]
+						},
+						"tpna": {
+							"type": "string",
+							"description": "tpna of this product",
+							"examples": [
+								"275280804"
+							],
+							"pattern": "^[0-9]+$"
+						},
+						"tpnb": {
+							"type": "string",
+							"description": "tpnb of this product",
+							"examples": [
+								"50502269"
+							],
+							"pattern": "^[0-9]+$"
+						},
+						"tpnc": {
+							"type": "string",
+							"description": "tpnc of this product",
+							"examples": [
+								"293017884"
+							],
+							"pattern": "^[0-9]+$"
+						},
+						"tpnd": {
+							"type": "string",
+							"description": "tpnd of this product",
+							"examples": [
+								"293017884"
+							],
+							"pattern": "^[0-9]+$"
+						},
+						"gtin": {
+							"type": "string",
+							"description": "gtin of this product",
+							"examples": [
+								"0261480000000"
+							],
+							"pattern": "^[0-9]+$"
+						},
+						"barcode": {
+							"type": "string",
+							"description": "barcode for this product",
+							"examples": [
+								"515005460006"
+							]
+						},
+						"uuid": {
+							"type": "string",
+							"description": "uuid for this product",
+							"examples": "trn:tesco:product:uuid:0004edad-a82b-464e-a5bd-9be4c4d8fa83",
+							"pattern": "^(trn:tesco:[\\\\w]+:uuid:|)(([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+))$"
+						},
+						"sellerId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "id for the seller of this product"
+						},
+						"sellerCategory": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "category for the seller of this product"
+						},
+						"personalisationModel": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "information related to personalisation of product"
+						},
+						"primaryAdId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "primary adId related to sponsored products",
+							"examples": [
+								"12345-abcds-67890"
+							]
+						},
+						"availability": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "availability status code for this product"
+						},
+						"offer": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"$ref": "#/definitions/bertie/product/offerData"
+							}
+						},
+						"singlePrice": {
+							"$ref": "#/definitions/misc/price",
+							"description": "price of a single unit of this product"
+						},
+						"singleWeight": {
+							"$ref": "#/definitions/misc/weight",
+							"description": "weight of a single unit of this product"
+						},
+						"quantity": {
+							"type": [
+								"number",
+								"null"
+							],
+							"description": "quantity of this product in the given context"
+						},
+						"productMethod": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "method by which this product is measured (weight or quantity)",
+							"enum": [
+								"w",
+								"q",
+								null
+							]
+						},
+						"isFavourite": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"description":"indicates whether this product is in this customer\'s favourites list"
+						},
+						"seedProduct": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"description": "describes the parent or seed product if such a relationship exists e.g. substitutions",
+							"anyOf": [
+								{
+									"required": [
+										"tpnb"
+									]
+								},
+								{
+									"required": [
+										"gtin"
+									]
+								}
+							],
+							"properties": {
+								"tpnb": {
+									"type": "string",
+									"description": "tpnb of this product",
+									"examples": [
+										"50502269"
+									],
+									"pattern": "^[0-9]+$"
+								},
+								"gtin": {
+									"type": "string",
+									"description": "gtin of this product",
+									"examples": [
+										"0261480000000"
+									],
+									"pattern": "^[0-9]+$"
+								}
+							}
+						},
+						"seedLookup": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "identifies the lookup used to retrieve the seed product",
+							"examples": [
+								"why not try"
+							]
+						},
+						"attribute": {
+							"type": [
+								"array",
+								"null"
+							],
+							"description": "defines additional attributes of this product",
+							"items": {
+								"$ref": "#/definitions/bertie/product/productAttribute"
+							}
+						},
+						"rating": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"description": "holds information from ratings and reviews",
+							"required": [
+								"averageRating",
+								"noOfRatings"
+							],
+							"properties": {
+								"averageRating": {
+									"type": "number",
+									"description": "the average rating of this product at the point it is displayed"
+								},
+								"noOfRatings": {
+									"type": "integer",
+									"description": "the number of reviews for this product"
+								}
+							}
+						},
+						"secondaryReference": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "used when a product is attributed an id or reference from another system which does not replace the primary id for the product"
+						}
+					}
+				},
+				"productChange": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "Holds data related to products",
+					"anyOf": [
+						{
+							"required": [
+								"primaryId"
+							]
+						},
+						{
+							"required": [
+								"secondaryId"
+							]
+						},
+						{
+							"required": [
+								"tpna"
+							]
+						},
+						{
+							"required": [
+								"tpnb"
+							]
+						},
+						{
+							"required": [
+								"tpnc"
+							]
+						},
+						{
+							"required": [
+								"tpnd"
+							]
+						},
+						{
+							"required": [
+								"gtin"
+							]
+						},
+						{
+							"required": [
+								"barcode"
+							]
+						},
+						{
+							"required": [
+								"uuid"
+							]
+						}
+					],
+					"properties": {
+						"primaryId": {
+							"type": "string",
+							"description": "primary product id used on this digital property",
+							"examples": [
+								"275280804"
+							]
+						},
+						"secondaryId": {
+							"type": "string",
+							"description": "secondary product id used on this digital property",
+							"examples": [
+								"345"
+							]
+						},
+						"tpna": {
+							"type": "string",
+							"description": "tpna of this product",
+							"examples": [
+								"275280804"
+							],
+							"pattern": "^[0-9]+$"
+						},
+						"tpnb": {
+							"type": "string",
+							"description": "tpnb of this product",
+							"examples": [
+								"50502269"
+							],
+							"pattern": "^[0-9]+$"
+						},
+						"tpnc": {
+							"type": "string",
+							"description": "tpnc of this product",
+							"examples": [
+								"293017884"
+							],
+							"pattern": "^[0-9]+$"
+						},
+						"tpnd": {
+							"type": "string",
+							"description": "tpnd of this product",
+							"examples": [
+								"293017884"
+							],
+							"pattern": "^[0-9]+$"
+						},
+						"gtin": {
+							"type": "string",
+							"description": "gtin of this product",
+							"examples": [
+								"0261480000000"
+							],
+							"pattern": "^[0-9]+$"
+						},
+						"barcode": {
+							"type": "string",
+							"description": "barcode for this product",
+							"examples": [
+								"515005460006"
+							]
+						},
+						"uuid": {
+							"type": "string",
+							"description": "uuid for this product",
+							"examples": [
+								"trn:tesco:product:uuid:0004edad-a82b-464e-a5bd-9be4c4d8fa83"
+							],
+							"pattern": "^(trn:tesco:[\\\\w]+:uuid:|)(([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+))$"
+						},
+						"sellerId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "id for the seller of this product"
+						},
+						"personalisationModel": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "information related to personalisation of product"
+						},
+						"primaryAdId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "primary adId related to sponsored products",
+							"examples": [
+								"12345-abcds-67890"
+							]
+						},
+						"availability": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "availability status code for this product"
+						},
+						"offer": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"$ref": "#/definitions/bertie/product/offerData"
+							}
+						},
+						"singlePrice": {
+							"$ref": "#/definitions/misc/price",
+							"description": "price of a single unit of this product"
+						},
+						"singleWeight": {
+							"$ref": "#/definitions/misc/weight",
+							"description": "weight of a single unit of this product"
+						},
+						"quantity": {
+							"type": [
+								"number",
+								"null"
+							],
+							"description": "quantity of this product in the given context"
+						},
+						"productMethod": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "method by which this product is measured (weight or quantity)",
+							"enum": [
+								"w",
+								"q",
+								null
+							]
+						},
+						"isFavourite": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"description":"indicates whether this product is in this customer\'s favourites list"
+						},
+						"seedProduct": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"description": "describes the parent or seed product if such a relationship exists e.g. substitutions",
+							"anyOf": [
+								{
+									"required": [
+										"tpnb"
+									]
+								},
+								{
+									"required": [
+										"gtin"
+									]
+								}
+							],
+							"properties": {
+								"tpnb": {
+									"type": "string",
+									"description": "tpnb of this product",
+									"examples": [
+										"50502269"
+									],
+									"pattern": "^[0-9]+$"
+								},
+								"gtin": {
+									"type": "string",
+									"description": "gtin of this product",
+									"examples": [
+										"0261480000000"
+									],
+									"pattern": "^[0-9]+$"
+								}
+							}
+						},
+						"seedLookup": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "identifies the lookup used to retrieve the seed product",
+							"examples": [
+								"why not try"
+							]
+						},
+						"attribute": {
+							"type": [
+								"array",
+								"null"
+							],
+							"description": "defines additional attributes of this product",
+							"items": {
+								"$ref": "#/definitions/bertie/product/productAttribute"
+							}
+						},
+						"rating": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"description": "holds information from ratings and reviews",
+							"required": [
+								"averageRating",
+								"noOfRatings"
+							],
+							"properties": {
+								"averageRating": {
+									"type": "number",
+									"description": "the average rating of this product at the point it is displayed"
+								},
+								"noOfRatings": {
+									"type": "integer",
+									"description": "the number of reviews for this product"
+								}
+							}
+						},
+						"secondaryReference": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "used when a product is attributed an id or reference from another system which does not replace the primary id for the product"
+						},
+						"qtyChange": {
+							"type": [
+								"number",
+								"null"
+							],
+							"description": "the quantity of units added or removed in this interaction. Value should be negative on removes."
+						},
+						"totalPriceChange": {
+							"description": "total price for all units of this product added or removed. Value should be negative on removes.",
+							"$ref": "#/definitions/misc/price"
+						},
+						"totalWeightChange": {
+							"description": "total change in weight as a result of this interactions. Value should be negative on removes.",
+							"$ref": "#/definitions/misc/weight"
+						}
+					}
+				},
+				"offerData": {
+					"additionalProperties": false,
+					"type": [
+						"object",
+						"null"
+					],
+					"description": "contains information related to offers",
+					"properties": {
+						"offerPrice": {
+							"description": "single unit offer price of this product",
+							"$ref": "#/definitions/misc/price"
+						},
+						"offerId": {
+							"type": "string",
+							"description": "ID associated with this offer",
+							"examples": [
+								"012345678"
+							]
+						},
+						"discount": {
+							"description": "The difference in cost for a single unit of this product on and off offer OR the number of points gained",
+							"anyOf": [
+								{
+									"$ref": "#/definitions/misc/price"
+								},
+								{
+									"$ref": "#/definitions/misc/points"
+								}
+							]
+						},
+						"discountType": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "The way in which the offer is applied",
+							"enum": [
+								"sum",
+								"pct",
+								"points",
+								null
+							]
+						},
+						"percentage": {
+							"type": [
+								"number",
+								"null"
+							],
+							"minimum": 0,
+							"maximum": 1,
+							"description": "the numeric value between 0 and 1 denoting the percentage value saved"
+						},
+						"offerMet": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"description": "identifies whether the conditions for this offer have been met"
+						},
+						"proposition": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": null,
+							"enum": [
+								"aldi price match",
+								"low everyday pricing",
+								null
+							]
+						},
+						"inSlot": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"description":"describes whether the offer is valid for the customer\'s current delivery / collection slot"
+						}
+					}
+				},
+				"brand": {
+					"additionalProperties": false,
+					"type": [
+						"object",
+						"null"
+					],
+					"description": "Defines brand",
+					"properties": {
+						"brandName": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "brand name",
+							"examples": [
+								"tesco finest"
+							]
+						},
+						"brandId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "brand ID",
+							"examples": [
+								"12345"
+							]
+						}
+					}
+				},
+				"productAttribute": {
+					"additionalProperties": false,
+					"type": [
+						"object",
+						"null"
+					],
+					"description": "Defines a set of attributes associated with a product",
+					"properties": {
+						"attributeName": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "attribute name",
+							"examples": [
+								"colour"
+							]
+						},
+						"attributeValue": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "attribute value",
+							"examples": [
+								"blue"
+							]
+						},
+						"attributeId": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "attribute ID",
+							"examples": [
+								"A036"
+							]
+						}
+					}
+				}
+			},
+			"platform": {
+				"platformData": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "Holds data defining the digital property or application the user is currently interacting with",
+					"examples": [
+						"../examples/platformData.json"
+					],
+					"required": [
+						"bertieType",
+						"application",
+						"property",
+						"country",
+						"buildVersion"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"platformData"
+							]
+						},
+						"application": {
+							"type": "string",
+							"description": "The current environment for this application",
+							"examples": [
+								"stg,ppe,dev,live etc"
+							]
+						},
+						"property": {
+							"type": "string",
+							"description":"denotes the digital property or data source <propertyid>:<country>:<platform type>:<os (apps)|\'browser\'(web)>:<responsive type>:<application>",
+							"examples": [
+								"ghs:uk:app:ios:phone:prod or cc:cz:web:browser:ppe"
+							]
+						},
+						"country": {
+							"type": "string",
+							"description": "the country code of the site",
+							"examples": [
+								"uk, pl, th, etc"
+							]
+						},
+						"built": {
+							"description": "date when this build was released or submitted to app store",
+							"anyOf": [
+								{
+									"$ref": "#/definitions/misc/date"
+								},
+								{
+									"$ref": "#/definitions/misc/timeStamp"
+								}
+							]
+						},
+						"buildVersion": {
+							"type": "string",
+							"description": "version details for this application",
+							"examples": [
+								"2.1.0"
+							]
+						},
+						"device": {
+							"additionalProperties": false,
+							"type": [
+								"object",
+								"null"
+							],
+							"examples": [
+								"../examples/platformData.json#/device"
+							],
+							"description": "Holds information about the device being used",
+							"properties": {
+								"breakPoint": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "Friendly term indicating the formfactor of the property being viewed",
+									"examples": [
+										"mobileSmall",
+										"mobileLarge",
+										"tablet",
+										"desktopSmall",
+										"desktopLarge",
+										"kiosk"
+									]
+								},
+								"width": {
+									"type": [
+										"integer",
+										"null"
+									],
+									"description": "pixel width of the viewport"
+								},
+								"orientation": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "orientation of the viewport",
+									"enum": [
+										"portrait",
+										"landscape",
+										"unknown",
+										null
+									]
+								},
+								"device": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "Device hardware type",
+									"examples": [
+										"phone",
+										"tablet",
+										"desktop",
+										"mainbank till"
+									]
+								},
+								"model": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "The model of hardware",
+									"examples": [
+										"iPhone 7S"
+									]
+								},
+								"operatingSystem": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "The operating system",
+									"examples": [
+										"iOS 10.2"
+									]
+								},
+								"deviceId": {
+									"type": [
+										"string",
+										"null"
+									],
+									"description": "ID for this device. Not to be captured for customer-owned devices"
+								}
+							}
+						}
+					}
+				},
+				"triggerFunction": {
+					"additionalProperties": false,
+					"type": "object",
+					"description": "Describes a trigger for another platform or tool to respond to",
+					"required": [
+						"bertieType",
+						"functionType"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"triggerFunction"
+							]
+						},
+						"functionType": {
+							"type": "string",
+							"description": "describes the function",
+							"examples": [
+								"spa start",
+								"session complete",
+								"feature:returns"
+							]
+						},
+						"functionValue": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "provides additional information about the function",
+							"examples": [
+								"search"
+							]
+						}
+					}
+				},
+				"errorOp": {
+					"additionalProperties": false,
+					"type": "object",
+					"examples": [
+						"../examples/errorOp.json"
+					],
+					"required": [
+						"bertieType",
+						"error"
+					],
+					"properties": {
+						"bertieType": {
+							"type": "string",
+							"description": "The type name of the data being presented",
+							"enum": [
+								"errorOp"
+							]
+						},
+						"error": {
+							"type": "array",
+							"description": "captures basic data about errors generated in the user interface",
+							"items": {
+								"additionalProperties": false,
+								"type": "object",
+								"required": [
+									"message"
+								],
+								"properties": {
+									"code": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "error code if available",
+										"examples": [
+											"30411"
+										]
+									},
+									"message": {
+										"type": "string",
+										"description": "error message displayed to user or friendly text for error",
+										"examples": [
+											"sorry this account has not been recognised"
+										]
+									},
+									"errorType": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "describes the type of error at a high level",
+										"enum": [
+											"server",
+											"api",
+											"interaction",
+											"network",
+											"other",
+											null
+										]
+									},
+									"interactionType": {
+										"type": [
+											"string",
+											"null"
+										],
+										"description": "describes the type of user interaction",
+										"enum": [
+											"input",
+											"form",
+											"action",
+											"pageload",
+											"checkout",
+											"other",
+											null
+										]
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"misc": {
+			"timeStamp": {
+				"type": "string",
+				"description": "ISO 8601 Format for timestamps UTC time. Can use local time + offset e.g. YYYY-MM-DDTHH:MM:SS.sss±HH:MM or Zulu time e.g. YYYY-MM-DDTHH:MM:SS.sssZ",
+				"pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\\\.[0-9]{3}(Z|(\\\\+|-)[0-9]{2}:[0-9]{2})$",
+				"examples": [
+					"2017-06-02T12:36:02.001+01:00"
+				]
+			},
+			"date": {
+				"type": [
+					"string",
+					"null"
+				],
+				"description": "A simple date YYYY-MM-DD",
+				"pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+				"examples": [
+					"2017-06-02"
+				]
+			},
+			"slotTime": {
+				"type": "string",
+				"description": "Time to closest minute in time zone of delivery YYYY-MM-DDTHH:MM",
+				"pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$",
+				"examples": [
+					"2017-06-02T12:36"
+				]
+			},
+			"taxonomyCategory": {
+				"additionalProperties": false,
+				"type": [
+					"object",
+					"null"
+				],
+				"description": "Defines a taxonomy level",
+				"properties": {
+					"categoryName": {
+						"type": [
+							"string",
+							"null"
+						],
+						"description": "category name",
+						"examples": [
+							"fresh food"
+						]
+					},
+					"catFriendlyLevel": {
+						"type": [
+							"string",
+							"null"
+						],
+						"description": "friendly name for this category level",
+						"examples": [
+							"super department"
+						]
+					}
+				}
+			},
+			"price": {
+				"additionalProperties": false,
+				"type": "object",
+				"description": "Contains price information for an item",
+				"required": [
+					"price",
+					"priceCurrency"
+				],
+				"properties": {
+					"price": {
+						"type": "number",
+						"description": "price of item limited to 2 decimal places",
+						"examples": [
+							12.36
+						]
+					},
+					"priceCurrency": {
+						"type": "string",
+						"description": "currency string for the price",
+						"examples": [
+							"GBP"
+						]
+					}
+				}
+			},
+			"points": {
+				"type": "integer",
+				"description": "volume of points"
+			},
+			"weight": {
+				"additionalProperties": false,
+				"type": "object",
+				"description": "weight of a product",
+				"required": [
+					"weightMeasure",
+					"weight"
+				],
+				"properties": {
+					"weightMeasure": {
+						"type": "string",
+						"description": "unit of measure for this product",
+						"examples": [
+							"kg"
+						]
+					},
+					"weight": {
+						"type": "number",
+						"description": "the weight of this product",
+						"examples": [
+							0.6
+						]
+					}
+				}
+			},
+			"segment": {
+				"additionalProperties": false,
+				"type": [
+					"object",
+					"null"
+				],
+				"description": "Defines the segment that this customer or content is a part of",
+				"required": [
+					"segmentName",
+					"segmentValue"
+				],
+				"properties": {
+					"segmentName": {
+						"type": "string",
+						"description": "name of this segment",
+						"examples": [
+							"hyf"
+						]
+					},
+					"segmentValue": {
+						"type": "string",
+						"description": "value of this segment",
+						"examples": [
+							"abc"
+						]
+					}
+				}
+			},
+			"storeData": {
+				"additionalProperties": false,
+				"type": [
+					"object",
+					"null"
+				],
+				"description": "Information about a store or location",
+				"properties": {
+					"storeId": {
+						"type": [
+							"string",
+							"null"
+						],
+						"description": "Store branch Id from location service",
+						"examples": [
+							"3103"
+						],
+						"pattern": "^[0-9]{4,5}$"
+					},
+					"locationId": {
+						"type": [
+							"string",
+							"null"
+						],
+						"description": "Store Location Id from location service",
+						"examples": [
+							"7a97c8ad-121e-40f7-9fad-33f1917e57da"
+						],
+						"pattern": "(([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+)-([\\\\d|\\\\w]+))"
+					}
+				}
+			},
+			"attribute": {
+				"additionalProperties": false,
+				"type": [
+					"object",
+					"null"
+				],
+				"description": "Defines a set of attributes associated with a product",
+				"properties": {
+					"attributeName": {
+						"type": [
+							"string",
+							"null"
+						],
+						"description": "attribute name",
+						"examples": [
+							"location"
+						]
+					},
+					"attributeValue": {
+						"type": [
+							"string",
+							"null"
+						],
+						"description": "attribute value",
+						"examples": [
+							"4R12B6"
+						]
+					}
+				}
+			},
+			"flag": {
+				"type": "object",
+				"additionalProperties": false,
+				"description": "describes one flag for this order",
+				"required": [
+					"flagName",
+					"flagValue"
+				],
+				"properties": {
+					"flagName": {
+						"type": "string",
+						"description": "the name of the flag",
+						"examples": [
+							"driver present"
+						]
+					},
+					"flagValue": {
+						"type": "string",
+						"description": "the value of the flag",
+						"examples": [
+							"yes"
+						]
+					}
+				}
+			},
+			"mediaData": {
+				"type": "object",
+				"additionalProperties": false,
+				"description": "holds additional info specific to media",
+				"properties": {
+					"catalogueCountry": {
+						"type": [
+							"string",
+							"null"
+						],
+						"description": "Uppercase ISO country code descriptor for Media audience catalogue",
+						"examples": [
+							"GB, IE, CZ"
+						]
+					},
+					"basketId": {
+						"description": "identifier for the primary basket",
+						"$ref": "#/definitions/bertie/basket/basketId"
+					},
+					"secondBasketId": {
+						"description": "identifier for secondary basket in cases where more than 1 basket is active concurrently",
+						"$ref": "#/definitions/bertie/basket/basketId"
+					}
+				}
+			}
+		}
+	},
+	"allOf": [
+		{
+			"$ref": "#/definitions/bertie/event"
+		}
+	]
+}'

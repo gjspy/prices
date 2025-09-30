@@ -27,3 +27,11 @@ ON MY GRAPH OF PRICE HISTORY, SHADE REGIONS WHERE AN OFFER WAS APPLIED
 GRAPH BKG IS WHITE, THEN WHEN "ANy X" WAS ON, LIGHT RED SHADING, CNA HOVER
 
 meal deal page, comparing them all :)
+
+
+
+
+
+
+need some cleanup for unlinked products. if one of our productids doesnt have a link, itll never be found in data gathering.
+have in admin panel!
