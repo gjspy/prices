@@ -1,0 +1,19 @@
+asda:
+
+look at firefox dev tools (SOFTWARE) network tab, inspected XHR filter
+found alogolia
+requires algolia-apikey
+
+
+
+tesco:
+ffx dev again
+found xapi.tesco.com, resembles graphql structure from past experience
+try "edit and resend", doesnt work
+requires traceid, xapi-key and , trkid (trace is trk:trace)
+notice other requests, traceid is sifferent
+stack trace /:37 (fetch), use debugger to step through code
+copied code to vs for easier navigatioN!!!!!!!!!
+found request() builder, with line 5648 (r.traceId = `${ this.traceIdPrefix }:${ (0, S.v4) () }`),
+S.v4 = k
+k = all the maths for uuid v4 generation.
