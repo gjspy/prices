@@ -1,10 +1,11 @@
 import requests
 import time
+import uuid
+from dotenv import dotenv_values
 
-
-trk = "a4d2f5be-cd48-4591-a9c1-32c9b95ed715"
-trc = "40a7198d-6b3b-466b-80b2-b4cca313e798"
-apik = ""
+trk = str(uuid.uuid4())#"a4d2f5be-cd48-4591-a9c1-32c9b95ed715"
+trc = str(uuid.uuid4())##"dcb28470-e239-44b1-b709-5405b700c075"#"40a7198d-6b3b-466b-80b2-b4cca313e798"
+apik = dotenv_values(".config")["TESCO_XAPI_KEY"]
 traceid = trk + ":" + trc
 print(traceid)
 
@@ -27,7 +28,7 @@ print(a.content)
 with open(f"{time.time()}.json", "wb") as f:
 	f.write(a.content)
 
-print("'''")
+print("#######")
 print(a.json())
 
 

@@ -35,3 +35,5 @@ meal deal page, comparing them all :)
 
 need some cleanup for unlinked products. if one of our productids doesnt have a link, itll never be found in data gathering.
 have in admin panel!
+
+tesco may be seriously different delivery vs instore

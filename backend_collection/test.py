@@ -14,6 +14,8 @@ from dbmanager.process import DBThread
 import dbclasses as objs
 from collectors.storagemanager import StorageManager
 
+# TODO: CLEAN NAMES BEFORE PUTTING INTO DB. REMOVE PACKSIZE AND BRANDNAME FROM TITLE, ETC.
+
 load_dotenv()
 
 SSH_USER = os.getenv("SSH_USER")
@@ -87,7 +89,7 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 
 	return
 
-	collector = AlgoliaCollector(CONFIG, "ASDA_PRODUCTS", "ASDA")
+	collector = AlgoliaCollector(CONFIG, "ASDA_PRODUCTS", "ASDA", 100)
 
 	storables = await this.search("cheese")
 	print("res",storables)

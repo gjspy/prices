@@ -1,19 +1,22 @@
 from copy import deepcopy
-from typing import Any
 import re
 
-
-from basecollector import BaseCollector
-from constants import safe_deepget, int_safe, convert_str_to_pence, split_packsize
+from backend_collection.collectors.basecollector import BaseCollector
+from backend_collection.mytypes import Number, Result
+from backend_collection.constants import (
+	safe_deepget, int_safe, convert_str_to_pence,
+	clean_product_name, regex)
 
 
 class AlgoliaCollector(BaseCollector):
-	def __init__(self, config: dict[str, str], algolia_index_name: str, store: str):
+	def __init__(
+			self, config: Result, endpoint: str, algolia_index_name: str,
+			store: str, results_per_search: int):
 
-		super().__init__(config)
+		super().__init__() # nothing happens here?
 
-		self.endpoint = "https://8i6wskccnv-dsn.algolia.net/1/indexes/*/queries"
-		self.headers = {
+		self.endpoint = endpoint
+		self.__HEADERS = {
 			"Accept": "*/*",
 			"x-algolia-api-key": config["ASDA_ALGOLIA_API_KEY"],
 			"x-algolia-application-id": config["ASDA_ALGOLIA_API_APP"]
@@ -28,7 +31,7 @@ class AlgoliaCollector(BaseCollector):
 					"indexName": algolia_index_name, # "ASDA_PRODUCTS"
 					"clickAnalytics": False,
 					"analytics": False,
-					"hitsPerPage": 100,
+					"hitsPerPage": results_per_search,
 					"page": 0,
 					"typoTolerance": True,
 					"removeWordsIfNoResults": "allOptional",
@@ -76,18 +79,20 @@ class AlgoliaCollector(BaseCollector):
 
 		self.results_path = ["results", 0, "hits"]
 		self.prices_from_result = ["PRICES", "EN"]
-		self.promo_from_result = ["PROMO", "EN", 0]
+		self.promo_from_result = ["PROMOS", "EN", 0]
+
+		self.image_url = "https://asdagroceries.scene7.com/is/image/asdagroceries/{0}"
 
 
 	def get_sendable_search_request(
-			self, query: str) -> dict[str, Any]:
+			self, query: str) -> Result:
 		v = deepcopy(self._base_search_request)
 		v["requests"][0]["query"] = query
 
 		return v
 
 
-	def process_promo(self, result: dict[str, Any]) -> dict[str, Any]:
+	def process_promo(self, result: Result) -> Result:
 		prices_data: dict[str, str] | None = safe_deepget(result, self.prices_from_result)
 
 		if (prices_data):
@@ -96,7 +101,8 @@ class AlgoliaCollector(BaseCollector):
 			if (offer_type and offer_type != "List"):
 				# Rollback, Dropped
 				return {
-					"offer_type": prices_data["OFFER"],
+					"offer_type": "_Reduction",
+					"store_given_data": prices_data["OFFER"],
 					"was_price": prices_data["WASPRICE"] * 100
 				}
 		
@@ -108,7 +114,7 @@ class AlgoliaCollector(BaseCollector):
 		offer_value = promo_data["NAME"]
 
 		# IS "Any X for £X"
-		match = re.match(r"Any (\d+) for ((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p))", offer_value) # TYPE 15
+		match = re.match(regex.ANY_X_FOR_PROMO, offer_value.lower()) # TYPE 15
 
 		if (match):
 			groups = match.groups()
@@ -127,42 +133,63 @@ class AlgoliaCollector(BaseCollector):
 		
 		# TODO: LOG THIS
 		return {
-			"offer_type": offer_value,
+			"unknown_offer_type": offer_value + "_" + str(promo_data.get("TYPE")),
 			"start_date": promo_data.get("START_DATE"),
 			"end_date": promo_data.get("END_DATE"), # TODO: THESE ARE UNIX STAMPS.
 			"store_given_id": promo_data.get("ID")
 		}
 
 
-	def parse_packsize(self, packsize: str) -> tuple[int, int | float, str]:
-		packsize = packsize.upper()
+	
+	
 
-		multi = re.search(r"([\d\.]+)X([\d\.]+)([A-z]*)", packsize)
-		if (multi):
-			count, size_each, unit = multi.groups()
+	def parse_packsize(self, result: Result, product_name: str):
+		"""
+		algolia provides pack size with the PACK_SIZE field
+		AND in the product name now too (sadly.)
+		
+		RIP to being atomic and beautiful..
 
-			if (unit): # TODO THEY GIVE "2L" OR "8X330". NO UNIT ON MULTIs. IN ADMIN PANEL, WRITE THEM.
-				size_, unit_ = split_packsize(size_each, unit)
-				return (int(count), size_, unit_)
-			
-			return (int(count), float(size_each), "")
+		This method parses all possible methods of finding PACKSIZE and
+		decides which one to keep.
+		"""
+		
+		# USUALLY TOTAL PACKSIZE. RARELY DOES MULTI HERE.
+		packsize_text = result.get("PACK_SIZE") or ""
+		pst_count, pst_size_each, pst_unit = self._parse_packsize_str(packsize_text)
 
+		# NOW USUALLY "..NAME.. MULTIxMULTI (TOTAL)"
+		n_count, n_size_each, n_unit = self._parse_packsize_str(product_name)
 
-		size, unit = split_packsize(packsize)
-		if (size != -1): return (1, size, unit)
-
-		return (0, -1, "")
+		# TAKE ANY NON-1 VALUE FOR COUNT, WE WANT MULTI IF IT EXISTS.
+		# IF n_c == 1, pst_c MUST BE MULTI OR == pst_c IF THAT EXISTS.
+		# BASICALLY, ONLY COME BACK FOR n_c IF pst DOESNT EXIST.
+		return (
+			(n_count, n_size_each, n_unit) if (
+				(n_count != 0 and n_count != 1) or (pst_count == 0)
+			) else (pst_count, pst_size_each, pst_unit)
+		)
 	
 
 
-	def get_storable_from_result(self, result: dict[str, Any]) -> dict[str, Any]:
-		count, size_each, unit = self.parse_packsize(result["PACKSIZE"])
-		image_id = result["IMAGE_ID"]
+	def get_storable_from_result(self, result: Result) -> Result:
+		brand_name = result.get("BRAND") or ""
+		image_id = result.get("IMAGE_ID") or ""
 
+		# ORIGINALLY GAVE SUPER CLEAN,
+		# NOW INCLUDES PACKSIZE :(
+		# CLEAN IT FOR FUTURE PROOFING
+		name = result.get("NAME") or ""
+
+		price_data: dict[str, str] = safe_deepget(result, self.prices_from_result) or {}
+		taxonomy: dict[str, str] = result.get("PRIMARY_TAXONOMY") or {}
+
+		count, size_each, unit = self.parse_packsize(result, name)
+		
 		return {
 			"product": {
-				"brand_name": result["BRAND"],
-				"name": result["NAME"],
+				"brand_name": brand_name, # CLEANEST, Title Case
+				"name": clean_product_name(name, brand_name),
 				"packsize": {
 					"count": count,
 					"sizeeach": size_each,
@@ -170,61 +197,31 @@ class AlgoliaCollector(BaseCollector):
 				}
 			},
 			"image": {
-				"url": f"https://asdagroceries.scene7.com/is/image/asdagroceries/{image_id}"
+				"url": self.image_url.format(image_id)
 				# ASDA IMAGES DO NOT HAVE ICONS!!
 			},
 			"link": {
 				"upc": int_safe(image_id),
 				"store": self.store,
-				"cin": int_safe(result["CIN"])
+				"cin": int_safe(result.get("CIN"))
 			},
 			"price": {
-				"price_pence": int(result["PRICES"]["EN"]["PRICE"]) * 100,
-				#"was_price": result["PRICES"]["EN"].get("WASPRICE"), now in offer
-				"available": result["STATUS"] == "A" # NOT STOCK LEVELS. THEY'RE PER STORE.
+				"price_pence": int(float(price_data.get("PRICE") or -1) * 100),
+				"available": result.get("STATUS") == "A" # NOT STOCK LEVELS. THEY'RE PER STORE.
 			},
 			"offer": self.process_promo(result),
 			"rating": {
-				"avg": result["AVG_RATING"],
-				"count": result["RATING_COUNT"]
+				"avg": result.get("AVG_RATING"),
+				"count": result.get("RATING_COUNT")
 			},
 			"category": {
-				"category": result["PRIMARY_TAXONOMY"]["CAT_NAME"], # eg Chilled Food
-				"department": result["PRIMARY_TAXONOMY"]["DEPT_NAME"] # eg Cheese
+				"category": taxonomy.get("CAT_NAME"), # eg Chilled Food
+				"department": taxonomy.get("DEPT_NAME") # eg Cheese
 				# also has aisle [Cheddar & Regional Cheese]
 				# and shelf [Mature Cheese] but thats too granular
 			}
 		}
 
 
-	def parse_data(self, data: dict[str, Any]) -> list[dict[str, Any]]:
-		results: list[dict[str, Any]] | None
-		results = safe_deepget(data, self.results_path)
-		print(results,"RESIL")
-		if (not results): return []
-
-		clean_datas: list[dict[str, Any]] = []
-
-		for result in results:
-			#try:
-				clean_datas.append(self.get_storable_from_result(result))
-			#except Exception as err:
-				#... # LOG, FIGURE LOGGING OUT
-			#	print(err,"err")
-			
-		return clean_datas
-
-
-
-
-
-	async def search(self, query: str) -> list[dict[str, Any]]:
-		req_body = self.get_sendable_search_request(query)
-
-		result = await self._post(body = req_body)
-		data = result.json()
-		print(data)
-
-		storables = self.parse_data(data)
-
-		return storables
+	def get_headers(self) -> dict[str, str]:
+		return self.__HEADERS # easy here, other places require computation
