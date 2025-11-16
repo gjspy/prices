@@ -4,6 +4,7 @@ from functools import partial
 from typing import Any
 from requests import Response
 import requests
+import urllib
 import time
 import json
 import re
@@ -26,6 +27,8 @@ class BaseCollector:
 		self.endpoint: str = NotImplemented
 		self.results_path = NotImplemented
 		self.store = NotImplemented
+
+		self.http_method = NotImplemented
 
 
 	async def _get(
@@ -75,7 +78,10 @@ class BaseCollector:
 		
 
 
-	def get_sendable_search_request(self, query: str) -> Any:
+	def get_postable_search_body(self, query: str) -> Any:
+		raise NotImplementedError
+	
+	def get_gettable_search_params(self, query: str) -> Any:
 		raise NotImplementedError
 	
 
@@ -154,9 +160,17 @@ class BaseCollector:
 	
 
 	async def search(self, query: str, debug: bool = False) -> list[Result]:
-		req_body = self.get_sendable_search_request(query)
+		result = None
 
-		result = await self._post(body = req_body)
+		if (self.http_method == "POST"):
+			req_body = self.get_postable_search_body(query)
+
+			result = await self._post(body = req_body)
+		
+		if (self.http_method == "GET"):
+			endpoint = self.get_sendable_search_params(query)
+
+			result = await self._get()
 		#data = result.json(kwds={"ensure_ascii": True}) # ensure_ascii so \u00a3 -> £ !!
 		data = self._load_data_from_response(result)
 

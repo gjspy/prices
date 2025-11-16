@@ -21,8 +21,10 @@ class AlgoliaCollector(BaseCollector):
 			"x-algolia-api-key": config["ASDA_ALGOLIA_API_KEY"],
 			"x-algolia-application-id": config["ASDA_ALGOLIA_API_APP"]
 		}
+		self.http_method = "POST"
 
 		self.store = store
+		self.results_per_search = results_per_search
 		self.algolia_index_name = algolia_index_name
 		self._base_search_request = {
 			"requests": [
@@ -84,7 +86,7 @@ class AlgoliaCollector(BaseCollector):
 		self.image_url = "https://asdagroceries.scene7.com/is/image/asdagroceries/{0}"
 
 
-	def get_sendable_search_request(
+	def get_postable_search_body(
 			self, query: str) -> Result:
 		v = deepcopy(self._base_search_request)
 		v["requests"][0]["query"] = query

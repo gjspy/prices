@@ -22,9 +22,10 @@ class GQLCollector(BaseCollector):
 			"Accept": "application/json",
 			"x-apikey": config["TESCO_XAPI_KEY"]
 		}
+		self.http_method = "POST"
 
 		self.store = store
-		#self.algolia_index_name = algolia_index_name
+		self.results_per_search = results_per_search
 		self._base_search_request: list[Result] = [
 			{
 				"operationName": "Search",
@@ -80,7 +81,7 @@ class GQLCollector(BaseCollector):
 		self.membership_price_promo_keyword = "Clubcard Price"
 
 
-	def get_sendable_search_request(
+	def get_postable_search_body(
 			self, query: str) -> list[Result]:
 		v = deepcopy(self._base_search_request)
 		v[0]["variables"]["query"] = query
