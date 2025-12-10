@@ -15,10 +15,12 @@ COLLECT_START_TIME = "02:00"
 
 ASDA_ENDPOINT = "https://8i6wskccnv-dsn.algolia.net/1/indexes/*/queries"
 TESCO_ENDPOINT = "https://xapi.tesco.com"
+MORRISONS_ENDPOINT = "https://groceries.morrisons.com/api/webproductpagews/v6/product-pages/search"
 
 class StoreNames:
 	tesco = "TESCO"
 	asda = "ASDA"
+	morrisons = "MORRISONS"
 
 class regex:
 	"""ALL MATCHES SHOULD USE .lower() FOR THE SEARCH STRING."""

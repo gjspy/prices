@@ -4,7 +4,6 @@ from functools import partial
 from typing import Any
 from requests import Response
 import requests
-import urllib
 import time
 import json
 import re
@@ -168,10 +167,14 @@ class BaseCollector:
 			result = await self._post(body = req_body)
 		
 		if (self.http_method == "GET"):
-			endpoint = self.get_sendable_search_params(query)
+			endpoint = self.get_gettable_search_params(query)
 
-			result = await self._get()
+			result = await self._get(endpoint)
 		#data = result.json(kwds={"ensure_ascii": True}) # ensure_ascii so \u00a3 -> £ !!
+
+		if (result == None):
+			raise ValueError("HTTP_METHOD INVALID")
+		
 		data = self._load_data_from_response(result)
 
 		if (debug):

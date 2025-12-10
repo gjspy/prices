@@ -4,8 +4,8 @@ import asyncio
 import json
 import time
 
-from backend_collection.collectors import algolia, graphql
-from backend_collection.constants import ASDA_ENDPOINT, TESCO_ENDPOINT, StoreNames
+from backend_collection.collectors import algolia, graphql, clusters
+from backend_collection.constants import ASDA_ENDPOINT, TESCO_ENDPOINT, MORRISONS_ENDPOINT, StoreNames
 
 import os
 print(os.getcwd())
@@ -13,8 +13,9 @@ print(os.getcwd())
 config = dotenv_values(".config")
 RESULTS_PER_SEARCH = 100
 
-asda = algolia.AlgoliaCollector(config, ASDA_ENDPOINT, "ASDA_PRODUCTS", StoreNames.asda, RESULTS_PER_SEARCH)
-tesco = graphql.GQLCollector(config, TESCO_ENDPOINT, StoreNames.tesco, RESULTS_PER_SEARCH)
+#asda = algolia.AlgoliaCollector(config, ASDA_ENDPOINT, "ASDA_PRODUCTS", StoreNames.asda, RESULTS_PER_SEARCH) # LAPTOP NEEDS ..config FILE!! NO KEYS!!
+#tesco = graphql.GQLCollector(config, TESCO_ENDPOINT, StoreNames.tesco, RESULTS_PER_SEARCH)
+mor = clusters.ClusterCollector(config, MORRISONS_ENDPOINT, StoreNames.morrisons, RESULTS_PER_SEARCH)
 
 
 """a = algolia.AlgoliaCollector({"ASDA_ALGOLIA_API_KEY":"", "ASDA_ALGOLIA_API_APP": ""}, "", "", "ASDA", 1)
@@ -254,17 +255,17 @@ print(a.parse_packsize({
 				},))
 """
 
-print(tesco._parse_packsize_str("Castello Extra Creamy Brie Cheese 200g  g"))
+#print(tesco._parse_packsize_str("Castello Extra Creamy Brie Cheese 200g  g"))
 
 async def main():
-	#result = await asda.search("cheese", True)
-	#print(result)
-	#result = await tesco.search("cheese", True)
-	d = json.load(open("TESCODebugResponse_1763226284j.json","r"))
+	result = await mor.search("cheese", True)
+	print(result)
+	
+	"""d = json.load(open("TESCODebugResponse_1763226284j.json","r"))
 	result = tesco.parse_data(d)
 
 	with open(f"TestResult_{int(time.time())}.json", "w") as f:
-		json.dump(result, f, indent = 2)
+		json.dump(result, f, indent = 2)"""
 
 
 
@@ -283,5 +284,8 @@ ASDA and TESCO seem complete:
 	-packsize works
 
 	check TODOS. theres quite a few :)
+
+	
+eventually want to have TESCO, ASDA, MORRISONS, SAINSBURYS, ALDI.
 
 """

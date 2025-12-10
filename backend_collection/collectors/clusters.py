@@ -25,11 +25,15 @@ class ClusterCollector(BaseCollector):
 
 		self.store = store
 		self.results_per_search = results_per_search
+	
+	def get_headers(self):
+		return self.__HEADERS
 		
 	def get_gettable_search_params(self, query: str):
 		return {
 			"includeAdditionalPageInfo": "false",
 			"maxProductsToDecorate": self.results_per_search,
+			"maxPageSize": self.results_per_search,
 			"q": query
 		}
 	
@@ -39,4 +43,15 @@ class ClusterCollector(BaseCollector):
 
 	def parse_packsize(self, result: Result, product_name: str):...
 
-	def get_storable_from_result(self, result: Result) -> Result:...
+	def get_storable_from_result(self, result: Result) -> Result:
+
+
+
+"""RESPONSE:
+productGroups[0] = decoratedProducts [type="featured"] (Sponsored results.)
+productGroups[1] = decoratedProducts [type="personalized"]
+each productGroup has a few products, and all seem related. scrolling on morrisons, saw same for first productgroup.
+
+
+
+"""
