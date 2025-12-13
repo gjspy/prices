@@ -10,8 +10,8 @@ from backend_collection.constants import (
 
 class AlgoliaCollector(BaseCollector):
 	def __init__(
-			self, config: Result, endpoint: str, algolia_index_name: str,
-			store: str, results_per_search: int):
+			self, env: Result, config: Result, endpoint: str,
+			algolia_index_name: str, store: str, results_per_search: int):
 
 		super().__init__() # nothing happens here?
 
@@ -22,6 +22,7 @@ class AlgoliaCollector(BaseCollector):
 			"x-algolia-application-id": config["ASDA_ALGOLIA_API_APP"]
 		}
 		self.http_method = "POST"
+		self._compute_cfw_e(env)
 
 		self.store = store
 		self.results_per_search = results_per_search
@@ -100,8 +101,8 @@ class AlgoliaCollector(BaseCollector):
 		if (prices_data):
 			offer_type = prices_data.get("OFFER")
 
-			if (offer_type and offer_type != "List"):
-				# Rollback, Dropped
+			if (offer_type and offer_type != "List"): # TODO, ARE THERE MORE THAN ROLLBACK THAT END UP HERE?
+				# Rollback, Dropped # TODO, WHAT IS store_given_data, WHERE IS store_given_id?
 				return {
 					"offer_type": "_Reduction",
 					"store_given_data": prices_data["OFFER"],
@@ -113,7 +114,8 @@ class AlgoliaCollector(BaseCollector):
 
 		if (not promo_data): return {}
 		
-		offer_value = promo_data["NAME"]
+		offer_value = promo_data.get("NAME")
+		if (not offer_value): return {}
 
 		# IS "Any X for £X"
 		match = re.match(regex.ANY_X_FOR_PROMO, offer_value.lower()) # TYPE 15
@@ -125,7 +127,7 @@ class AlgoliaCollector(BaseCollector):
 				"offer_type": "_AnyFor",
 				"any_count": int(groups[0]),
 				"for_price": convert_str_to_pence(groups[1]),
-				"store_given_id": promo_data["ID"] # CAN MIX AND MATCH OTHER PRODUCTS
+				"store_given_id": promo_data.get("ID") # CAN MIX AND MATCH OTHER PRODUCTS
 			}
 		
 		# TODO: REFER BY TYPE
@@ -208,7 +210,7 @@ class AlgoliaCollector(BaseCollector):
 				"cin": int_safe(result.get("CIN"))
 			},
 			"price": {
-				"price_pence": int(float(price_data.get("PRICE") or -1) * 100),
+				"price_pence": convert_str_to_pence(price_data.get("PRICE") or ""),
 				"available": result.get("STATUS") == "A" # NOT STOCK LEVELS. THEY'RE PER STORE.
 			},
 			"offer": self.process_promo(result),

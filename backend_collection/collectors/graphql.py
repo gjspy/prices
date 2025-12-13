@@ -12,7 +12,7 @@ from backend_collection.constants import (
 
 class GQLCollector(BaseCollector):
 	def __init__(
-			self, config: Result, endpoint: str,
+			self, env: Result, config: Result, endpoint: str,
 			store: str, results_per_search: int):
 
 		super().__init__() # nothing happens here?
@@ -23,6 +23,7 @@ class GQLCollector(BaseCollector):
 			"x-apikey": config["TESCO_XAPI_KEY"]
 		}
 		self.http_method = "POST"
+		self._compute_cfw_e(env)
 
 		self.store = store
 		self.results_per_search = results_per_search
@@ -78,7 +79,7 @@ class GQLCollector(BaseCollector):
 		self.promo_from_result = ["promotions", 0]
 		self.reviews_from_result = ["reviews", "stats"]
 		self.first_attribute_from_promo = ["attributes", 0]
-		self.membership_price_promo_keyword = "Clubcard Price"
+		self.membership_price_promo_keyword = "clubcard price"
 
 
 	def get_postable_search_body(
@@ -121,7 +122,7 @@ class GQLCollector(BaseCollector):
 
 		# THIS MUST BE THE LAST EVALUATION
 		# AS OTHERS LIKE "ANY FOR" INCLUDE THE KEYWORD.
-		if (self.membership_price_promo_keyword in offer_value):
+		if (self.membership_price_promo_keyword in offer_value.lower()):
 			price_found = re.match(regex.ANY_PRICE, offer_value.lower())
 			if (not price_found): return {}
 
@@ -132,6 +133,10 @@ class GQLCollector(BaseCollector):
 				formatted_data,
 				member_reduced_price = convert_str_to_pence(price_str)
 			)
+
+		# TODO: ALDI PRICE MATCH
+		# VERIFY IF IS ACTUALLY A PRICE MATCH!! COOL IDEA!!
+		# MORRISONS ALSO HAS PRICE MATCHES.
 
 		
 		# TODO: LOG THIS

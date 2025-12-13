@@ -1,3 +1,5 @@
+*_private.*
+
 .config
 #*DebugResponse_*.json
 #TestResult_*.json

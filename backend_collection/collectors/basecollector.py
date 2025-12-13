@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor as TPE
+#from urllib import parse as urlparse
 from asyncio import get_running_loop
 from functools import partial
 from typing import Any
@@ -8,10 +9,14 @@ import time
 import json
 import re
 
+
 from backend_collection.mytypes import Number, Result
 from backend_collection.constants import (
-	safe_deepget, regex, split_packsize_str, standardise_packsize)
+	safe_deepget, regex, split_packsize_str, standardise_packsize,
+	stringify_query)
 
+
+# WE HAVE EXECUTOR AS requests IS NOT NATIVELY ASYNCHRONOUS.
 async def async_executor(func: partial[Any]):
 	loop = get_running_loop()
 
@@ -30,35 +35,76 @@ class BaseCollector:
 		self.http_method = NotImplemented
 
 
+	async def __request(self, options: dict[str, Any]):
+		if (not self._cfwt):
+			p = options.get("p") or ""
+
+			func = partial(requests.request,
+				method = options["m"],
+				url = self.endpoint + (f"?{p}" if p else ""),
+				headers = options.get("h"),
+				json = options.get("b"))
+
+			result = await async_executor(func)
+			return result
+		
+		b = options.get("b")
+		d = {
+			"s": self.__cfws,
+			"i": self.__cfwe,
+			"p": options.get("p"),
+			"h": options.get("h"),
+			"m": options.get("m"),
+			"b": json.dumps(b) if b else None
+		}
+
+		f = partial(requests.request,
+			method = "POST",
+			url = self.__cfww,
+			json = d,
+			headers =  self.__cfwa)
+		
+		result = await async_executor(f)
+		return result
+
+
 	async def _get(
 			self, query_params: dict[str, str] = {}) -> Response:
+		
+		r = await self.__request({
+			"m": "GET",
+			"h": self.get_headers(),
+			"p": stringify_query(query_params)
+		})
 
-		func = partial(requests.request,
-			method = "GET",
-			url = self.endpoint,
-			params = query_params,
-			headers = self.get_headers())
-
-		result = await async_executor(func)
-
-		return result
+		return r
 
 
 	async def _post(
 			self, query_params: dict[str, str] = {},
 			body: Result = {}) -> Response:
 
-		func = partial(requests.request,
-			method = "POST",
-			url = self.endpoint,
-			json = body,
-			params = query_params,
-			headers = self.get_headers())
+		r = await self.__request({
+			"m": "POST",
+			"h": self.get_headers(),
+			"p": stringify_query(query_params),
+			"b": body
+		})
 
-		result = await async_executor(func)
-
-		return result
+		return r
 	
+
+	def _compute_cfw_e(self, env: Result):
+		try:
+			self.__cfwe = json.loads(env["CFW_E"]).index(self.endpoint)
+			self.__cfws = env["CFW_S"]
+			self.__cfwa = json.loads(env["CFW_A"])
+			self.__cfww = env["CFW"]
+			self._cfwt = True
+		except Exception as err:
+			err.add_note("FATAL: COULD NOT COMPUTE CFW")
+			raise err
+
 
 	def _load_data_from_response(self, response: requests.Response):
 		"""
@@ -88,7 +134,7 @@ class BaseCollector:
 	def get_headers(self) -> dict[str, str]:
 		raise NotImplementedError
 
-	def get_storable_from_result(self, result: Result) -> Result:
+	def get_storables_from_result(self, result: Result) -> list[Result]:
 		raise NotImplementedError
 
 
@@ -140,17 +186,17 @@ class BaseCollector:
 		return (0, -1, "")
 
 
-	def parse_data(self, data: Result) -> list[Result]:
+	def parse_data(self, data: Result) -> list[list[Result]]:
 		results: list[Result] | None
 		results = safe_deepget(data, self.results_path)
 
 		if (not results): return []
 
-		clean_datas: list[Result] = []
+		clean_datas: list[list[Result]] = []
 
 		for result in results:
 			#try:
-				clean_datas.append(self.get_storable_from_result(result))
+				clean_datas.append(self.get_storables_from_result(result))
 			#except Exception as err:
 				#... # TODO LOG, FIGURE LOGGING OUT
 			#	print(err,"err")
@@ -158,7 +204,7 @@ class BaseCollector:
 		return clean_datas
 	
 
-	async def search(self, query: str, debug: bool = False) -> list[Result]:
+	async def search(self, query: str, debug: bool = False) -> list[list[Result]]:
 		result = None
 
 		if (self.http_method == "POST"):
@@ -175,7 +221,12 @@ class BaseCollector:
 		if (result == None):
 			raise ValueError("HTTP_METHOD INVALID")
 		
-		data = self._load_data_from_response(result)
+		data = None
+
+		try:
+			data = self._load_data_from_response(result)
+		except Exception as err:
+			print("error loading JSON from response", err)
 
 		if (debug):
 			with open(
@@ -189,6 +240,8 @@ class BaseCollector:
 			with open(
 				f"{self.store}DebugResponse_{int(time.time())}j.json", "w"
 			) as f: json.dump(data, f)
+		
+		if (not data): return []
 
 		storables = self.parse_data(data)
 

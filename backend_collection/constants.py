@@ -16,11 +16,13 @@ COLLECT_START_TIME = "02:00"
 ASDA_ENDPOINT = "https://8i6wskccnv-dsn.algolia.net/1/indexes/*/queries"
 TESCO_ENDPOINT = "https://xapi.tesco.com"
 MORRISONS_ENDPOINT = "https://groceries.morrisons.com/api/webproductpagews/v6/product-pages/search"
+SAINSBURYS_ENDPOINT = "https://www.sainsburys.co.uk/groceries-api/gol-services/product/v1/product" # SEARCH ENDPOINT. (SAME AS PRODUCT?)
 
 class StoreNames:
 	tesco = "TESCO"
 	asda = "ASDA"
 	morrisons = "MORRISONS"
+	sainsburys = "SAINSBURYS"
 
 class regex:
 	"""ALL MATCHES SHOULD USE .lower() FOR THE SEARCH STRING."""
@@ -28,8 +30,11 @@ class regex:
 	CLEAN_STR = r"(?: {2,})|(?:^ +)|(?: +$)|(?:\( *\))|(?:\[ *\])|(?:\{ *\})"
 
 	# MATCHES £4.29, £4, 29p
-	ANY_PRICE = r"((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p))"
+	ANY_PRICE = r"((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p))" # CAPTURE GROUP
 	ANY_X_FOR_PROMO = rf"any (\d+) for {ANY_PRICE}"
+
+	MOR_REDUCTION = rf"now {ANY_PRICE}, was {ANY_PRICE}"
+	MOR_MULTIBUY = rf"buy (\d+) for {ANY_PRICE}"
 
 	# MATCHES DIGITS FOLLOWED BY CHAR UNITS.
 	PACKSIZE_ONE = r"([\d\.]+)([A-z]+)"
@@ -105,12 +110,12 @@ def int_safe(value: Any) -> int | None:
 
 
 def convert_str_to_pence(value: str) -> int:
-	if type(value) == int: # type: ignore [JUST IN CASE]
+	if type(value) == int or type(value) == float: # type: ignore [JUST IN CASE]
 		print(f"assuming int value is £ {value}")
 		return value * 100 # pence
 	
-	if ("£" in value): return int(float(value.replace("£", "")) * 100)
-	if ("p" in value): return int(value.replace("p", ""))
+	if ("£" in value): return int_safe(float(value.replace("£", "")) * 100) or -1
+	if ("p" in value): return int_safe(value.replace("p", "")) or -1
 
 	return -1
 
@@ -167,7 +172,7 @@ def clean_string(value: str):
 	return re.sub(regex.CLEAN_STR, "", value)
 
 
-def clean_product_name(name: str, brand_name: str):
+def clean_product_name(name: str, brand_name: str | None = None):
 	"""
 	Remove packsize/brand name, and clean string.
 
@@ -183,6 +188,15 @@ def clean_product_name(name: str, brand_name: str):
 	
 	name = clean_string(name)
 	return name
+
+
+def stringify_query(query_params: dict[str, str | Any]):
+	"""
+	Created this method as an alternative to `urllib.parse.urlencode`
+	
+	Point of this method is to stringify query params without urlsafing characters.
+	"""
+	return "&".join(f"{k}={repr(v)}" for k,v in query_params.items())
 
 class TaskThread(Thread):
 	"""

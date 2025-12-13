@@ -17,3 +17,20 @@ copied code to vs for easier navigatioN!!!!!!!!!
 found request() builder, with line 5648 (r.traceId = `${ this.traceIdPrefix }:${ (0, S.v4) () }`),
 S.v4 = k
 k = all the maths for uuid v4 generation.
+
+morrisons:
+straight forward, no trouble with calling api
+methods are reusable and easy to implement
+does not have upc field, sad
+
+
+**data analysis: get lots of different promos**
+
+didnt want to name each class [supermarket]collector, but none were reused so I did for future reference.
+while researching, discovered multiple shops aldi price match. implemented this as a feature..
+
+changed get_storable_from_result return format to allow for multiple Link entries per product.
+
+wanted to have a proxy
+researched and found cloudflare workers
+set up, discovered akamai blocks. built workaround.
