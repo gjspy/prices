@@ -65,7 +65,7 @@ class ClusterCollector(BaseCollector):
 			}
 
 		# REDUCTION
-		reduction_match = re.match(regex.MOR_REDUCTION, promo_description.lower())
+		reduction_match = re.match(regex.REDUCTION, promo_description.lower())
 
 		if (reduction_match):
 			groups = reduction_match.groups()
@@ -78,7 +78,7 @@ class ClusterCollector(BaseCollector):
 			}
 		
 		# MULTIBUY
-		multibuy_match = re.match(regex.MOR_MULTIBUY, promo_description.lower())
+		multibuy_match = re.match(regex.MULTIBUY, promo_description.lower())
 
 		if (multibuy_match):
 			groups = multibuy_match.groups()

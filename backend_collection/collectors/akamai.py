@@ -57,7 +57,23 @@ class AKMCollector(BaseCollector):
 
 		if ((not promo_id) or (not promo_description)): return {}
 
-		#promo_mechanic_id=99 = Save x with Nectar
+		formatted_data = {
+			"start_date": specific_promo.get("start_date"),
+			"end_date": specific_promo.get("end_date"),
+			"requires_membership": bool(specific_promo.get("is_nectar")),
+			"store_given_id": specific_promo.get("promotion_id")
+		}
+
+		# "Buy x for y"
+		multibuy_match = re.match(regex.MULTIBUY, promo_description.lower())
+
+		if (multibuy_match):
+			groups = multibuy_match.groups()
+
+			return {
+				"offer_type": "_Reduction",
+				
+			}
 
 
 

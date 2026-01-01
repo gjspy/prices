@@ -33,8 +33,8 @@ class regex:
 	ANY_PRICE = r"((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p))" # CAPTURE GROUP
 	ANY_X_FOR_PROMO = rf"any (\d+) for {ANY_PRICE}"
 
-	MOR_REDUCTION = rf"now {ANY_PRICE}, was {ANY_PRICE}"
-	MOR_MULTIBUY = rf"buy (\d+) for {ANY_PRICE}"
+	REDUCTION = rf"now {ANY_PRICE}, was {ANY_PRICE}"
+	MULTIBUY = rf"buy (\d+) for {ANY_PRICE}"
 
 	# MATCHES DIGITS FOLLOWED BY CHAR UNITS.
 	PACKSIZE_ONE = r"([\d\.]+)([A-z]+)"
