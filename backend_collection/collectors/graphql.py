@@ -1,3 +1,4 @@
+from typing import Any, Callable
 from copy import deepcopy
 import re
 from uuid import uuid4
@@ -6,8 +7,64 @@ from uuid import uuid4
 from backend_collection.collectors.basecollector import BaseCollector
 from backend_collection.mytypes import Result
 from backend_collection.constants import (
-	safe_deepget, int_safe, convert_str_to_pence, dict_add_values, 
-	clean_product_name, standardise_packsize, regex)
+	safe_deepget, int_safe, convert_str_to_pence, 
+	clean_product_name, standardise_packsize, regex, OFFER_TYPES)
+from backend_collection.promo_processor2 import InterfacePromoKeys, PromoProcessor
+
+
+class TSCPromoKeys(InterfacePromoKeys):
+	promo_from_data = 
+	promo_id = "id"
+	promo_description = "description"
+	promo_type = None
+
+	start_date = "startDate"
+	end_date = "endDate"
+	requires_membership = None
+
+
+class TSCPromoProcessor(PromoProcessor):
+	keys = TSCPromoKeys()
+	membership_price_promo_keyword = "clubcard price"
+
+	path_to_competitors: list[str | Callable[[Any], bool]] = [
+		"details", "components",
+		lambda x: x["__typename"] == "CompetitorsInfo", "competitors"]
+
+	def get_requires_membership(self):
+		promo_attributes = self.promo_data.get("attributes")
+		return (promo_attributes and "CLUBCARD_PRICING" in promo_attributes)
+	
+	def check_membership_price(self):
+		"""
+		Check match for "[X] Clubcard price"
+		MUST BE LAST, AS other promos may include the keyword.
+		"""
+		if (not self.strapline): return
+		if (not self.membership_price_promo_keyword in self.strapline.lower()): return
+
+		price = self._query_regex(regex.PRICE, self.strapline)
+		if (not price): return
+
+		return {
+			"offer_type": OFFER_TYPES.simple_reduction,
+			"member_reduced_price": convert_str_to_pence(price[0])
+		}
+	
+	def check_pricematch(self):
+		""" Check for pricematch with competitors. """
+
+		competitors = safe_deepget(self.entire_data, self.path_to_competitors)
+
+		# TODO: put this in normal place, not promos
+		for competitor in competitors:
+			return {
+				"matching_store": competitor["id"]
+			}
+
+
+
+
 
 
 class GQLCollector(BaseCollector):
@@ -74,11 +131,12 @@ class GQLCollector(BaseCollector):
 			}
 		]
 
+		self.promo_processor = TSCPromoProcessor
+
 		self.results_path = [0, "data", "search", "results"]
 		self.price_from_result = ["sellers", "results", 0]
 		self.promo_from_result = ["promotions", 0]
 		self.reviews_from_result = ["reviews", "stats"]
-		self.first_attribute_from_promo = ["attributes", 0]
 		self.membership_price_promo_keyword = "clubcard price"
 
 
@@ -90,7 +148,7 @@ class GQLCollector(BaseCollector):
 		return v
 
 
-	def process_promo(self, result: Result) -> Result:		
+	def process_promos(self, result: Result) -> Result:		
 		promo_data: dict[str, str] | None = safe_deepget(result, self.promo_from_result)
 
 		if (not promo_data): return {}
@@ -106,18 +164,7 @@ class GQLCollector(BaseCollector):
 			"store_given_id": promo_data.get("id") # ANY X.. CAN MIX AND MATCH OTHER PRODUCTS
 		}
 
-		# IS "Any X for £X"
-		match = re.match(regex.ANY_X_FOR_PROMO, offer_value.lower())
-
-		if (match):
-			groups = match.groups()
-
-			return dict_add_values(
-				formatted_data,
-				any_count = int(groups[0]),
-				for_price = convert_str_to_pence(groups[1])
-			)
-		
+		# IS "Any X for £X"		
 		
 
 		# THIS MUST BE THE LAST EVALUATION
@@ -134,9 +181,7 @@ class GQLCollector(BaseCollector):
 				member_reduced_price = convert_str_to_pence(price_str)
 			)
 
-		# TODO: ALDI PRICE MATCH
-		# VERIFY IF IS ACTUALLY A PRICE MATCH!! COOL IDEA!!
-		# MORRISONS ALSO HAS PRICE MATCHES.
+		
 
 		
 		# TODO: LOG THIS

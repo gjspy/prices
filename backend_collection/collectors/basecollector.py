@@ -14,6 +14,7 @@ from backend_collection.mytypes import Number, Result
 from backend_collection.constants import (
 	safe_deepget, regex, split_packsize_str, standardise_packsize,
 	stringify_query)
+from backend_collection.promo_processor2 import PromoProcessor
 
 
 # WE HAVE EXECUTOR AS requests IS NOT NATIVELY ASYNCHRONOUS.
@@ -27,13 +28,14 @@ async def async_executor(func: partial[Any]):
 
 
 class BaseCollector:
-	def __init__(self):
-		self.endpoint: str = NotImplemented
-		self.results_path = NotImplemented
-		self.store = NotImplemented
+	endpoint: str
+	store: str
+	http_method: str
 
-		self.http_method = NotImplemented
+	promo_processor: type[PromoProcessor]
 
+	promos_path: list[Any]
+	results_path: list[Any]
 
 	async def __request(self, options: dict[str, Any]):
 		if (not self._cfwt):
@@ -202,7 +204,21 @@ class BaseCollector:
 			#	print(err,"err")
 			
 		return clean_datas
-	
+
+	def process_promos(self, data: Result):
+		gathered_promos: list[dict[str, Any]] = []
+
+		promotions: list[dict[str, Any]] = safe_deepget(data, self.promos_path)
+
+		for promo in (promotions or []):
+			processor = self.promo_processor(data, promo)
+
+			try: promo = processor.process_promo()
+			except: pass
+			else: gathered_promos.append(promo)
+
+		return gathered_promos
+
 
 	async def search(self, query: str, debug: bool = False) -> list[list[Result]]:
 		result = None

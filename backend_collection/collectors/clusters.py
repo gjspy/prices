@@ -65,36 +65,7 @@ class ClusterCollector(BaseCollector):
 			}
 
 		# REDUCTION
-		reduction_match = re.match(regex.REDUCTION, promo_description.lower())
-
-		if (reduction_match):
-			groups = reduction_match.groups()
-
-			return {
-				"offer_type": "_Reduction",
-				"store_given_data": promo_description,
-				"was_price": convert_str_to_pence(groups[1]),
-				"store_given_id": promo_id
-			}
-		
 		# MULTIBUY
-		multibuy_match = re.match(regex.MULTIBUY, promo_description.lower())
-
-		if (multibuy_match):
-			groups = multibuy_match.groups()
-
-			return {
-				"offer_type": "_AnyFor",
-				"any_count": int(groups[0]),
-				"for_price": convert_str_to_pence(groups[1]),
-				"store_given_id": promo_id
-			}
-		
-
-		return {
-			"unknown_offer_type": promo_description,
-			"store_given_id": promo_id
-		}
 
 
 

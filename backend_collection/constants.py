@@ -30,11 +30,11 @@ class regex:
 	CLEAN_STR = r"(?: {2,})|(?:^ +)|(?: +$)|(?:\( *\))|(?:\[ *\])|(?:\{ *\})"
 
 	# MATCHES £4.29, £4, 29p
-	ANY_PRICE = r"((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p))" # CAPTURE GROUP
-	ANY_X_FOR_PROMO = rf"any (\d+) for {ANY_PRICE}"
-
-	REDUCTION = rf"now {ANY_PRICE}, was {ANY_PRICE}"
-	MULTIBUY = rf"buy (\d+) for {ANY_PRICE}"
+	PRICE = r"((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p))" # CAPTURE GROUP
+	
+	ANYFOR = rf"any (\d+) for {PRICE}"
+	REDUCTION = rf"now {PRICE}, was {PRICE}"
+	MULTIBUY = rf"buy (\d+) for {PRICE}"
 
 	# MATCHES DIGITS FOLLOWED BY CHAR UNITS.
 	PACKSIZE_ONE = r"([\d\.]+)([A-z]+)"
@@ -44,6 +44,12 @@ class regex:
 	# SECOND HALF OF MULTI IS SAME AS SINGLE, BUT [A-z] IS OPTIONAL.
 	# SOME WILL GIVE 4x330 BUT NO UNIT. STILL WANT MATCH.
 	PACKSIZE_MULTIPLE = rf"([\d\.]+) ?x ?([\d\.]+)([A-z]*)"
+
+class OFFER_TYPES:
+	unknown = 0
+	any_for = 1
+	simple_reduction = 2
+
 
 
 LOG_FORMAT = "%(asctime)s - %(levelname)-8s IN %(threadName)-20s :  %(message)s"
@@ -80,26 +86,28 @@ class CustomLogSH(logging.StreamHandler): # type: ignore
 
 
 
-
 def safe_deepget(
 		data: dict[Any, Any], path: list[Any],
 		default_value: Any = None) -> Any:
 	
+	if (not path): return default_value
+	
 	for key in path:
+		if (callable(key) and isinstance(data, list)):
+			data = choose_child(data, key) # type: ignore
+			continue
+
 		try: data = data[key] # NOT .get(), NEED LIST[index] TOO.
 		except: return default_value
 	
-	if (not data): return default_value
 	return data
 
 
-def dict_add_values(
-		data: dict[Any, Any], **kwargs: Any) -> dict[Any, Any]:
-
-	for i,v in kwargs.items():
-		data[i] = v
-
-	return data
+def choose_child(data: list[Any], check: Callable[[Any], bool]):
+	for child in data:
+		try:
+			if (check(child)): return child
+		except: pass
 
 def int_safe(value: Any) -> int | None:
 	try: return int(value)

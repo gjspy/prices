@@ -49,7 +49,7 @@ class AKMCollector(BaseCollector):
 			"filter[keyword]": query,
 			"page_size": self.results_per_search,
 		}
-	
+
 
 	def process_promo(self, result: Result, specific_promo: Result) -> Result:
 		promo_id = specific_promo.get("promotion_uid")
