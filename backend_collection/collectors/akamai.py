@@ -109,6 +109,18 @@ class AKMCollector(BaseCollector):
 
 		promotions: list[Result] = result.get("promotions") or []
 
+		# GET ALDI PRICE MATCHES, SAINSBURYS STORES THEM IN "LABELS"
+		# WE WANT THEM AS A PROMO
+
+		labels: list[Result] = result.get("labels") or []
+
+		label: Result
+		for label in (labels):
+			uid: str = (label.get("label_uid") or "").lower().replace(" ","")
+			if (uid != self.price_match_keyword): continue
+
+			promotions.append(label)
+
 		return [
 			{
 				"type": "product",
