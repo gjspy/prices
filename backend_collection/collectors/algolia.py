@@ -2,7 +2,7 @@ from copy import deepcopy
 import re
 
 from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.mytypes import Number, Result
+from backend_collection.mytypes import Number, DSA
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence,
 	clean_product_name, regex)
@@ -10,7 +10,7 @@ from backend_collection.constants import (
 
 class AlgoliaCollector(BaseCollector):
 	def __init__(
-			self, env: Result, config: Result, endpoint: str,
+			self, env: DSA, config: DSA, endpoint: str,
 			algolia_index_name: str, store: str, results_per_search: int):
 
 		super().__init__() # nothing happens here?
@@ -37,7 +37,7 @@ class AlgoliaCollector(BaseCollector):
 					"hitsPerPage": results_per_search,
 					"page": 0,
 					"typoTolerance": True,
-					"removeWordsIfNoResults": "allOptional",
+					"removeWordsIfNoDSAs": "allOptional",
 					"attributesToRetrieve": [
 						"STATUS",
 						"BRAND",
@@ -88,14 +88,14 @@ class AlgoliaCollector(BaseCollector):
 
 
 	def get_postable_search_body(
-			self, query: str) -> Result:
+			self, query: str) -> DSA:
 		v = deepcopy(self._base_search_request)
 		v["requests"][0]["query"] = query
 
 		return v
 
 
-	def process_promo(self, result: Result) -> Result:
+	def process_promo(self, result: DSA) -> DSA:
 		prices_data: dict[str, str] | None = safe_deepget(result, self.prices_from_result)
 
 		if (prices_data):
@@ -147,7 +147,7 @@ class AlgoliaCollector(BaseCollector):
 	
 	
 
-	def parse_packsize(self, result: Result, product_name: str):
+	def parse_packsize(self, result: DSA, product_name: str):
 		"""
 		algolia provides pack size with the PACK_SIZE field
 		AND in the product name now too (sadly.)
@@ -176,7 +176,7 @@ class AlgoliaCollector(BaseCollector):
 	
 
 
-	def get_storable_from_result(self, result: Result) -> Result:
+	def get_storable_from_result(self, result: DSA) -> DSA:
 		brand_name = result.get("BRAND") or ""
 		image_id = result.get("IMAGE_ID") or ""
 

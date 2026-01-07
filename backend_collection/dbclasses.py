@@ -118,7 +118,7 @@ class Queries:
 			(ProductLink.cin == cin) & (ProductLink.store == store))
 	
 	@staticmethod
-	def get_link_by_some_id(data: dict[str, Any]):
+	def get_link_by_some_id(data: DSA):
 		upc: int | None = data.get("upc")
 
 		if (upc): return Queries.get_link_by_upc(upc)

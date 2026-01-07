@@ -3,6 +3,7 @@ import re
 import traceback
 
 from backend_collection.constants import regex, convert_str_to_pence, OFFER_TYPES, safe_deepget
+from backend_collection.mytypes import DSA
 
 class InterfacePromoKeys:
 	promo_from_data = NotImplemented
@@ -22,7 +23,7 @@ class PromoProcessor:
 	membership_price_promo_keyword: str = NotImplemented
 
 	def __init__(
-			self, result: dict[str, Any], specific_promo: dict[str, Any]):
+			self, result: DSA, specific_promo: DSA):
 		self.entire_data = result
 		self.promo_data = specific_promo
 
@@ -71,7 +72,7 @@ class PromoProcessor:
 			"offer_type": OFFER_TYPES.simple_reduction,
 			"was_price": convert_str_to_pence(groups[1])
 		}
-	
+
 
 	def check_multibuy(self):
 		"""
@@ -105,11 +106,11 @@ class PromoProcessor:
 		
 
 
-	def process_by_type(self) -> dict[str, Any]:
+	def process_by_type(self) -> DSA:
 		raise NotImplementedError
 
 
-	def process_promo(self) -> dict[str, Any]:
+	def process_promo(self) -> DSA:
 		initial_data = self._build_initial_data()
 
 		result = {}
@@ -140,3 +141,5 @@ class PromoProcessor:
 		# TODO: ALDI PRICE MATCH
 		# VERIFY IF IS ACTUALLY A PRICE MATCH!! COOL IDEA!!
 		# MORRISONS ALSO HAS PRICE MATCHES.s
+		# CHECK WHEN SETTING PRODUCT PRICE THAT IT IS NON-DISCOUNTED PRICE.
+		# IN PROMO, STORE WAS_PRICE AND NEW_PRICE? IDK WHAT?

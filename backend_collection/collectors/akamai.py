@@ -6,7 +6,7 @@ import time
 
 
 from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.mytypes import Result
+from backend_collection.mytypes import DSA
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence, dict_add_values, 
 	clean_product_name, standardise_packsize, regex)
@@ -14,7 +14,7 @@ from backend_collection.constants import (
 
 class AKMCollector(BaseCollector):
 	def __init__(
-			self, env: Result, config: Result, endpoint: str,
+			self, env: DSA, config: DSA, endpoint: str,
 			store: str, results_per_search: int):
 		
 		super().__init__()
@@ -51,7 +51,7 @@ class AKMCollector(BaseCollector):
 		}
 
 
-	def process_promo(self, result: Result, specific_promo: Result) -> Result:
+	def process_promo(self, result: DSA, specific_promo: DSA) -> DSA:
 		promo_id = specific_promo.get("promotion_uid")
 		promo_description: str | None = specific_promo.get("strap_line")
 
@@ -77,7 +77,7 @@ class AKMCollector(BaseCollector):
 
 
 
-	def parse_packsize(self, result: Result, product_name: str):
+	def parse_packsize(self, result: DSA, product_name: str):
 		"""
 		This method parses all possible methods of finding PACKSIZE and
 		decides which one to keep.
@@ -88,7 +88,7 @@ class AKMCollector(BaseCollector):
 		return self._parse_packsize_str(product_name)
 	
 
-	def get_storables_from_result(self, result: Result) -> list[Result]:
+	def get_storables_from_result(self, result: DSA) -> list[DSA]:
 		name = result.get("name") or ""
 		img = result.get("image") or ""
 		# NO BRAND NAME FIELD :(
@@ -97,9 +97,9 @@ class AKMCollector(BaseCollector):
 
 		# RETAIL_PRICE IS DISCOUNTED. NEED TO DIG FOR ORIGINAL :(
 
-		price_data: Result = result.get("retail_price") or {}
+		price_data: DSA = result.get("retail_price") or {}
 		promo_original: int = safe_deepget(result, self.promo_original_price_path)
-		rating_data: Result = result.get("reviews") or {}
+		rating_data: DSA = result.get("reviews") or {}
 
 		price = promo_original or price_data.get("price")
 		price_pence = price * 100 if (price) else -1
@@ -107,14 +107,14 @@ class AKMCollector(BaseCollector):
 		eans: list[str] = result.get("eans") or []
 		cin = result.get("product_uid")
 
-		promotions: list[Result] = result.get("promotions") or []
+		promotions: list[DSA] = result.get("promotions") or []
 
 		# GET ALDI PRICE MATCHES, SAINSBURYS STORES THEM IN "LABELS"
 		# WE WANT THEM AS A PROMO
 
-		labels: list[Result] = result.get("labels") or []
+		labels: list[DSA] = result.get("labels") or []
 
-		label: Result
+		label: DSA
 		for label in (labels):
 			uid: str = (label.get("label_uid") or "").lower().replace(" ","")
 			if (uid != self.price_match_keyword): continue

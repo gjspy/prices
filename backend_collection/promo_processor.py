@@ -26,11 +26,11 @@ class PromoProcessor:
 		self._strapline_checks = [self.check_reduction, self.check_multibuy]
 
 		
-	def get_requires_membership(self, data: dict[str, Any]):
+	def get_requires_membership(self, data: DSA):
 		return data.get(self._keys.requires_membership)
 
 	
-	def _build_initial_data(self, data: dict[str, Any], promo_id: str | None):
+	def _build_initial_data(self, data: DSA, promo_id: str | None):
 		return {
 			"start_date": data.get(self._keys.start_date),
 			"end_date": data.get(self._keys.end_date),
@@ -108,11 +108,11 @@ class PromoProcessor:
 		
 
 
-	def process_by_type(self, promo_type: str) -> dict[str, Any]:
+	def process_by_type(self, promo_type: str) -> DSA:
 		raise NotImplementedError
 
 
-	def process_promo(self, data: dict[str, Any]) -> dict[str, Any]:
+	def process_promo(self, data: DSA) -> DSA:
 		promo_description = data.get(self._keys.promo_description)
 		promo_id = data.get(self._keys.promo_id)
 		promo_type = data.get(self._keys.promo_type)

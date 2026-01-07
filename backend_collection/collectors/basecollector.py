@@ -10,7 +10,7 @@ import json
 import re
 
 
-from backend_collection.mytypes import Number, Result
+from backend_collection.mytypes import Number, DSA
 from backend_collection.constants import (
 	safe_deepget, regex, split_packsize_str, standardise_packsize,
 	stringify_query)
@@ -37,7 +37,7 @@ class BaseCollector:
 	promos_path: list[Any]
 	results_path: list[Any]
 
-	async def __request(self, options: dict[str, Any]):
+	async def __request(self, options: DSA):
 		if (not self._cfwt):
 			p = options.get("p") or ""
 
@@ -84,7 +84,7 @@ class BaseCollector:
 
 	async def _post(
 			self, query_params: dict[str, str] = {},
-			body: Result = {}) -> Response:
+			body: DSA = {}) -> Response:
 
 		r = await self.__request({
 			"m": "POST",
@@ -96,7 +96,7 @@ class BaseCollector:
 		return r
 	
 
-	def _compute_cfw_e(self, env: Result):
+	def _compute_cfw_e(self, env: DSA):
 		try:
 			self.__cfwe = json.loads(env["CFW_E"]).index(self.endpoint)
 			self.__cfws = env["CFW_S"]
@@ -136,11 +136,11 @@ class BaseCollector:
 	def get_headers(self) -> dict[str, str]:
 		raise NotImplementedError
 
-	def get_storables_from_result(self, result: Result) -> list[Result]:
+	def get_storables_from_result(self, result: DSA) -> list[DSA]:
 		raise NotImplementedError
 
 
-	def parse_packsize(self, result: Result, product_name: str) -> tuple[int, Number, str]:
+	def parse_packsize(self, result: DSA, product_name: str) -> tuple[int, Number, str]:
 		"""
 		This method parses all possible methods of finding PACKSIZE and
 		decides which one to keep.
@@ -188,13 +188,13 @@ class BaseCollector:
 		return (0, -1, "")
 
 
-	def parse_data(self, data: Result) -> list[list[Result]]:
-		results: list[Result] | None
+	def parse_data(self, data: DSA) -> list[list[DSA]]:
+		results: list[DSA] | None
 		results = safe_deepget(data, self.results_path)
 
 		if (not results): return []
 
-		clean_datas: list[list[Result]] = []
+		clean_datas: list[list[DSA]] = []
 
 		for result in results:
 			#try:
@@ -202,13 +202,13 @@ class BaseCollector:
 			#except Exception as err:
 				#... # TODO LOG, FIGURE LOGGING OUT
 			#	print(err,"err")
-			
+
 		return clean_datas
 
-	def process_promos(self, data: Result):
-		gathered_promos: list[dict[str, Any]] = []
+	def process_promos(self, data: DSA):
+		gathered_promos: list[DSA] = []
 
-		promotions: list[dict[str, Any]] = safe_deepget(data, self.promos_path)
+		promotions: list[DSA] = safe_deepget(data, self.promos_path)
 
 		for promo in (promotions or []):
 			processor = self.promo_processor(data, promo)
@@ -220,7 +220,7 @@ class BaseCollector:
 		return gathered_promos
 
 
-	async def search(self, query: str, debug: bool = False) -> list[list[Result]]:
+	async def search(self, query: str, debug: bool = False) -> list[list[DSA]]:
 		result = None
 
 		if (self.http_method == "POST"):

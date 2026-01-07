@@ -4,20 +4,20 @@ import asyncio
 import json
 import time
 
-from backend_collection.collectors import algolia, graphql, clusters, akamai
+from backend_collection.collectors import algolia, graphql, clusters#, akamai
 from backend_collection.constants import ASDA_ENDPOINT, TESCO_ENDPOINT, MORRISONS_ENDPOINT, SAINSBURYS_ENDPOINT, StoreNames
 
 import os
 print(os.getcwd())
 
-config = dotenv_values(".config")
-env = dotenv_values(".env")
+config ={"TESCO_XAPI_KEY": 1}# dotenv_values(".config")
+env = {"CFW_E": f"[\"{TESCO_ENDPOINT}\"]", "CFW_S": "", "CFW_A": "{}", "CFW": ""}#dotenv_values(".env")
 RESULTS_PER_SEARCH = 100
 
-asda = algolia.AlgoliaCollector(env, config, ASDA_ENDPOINT, "ASDA_PRODUCTS", StoreNames.asda, RESULTS_PER_SEARCH) # good cfw
+#asda = algolia.AlgoliaCollector(env, config, ASDA_ENDPOINT, "ASDA_PRODUCTS", StoreNames.asda, RESULTS_PER_SEARCH) # good cfw
 tesco = graphql.GQLCollector(env, config, TESCO_ENDPOINT, StoreNames.tesco, RESULTS_PER_SEARCH) # good cfw
-mor = clusters.ClusterCollector(env, config, MORRISONS_ENDPOINT, StoreNames.morrisons, RESULTS_PER_SEARCH) # good cfw
-sains = akamai.AKMCollector(env, config, SAINSBURYS_ENDPOINT, StoreNames.sainsburys, RESULTS_PER_SEARCH) # bad cfw
+#mor = clusters.ClusterCollector(env, config, MORRISONS_ENDPOINT, StoreNames.morrisons, RESULTS_PER_SEARCH) # good cfw
+#sains = akamai.AKMCollector(env, config, SAINSBURYS_ENDPOINT, StoreNames.sainsburys, RESULTS_PER_SEARCH) # bad cfw
 
 """a = algolia.AlgoliaCollector({"ASDA_ALGOLIA_API_KEY":"", "ASDA_ALGOLIA_API_APP": ""}, "", "", "ASDA", 1)
 print(a.parse_packsize({
@@ -83,7 +83,7 @@ print(a.parse_packsize({
 					},
 					"MAX_QTY": 10,
 					"objectID": "6744532",
-					"_highlightResult": {
+					"_highlightDSA": {
 						"ID": {
 							"value": "1000226920906",
 							"matchLevel": "none",
@@ -213,7 +213,7 @@ print(a.parse_packsize({
 					},
 					"MAX_QTY": 10,
 					"objectID": "5400878",
-					"_highlightResult": {
+					"_highlightDSA": {
 						"ID": {
 							"value": "910002366368",
 							"matchLevel": "none",
@@ -259,14 +259,14 @@ print(a.parse_packsize({
 #print(tesco._parse_packsize_str("Castello Extra Creamy Brie Cheese 200g  g"))
 
 async def main():
-	#result = await asda.search("cheese", True)
-	result = await sains.search("cheese", True)
-	print(result)
+	#result = await tesco.search("cheese", True)
+	#result = await sains.search("cheese", True)
+	#print(result)
 	
-	"""d = json.load(open("TESCODebugResponse_1763226284j.json","r"))
-	result = tesco.parse_data(d)"""
+	d = json.load(open("TESCODebugResponse_1765497922j.json","r"))
+	result = tesco.parse_data(d)
 
-	with open(f"TestResult_{int(time.time())}.json", "w") as f:
+	with open(f"TestDSA_{int(time.time())}.json", "w") as f:
 		json.dump(result, f, indent = 2)
 
 

@@ -4,15 +4,15 @@ import re
 
 
 from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.mytypes import Result
+from backend_collection.mytypes import DSA
 from backend_collection.constants import (
-	safe_deepget, int_safe, convert_str_to_pence, dict_add_values, 
+	safe_deepget, int_safe, convert_str_to_pence, 
 	clean_product_name, standardise_packsize, regex)
 
 
 class ClusterCollector(BaseCollector):
 	def __init__(
-			self, env: Result, config: Result, endpoint: str,
+			self, env: DSA, config: DSA, endpoint: str,
 			store: str, results_per_search: int):
 		
 		super().__init__()
@@ -46,11 +46,11 @@ class ClusterCollector(BaseCollector):
 		}
 	
 
-	def process_promo(self, result: Result) -> Result:
+	def process_promo(self, result: DSA) -> DSA:
 		promotions = result.get("promotions")
 		if (not promotions): return {}
 
-		promo: Result = promotions[0] # NEVER SEEN MORE THAN ONE ANYWHERE
+		promo: DSA = promotions[0] # NEVER SEEN MORE THAN ONE ANYWHERE
 		promo_id = promo.get("retailerPromotionId")
 		promo_description: str | None = promo.get("description")
 
@@ -69,7 +69,7 @@ class ClusterCollector(BaseCollector):
 
 
 
-	def parse_packsize(self, result: Result, product_name: str):
+	def parse_packsize(self, result: DSA, product_name: str):
 		"""
 		This method parses all possible methods of finding PACKSIZE and
 		decides which one to keep.
@@ -85,7 +85,7 @@ class ClusterCollector(BaseCollector):
 		return self._parse_packsize_str(product_name)
 	
 
-	def get_storable_from_result(self, result: Result) -> Result:
+	def get_storable_from_result(self, result: DSA) -> DSA:
 		name = result.get("name") or ""
 		brand_name = result.get("brand") or ""
 		count, size_each, unit = self.parse_packsize(result, name)
@@ -102,9 +102,9 @@ class ClusterCollector(BaseCollector):
 				fmt = img_format
 			)
 
-		price_data: Result = result.get("price") or {}
-		promo_price_data: Result | None = result.get("promoPrice")
-		rating_data: Result = result.get("ratingSummary") or {}
+		price_data: DSA = result.get("price") or {}
+		promo_price_data: DSA | None = result.get("promoPrice")
+		rating_data: DSA = result.get("ratingSummary") or {}
 		category_data: list[str] = result.get("categoryPath") or []
 
 		price = price_data.get("amount") 
@@ -157,18 +157,18 @@ class ClusterCollector(BaseCollector):
 		}
 
 	
-	def parse_data(self, data: Result) -> list[list[Result]]:
-		results: list[list[Result]] = []
+	def parse_data(self, data: DSA) -> list[list[DSA]]:
+		results: list[list[DSA]] = []
 
 		shelves = data.get("productGroups")
 		if (not shelves): return []
 
-		shelf: Result
+		shelf: DSA
 		for shelf in shelves:
 			products = shelf.get("decoratedProducts")
 			if (not products): continue
 
-			product: Result
+			product: DSA
 			for product in products:
 				#try TODO
 				results.append(self.get_storables_from_result(product))

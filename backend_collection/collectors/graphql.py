@@ -5,7 +5,7 @@ from uuid import uuid4
 
 
 from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.mytypes import Result
+from backend_collection.mytypes import DSA
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence, 
 	clean_product_name, standardise_packsize, regex, OFFER_TYPES)
@@ -13,7 +13,7 @@ from backend_collection.promo_processor2 import InterfacePromoKeys, PromoProcess
 
 
 class TSCPromoKeys(InterfacePromoKeys):
-	promo_from_data = 
+	promo_from_data = ["promotions", 0]
 	promo_id = "id"
 	promo_description = "description"
 	promo_type = None
@@ -34,7 +34,7 @@ class TSCPromoProcessor(PromoProcessor):
 	def get_requires_membership(self):
 		promo_attributes = self.promo_data.get("attributes")
 		return (promo_attributes and "CLUBCARD_PRICING" in promo_attributes)
-	
+
 	def check_membership_price(self):
 		"""
 		Check match for "[X] Clubcard price"
@@ -50,7 +50,7 @@ class TSCPromoProcessor(PromoProcessor):
 			"offer_type": OFFER_TYPES.simple_reduction,
 			"member_reduced_price": convert_str_to_pence(price[0])
 		}
-	
+
 	def check_pricematch(self):
 		""" Check for pricematch with competitors. """
 
@@ -69,7 +69,7 @@ class TSCPromoProcessor(PromoProcessor):
 
 class GQLCollector(BaseCollector):
 	def __init__(
-			self, env: Result, config: Result, endpoint: str,
+			self, env: DSA, config: DSA, endpoint: str,
 			store: str, results_per_search: int):
 
 		super().__init__() # nothing happens here?
@@ -84,7 +84,7 @@ class GQLCollector(BaseCollector):
 
 		self.store = store
 		self.results_per_search = results_per_search
-		self._base_search_request: list[Result] = [
+		self._base_search_request: list[DSA] = [
 			{
 				"operationName": "Search",
 				"variables": {
@@ -93,7 +93,7 @@ class GQLCollector(BaseCollector):
 					"includeVariations": True,
 					"showDepositReturnCharge": False,
 					"showPopularFilter": True,
-					"showExpandedResults": False,
+					"showExpandedDSAs": False,
 					"query": "[UNSET]",
 					"count": results_per_search,
 					"configs": [
@@ -127,7 +127,7 @@ class GQLCollector(BaseCollector):
 				"extensions": {
 					"mfeName": "mfe-plp"
 				},
-				"query": "query Search($query: String!, $page: Int = 1, $count: Int, $sortBy: String, $offset: Int, $facet: ID, $favourites: Boolean, $filterCriteria: [filterCriteria], $configs: [ConfigArgType], $includeRestrictions: Boolean = true, $includeVariations: Boolean = true, $config: BrowseSearchConfig, $showDepositReturnCharge: Boolean = false, $showPopularFilter: Boolean = true, $appliedFacetArgs: [AppliedFacetArgs], $showExpandedResults: Boolean = false) {\n  search(\n    query: $query\n    page: $page\n    count: $count\n    sortBy: $sortBy\n    offset: $offset\n    facet: $facet\n    favourites: $favourites\n    filterCriteria: $filterCriteria\n    configs: $configs\n    config: $config\n    appliedFacetArgs: $appliedFacetArgs\n  ) {\n    pageInformation: info {\n      ...PageInformation\n      __typename\n    }\n    results {\n      node {\n        ... on MPProduct {\n          ...ProductItem\n          __typename\n        }\n        ... on FNFProduct {\n          ...ProductItem\n          __typename\n        }\n        ... on ProductType {\n          ...ProductItem\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    expandedResults @include(if: $showExpandedResults) {\n      node {\n        ... on MPProduct {\n          ...ProductItem\n          __typename\n        }\n        ... on FNFProduct {\n          ...ProductItem\n          __typename\n        }\n        ... on ProductType {\n          ...ProductItem\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    facetLists: facetGroups {\n      ...FacetLists\n      __typename\n    }\n    popularFilters: popFilters @include(if: $showPopularFilter) {\n      ...PopFilters\n      __typename\n    }\n    facets {\n      ...facet\n      __typename\n    }\n    options {\n      sortBy\n      __typename\n    }\n    __typename\n  }\n}\n\nfragment ProductItem on ProductInterface {\n  typename: __typename\n  ... on ProductType {\n    context {\n      type\n      ... on ProductContextOfferType {\n        linkTo\n        offerType\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  sellers(type: TOP, limit: 1, offset: 0) {\n    ...Sellers\n    __typename\n  }\n  ... on MPProduct {\n    context {\n      type\n      ... on ProductContextOfferType {\n        linkTo\n        offerType\n        __typename\n      }\n      __typename\n    }\n    seller {\n      id\n      name\n      __typename\n    }\n    variations {\n      ...Variation @include(if: $includeVariations)\n      __typename\n    }\n    __typename\n  }\n  ... on FNFProduct {\n    context {\n      type\n      ... on ProductContextOfferType {\n        linkTo\n        offerType\n        __typename\n      }\n      __typename\n    }\n    variations {\n      priceRange {\n        minPrice\n        maxPrice\n        __typename\n      }\n      ...Variation @include(if: $includeVariations)\n      __typename\n    }\n    __typename\n  }\n  id\n  tpnb\n  tpnc\n  gtin\n  adId\n  baseProductId\n  title\n  brandName\n  shortDescription\n  defaultImageUrl\n  superDepartmentId\n  media {\n    defaultImage {\n      aspectRatio\n      __typename\n    }\n    __typename\n  }\n  quantityInBasket\n  superDepartmentName\n  departmentId\n  departmentName\n  aisleId\n  aisleName\n  shelfId\n  shelfName\n  displayType\n  productType\n  charges @include(if: $showDepositReturnCharge) {\n    ... on ProductDepositReturnCharge {\n      __typename\n      amount\n    }\n    __typename\n  }\n  averageWeight\n  bulkBuyLimit\n  maxQuantityAllowed: bulkBuyLimit\n  groupBulkBuyLimit\n  bulkBuyLimitMessage\n  bulkBuyLimitGroupId\n  timeRestrictedDelivery\n  restrictedDelivery\n  isInFavourites\n  isNew\n  isRestrictedOrderAmendment\n  maxWeight\n  minWeight\n  increment\n  details {\n    components {\n      ...Competitors\n      ...AdditionalInfo\n      __typename\n    }\n    __typename\n  }\n  catchWeightList {\n    price\n    weight\n    default\n    __typename\n  }\n  restrictions @include(if: $includeRestrictions) {\n    type\n    isViolated\n    message\n    __typename\n  }\n  reviews {\n    stats {\n      noOfReviews\n      overallRating\n      overallRatingRange\n      __typename\n    }\n    __typename\n  }\n  modelMetadata {\n    name\n    version\n    __typename\n  }\n}\n\nfragment Competitors on CompetitorsInfo {\n  competitors {\n    id\n    priceMatch {\n      isMatching\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment AdditionalInfo on AdditionalInfo {\n  isLowEverydayPricing\n  __typename\n}\n\nfragment Variation on VariationsType {\n  products {\n    id\n    baseProductId\n    variationAttributes {\n      attributeGroup\n      attributeGroupData {\n        name\n        value\n        attributes {\n          name\n          value\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment Sellers on ProductSellers {\n  __typename\n  results {\n    id\n    __typename\n    isForSale\n    status\n    seller {\n      id\n      name\n      logo {\n        url\n        __typename\n      }\n      __typename\n    }\n    price {\n      price: actual\n      unitPrice\n      unitOfMeasure\n      actual\n      __typename\n    }\n    promotions {\n      id\n      promotionType\n      startDate\n      endDate\n      description\n      unitSellingInfo\n      price {\n        beforeDiscount\n        afterDiscount\n        __typename\n      }\n      attributes\n      __typename\n    }\n    fulfilment(deliveryOptions: BEST) {\n      __typename\n      ... on ProductDeliveryType {\n        end\n        charges {\n          value\n          __typename\n        }\n        __typename\n      }\n    }\n  }\n}\n\nfragment FacetLists on ProductListFacetsType {\n  __typename\n  category\n  categoryId\n  facets {\n    facetId: id\n    facetName: name\n    binCount: count\n    isSelected: selected\n    __typename\n  }\n}\n\nfragment PageInformation on ListInfoType {\n  totalCount: total\n  pageNo: page\n  pageId\n  count\n  pageSize\n  matchType\n  offset\n  query {\n    searchTerm\n    actualTerm\n    queryPhase\n    __typename\n  }\n  __typename\n}\n\nfragment PopFilters on ProductListFacetsType {\n  category\n  categoryId\n  facets {\n    facetId: id\n    facetName: name\n    binCount: count\n    isSelected: selected\n    __typename\n  }\n  __typename\n}\n\nfragment facet on FacetInterface {\n  __typename\n  id\n  name\n  type\n  ... on FacetListType {\n    id\n    name\n    listValues: values {\n      name\n      value\n      isSelected\n      count\n      __typename\n    }\n    multiplicity\n    metadata {\n      description\n      footerText\n      linkText\n      linkUrl\n      __typename\n    }\n    __typename\n  }\n  ... on FacetMultiLevelType {\n    id\n    name\n    multiLevelValues: values {\n      children {\n        count\n        name\n        value\n        isSelected\n        __typename\n      }\n      appliedValues {\n        isSelected\n        name\n        value\n        __typename\n      }\n      __typename\n    }\n    multiplicity\n    metadata {\n      description\n      footerText\n      linkText\n      linkUrl\n      __typename\n    }\n    __typename\n  }\n  ... on FacetBooleanType {\n    booleanValues: values {\n      count\n      isSelected\n      value\n      name\n      __typename\n    }\n    __typename\n  }\n}\n"
+				"query": "query Search($query: String!, $page: Int = 1, $count: Int, $sortBy: String, $offset: Int, $facet: ID, $favourites: Boolean, $filterCriteria: [filterCriteria], $configs: [ConfigArgType], $includeRestrictions: Boolean = true, $includeVariations: Boolean = true, $config: BrowseSearchConfig, $showDepositReturnCharge: Boolean = false, $showPopularFilter: Boolean = true, $appliedFacetArgs: [AppliedFacetArgs], $showExpandedDSAs: Boolean = false) {\n  search(\n    query: $query\n    page: $page\n    count: $count\n    sortBy: $sortBy\n    offset: $offset\n    facet: $facet\n    favourites: $favourites\n    filterCriteria: $filterCriteria\n    configs: $configs\n    config: $config\n    appliedFacetArgs: $appliedFacetArgs\n  ) {\n    pageInformation: info {\n      ...PageInformation\n      __typename\n    }\n    results {\n      node {\n        ... on MPProduct {\n          ...ProductItem\n          __typename\n        }\n        ... on FNFProduct {\n          ...ProductItem\n          __typename\n        }\n        ... on ProductType {\n          ...ProductItem\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    expandedDSAs @include(if: $showExpandedDSAs) {\n      node {\n        ... on MPProduct {\n          ...ProductItem\n          __typename\n        }\n        ... on FNFProduct {\n          ...ProductItem\n          __typename\n        }\n        ... on ProductType {\n          ...ProductItem\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    facetLists: facetGroups {\n      ...FacetLists\n      __typename\n    }\n    popularFilters: popFilters @include(if: $showPopularFilter) {\n      ...PopFilters\n      __typename\n    }\n    facets {\n      ...facet\n      __typename\n    }\n    options {\n      sortBy\n      __typename\n    }\n    __typename\n  }\n}\n\nfragment ProductItem on ProductInterface {\n  typename: __typename\n  ... on ProductType {\n    context {\n      type\n      ... on ProductContextOfferType {\n        linkTo\n        offerType\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  sellers(type: TOP, limit: 1, offset: 0) {\n    ...Sellers\n    __typename\n  }\n  ... on MPProduct {\n    context {\n      type\n      ... on ProductContextOfferType {\n        linkTo\n        offerType\n        __typename\n      }\n      __typename\n    }\n    seller {\n      id\n      name\n      __typename\n    }\n    variations {\n      ...Variation @include(if: $includeVariations)\n      __typename\n    }\n    __typename\n  }\n  ... on FNFProduct {\n    context {\n      type\n      ... on ProductContextOfferType {\n        linkTo\n        offerType\n        __typename\n      }\n      __typename\n    }\n    variations {\n      priceRange {\n        minPrice\n        maxPrice\n        __typename\n      }\n      ...Variation @include(if: $includeVariations)\n      __typename\n    }\n    __typename\n  }\n  id\n  tpnb\n  tpnc\n  gtin\n  adId\n  baseProductId\n  title\n  brandName\n  shortDescription\n  defaultImageUrl\n  superDepartmentId\n  media {\n    defaultImage {\n      aspectRatio\n      __typename\n    }\n    __typename\n  }\n  quantityInBasket\n  superDepartmentName\n  departmentId\n  departmentName\n  aisleId\n  aisleName\n  shelfId\n  shelfName\n  displayType\n  productType\n  charges @include(if: $showDepositReturnCharge) {\n    ... on ProductDepositReturnCharge {\n      __typename\n      amount\n    }\n    __typename\n  }\n  averageWeight\n  bulkBuyLimit\n  maxQuantityAllowed: bulkBuyLimit\n  groupBulkBuyLimit\n  bulkBuyLimitMessage\n  bulkBuyLimitGroupId\n  timeRestrictedDelivery\n  restrictedDelivery\n  isInFavourites\n  isNew\n  isRestrictedOrderAmendment\n  maxWeight\n  minWeight\n  increment\n  details {\n    components {\n      ...Competitors\n      ...AdditionalInfo\n      __typename\n    }\n    __typename\n  }\n  catchWeightList {\n    price\n    weight\n    default\n    __typename\n  }\n  restrictions @include(if: $includeRestrictions) {\n    type\n    isViolated\n    message\n    __typename\n  }\n  reviews {\n    stats {\n      noOfReviews\n      overallRating\n      overallRatingRange\n      __typename\n    }\n    __typename\n  }\n  modelMetadata {\n    name\n    version\n    __typename\n  }\n}\n\nfragment Competitors on CompetitorsInfo {\n  competitors {\n    id\n    priceMatch {\n      isMatching\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment AdditionalInfo on AdditionalInfo {\n  isLowEverydayPricing\n  __typename\n}\n\nfragment Variation on VariationsType {\n  products {\n    id\n    baseProductId\n    variationAttributes {\n      attributeGroup\n      attributeGroupData {\n        name\n        value\n        attributes {\n          name\n          value\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment Sellers on ProductSellers {\n  __typename\n  results {\n    id\n    __typename\n    isForSale\n    status\n    seller {\n      id\n      name\n      logo {\n        url\n        __typename\n      }\n      __typename\n    }\n    price {\n      price: actual\n      unitPrice\n      unitOfMeasure\n      actual\n      __typename\n    }\n    promotions {\n      id\n      promotionType\n      startDate\n      endDate\n      description\n      unitSellingInfo\n      price {\n        beforeDiscount\n        afterDiscount\n        __typename\n      }\n      attributes\n      __typename\n    }\n    fulfilment(deliveryOptions: BEST) {\n      __typename\n      ... on ProductDeliveryType {\n        end\n        charges {\n          value\n          __typename\n        }\n        __typename\n      }\n    }\n  }\n}\n\nfragment FacetLists on ProductListFacetsType {\n  __typename\n  category\n  categoryId\n  facets {\n    facetId: id\n    facetName: name\n    binCount: count\n    isSelected: selected\n    __typename\n  }\n}\n\nfragment PageInformation on ListInfoType {\n  totalCount: total\n  pageNo: page\n  pageId\n  count\n  pageSize\n  matchType\n  offset\n  query {\n    searchTerm\n    actualTerm\n    queryPhase\n    __typename\n  }\n  __typename\n}\n\nfragment PopFilters on ProductListFacetsType {\n  category\n  categoryId\n  facets {\n    facetId: id\n    facetName: name\n    binCount: count\n    isSelected: selected\n    __typename\n  }\n  __typename\n}\n\nfragment facet on FacetInterface {\n  __typename\n  id\n  name\n  type\n  ... on FacetListType {\n    id\n    name\n    listValues: values {\n      name\n      value\n      isSelected\n      count\n      __typename\n    }\n    multiplicity\n    metadata {\n      description\n      footerText\n      linkText\n      linkUrl\n      __typename\n    }\n    __typename\n  }\n  ... on FacetMultiLevelType {\n    id\n    name\n    multiLevelValues: values {\n      children {\n        count\n        name\n        value\n        isSelected\n        __typename\n      }\n      appliedValues {\n        isSelected\n        name\n        value\n        __typename\n      }\n      __typename\n    }\n    multiplicity\n    metadata {\n      description\n      footerText\n      linkText\n      linkUrl\n      __typename\n    }\n    __typename\n  }\n  ... on FacetBooleanType {\n    booleanValues: values {\n      count\n      isSelected\n      value\n      name\n      __typename\n    }\n    __typename\n  }\n}\n"
 			}
 		]
 
@@ -135,20 +135,20 @@ class GQLCollector(BaseCollector):
 
 		self.results_path = [0, "data", "search", "results"]
 		self.price_from_result = ["sellers", "results", 0]
-		self.promo_from_result = ["promotions", 0]
+		self.promos_path = ["sellers", "results", 0, "promotions"]
 		self.reviews_from_result = ["reviews", "stats"]
 		self.membership_price_promo_keyword = "clubcard price"
 
 
 	def get_postable_search_body(
-			self, query: str) -> list[Result]:
+			self, query: str) -> list[DSA]:
 		v = deepcopy(self._base_search_request)
 		v[0]["variables"]["query"] = query
 
 		return v
 
 
-	def process_promos(self, result: Result) -> Result:		
+	"""def process_promos(self, result: DSA) -> DSA:		
 		promo_data: dict[str, str] | None = safe_deepget(result, self.promo_from_result)
 
 		if (not promo_data): return {}
@@ -187,8 +187,10 @@ class GQLCollector(BaseCollector):
 		# TODO: LOG THIS
 		formatted_data["unknown_offer_type"] = offer_value
 		return formatted_data
-	
-	def parse_packsize(self, result: Result, product_name: str):
+	"""
+
+
+	def parse_packsize(self, result: DSA, product_name: str):
 		"""
 		Tesco GQL does not provide a PACKSIZE attribute.
 		We scrape it from the name instead.
@@ -219,57 +221,77 @@ class GQLCollector(BaseCollector):
 
 		return (1, size_each, unit)
 
-	def get_storable_from_result(self, result: Result) -> Result:
-		data: Result | None = result.get("node")
-		if (not data): return {}
+	def get_storables_from_result(self, result: DSA) -> list[DSA]:
+		result = result.get("node") # type: ignore
+		if (not result): return []
 
 		# TODO: filter list for marketplace?
-		sale_data: Result = safe_deepget(data, self.price_from_result, {})
-		price: Result | None = sale_data.get("price")
-		if (not price): return {}
+		sale_data: DSA = safe_deepget(result, self.price_from_result, {})
+		price: DSA | None = sale_data.get("price")
+		if (not price): return []
 
-		rating_data: Result = safe_deepget(data, self.reviews_from_result, {})
+		rating_data: DSA = safe_deepget(result, self.reviews_from_result, {})
 
-		brand_name = data.get("brandName") or ""
-		name = data.get("title") or ""
+		brand_name = result.get("brandName") or ""
+		name = result.get("title") or ""
 
 		count, size_each, unit = self.parse_packsize(price, name)
-		print(sale_data.get("isForSale"))
 
-		return {
-			"product": {
-				"brand_name": brand_name, # ALL CAPS, "BABYBEL"
-				"name": clean_product_name(name, brand_name), # UNCLEAN, HAS BRAND AND PACKSIZE.
-				"packsize": {
-					"count": count, # ONLY IN TITLE.
-					"sizeeach": size_each,
-					"unit": unit
+		promos_data = self.process_promos(result)
+		promo_objects = [{"type": "offer", "data": v} for v in promos_data]
+
+		return [
+			{
+				"type": "product",
+				"data": {
+					"brand_name": brand_name, # ALL CAPS, "BABYBEL"
+					"name": clean_product_name(name, brand_name), # UNCLEAN, HAS BRAND AND PACKSIZE.
+					"packsize": {
+						"count": count, # ONLY IN TITLE.
+						"sizeeach": size_each,
+						"unit": unit
+					}
 				}
 			},
-			"image": {
-				"url": data.get("defaultImageUrl") # HAS ICONS :( # TODO: STANDARDISE IMAGE SIZE. TESCO HAVE ?h=x&w=x, ASDA?
+			{
+				"type": "image",
+				"data": {
+					"url": result.get("defaultImageUrl") # HAS ICONS :( # TODO: STANDARDISE IMAGE SIZE. TESCO HAVE ?h=x&w=x, ASDA?
+				}
 			},
-			"link": {
-				"upc": int_safe(data.get("gtin")),
-				"store": self.store,
-				"cin": int_safe(data.get("tpnc")) # TSC PROD NUM C, A AND B EXIST, B GIVEN, C = WEBSITE PAGE ID.
+			{
+				"type": "link",
+				"data": {
+					"upc": int_safe(result.get("gtin")),
+					"store": self.store,
+					"cin": int_safe(result.get("tpnc")) # TSC PROD NUM C, A AND B EXIST, B GIVEN, C = WEBSITE PAGE ID.
+				}
 			},
-			"price": {
-				"price_pence": round(float(price.get("price") or -1) * 100),
-				"available": sale_data.get("isForSale") == True # NOT STOCK LEVELS. THEY'RE PER STORE.
+			{
+				"type": "price",
+				"data": {
+					"price_pence": round(float(price.get("price") or -1) * 100),
+					"available": sale_data.get("isForSale") == True # NOT STOCK LEVELS. THEY'RE PER STORE.
+				}
 			},
-			"offer": self.process_promo(sale_data),
-			"rating": {
-				"avg": rating_data.get("overallRating"),
-				"count": rating_data.get("noOfReviews")
+			*promo_objects,
+			{
+				"type": "rating",
+				"data": {
+					"avg": rating_data.get("overallRating"),
+					"count": rating_data.get("noOfReviews")
+				}
 			},
-			"category": {
-				"category": data.get("superDepartmentName"), # eg Fresh Food
-				"department": data.get("departmentName") # eg Cheese
-				# also has aisle [Cheese Snacking & Lunchbox]
-				# and shelf [Cheese Snacking & Minis] but thats too granular
+			{
+				"type": "category",
+				"data": {
+					"category": result.get("superDepartmentName"), # eg Fresh Food
+					"department": result.get("departmentName") # eg Cheese
+					# also has aisle [Cheese Snacking & Lunchbox]
+					# and shelf [Cheese Snacking & Minis] but thats too granular
+				}
 			}
-		}
+		]
 
 
 	def get_headers(self) -> dict[str, str]:

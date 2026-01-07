@@ -217,7 +217,7 @@ class TaskThread(Thread):
 	def __init__(self, *args: Any, **kwargs: Any):
 		self._target: Callable[..., Any]
 		self._args: list[Any]
-		self._kwargs: dict[str, Any]
+		self._kwargs: DSA
 
 		super().__init__(*args, **kwargs)
 

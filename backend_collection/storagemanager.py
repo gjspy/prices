@@ -12,7 +12,7 @@ import asyncio
 
 
 class StorageManager():
-	def __init__(self, db_thread: DBThread, data: dict[str, Any]):
+	def __init__(self, db_thread: DBThread, data: DSA):
 		self._db_thread = db_thread
 		self._data = data
 
@@ -22,7 +22,7 @@ class StorageManager():
 
 
 	"""async def query_product_exists(self):
-		link_data: dict[str, Any] = self._data["link"]
+		link_data: DSA = self._data["link"]
 		
 		future = self._db_thread.create_future()
 		query = Queries.get_link_by_some_id(link_data)
@@ -90,7 +90,7 @@ class StorageManager():
 
 
 	async def process_product_storable(self):
-		link_data: dict[str, Any] = self._data["link"]
+		link_data: DSA = self._data["link"]
 		upc: int | None = link_data.get("upc")
 		cin: int = link_data.get("cin") # type: ignore
 		store: str = link_data.get("store") # type: ignore
