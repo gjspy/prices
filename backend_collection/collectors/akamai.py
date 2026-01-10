@@ -8,7 +8,7 @@ import time
 from backend_collection.collectors.basecollector import BaseCollector
 from backend_collection.mytypes import DSA
 from backend_collection.constants import (
-	safe_deepget, int_safe, convert_str_to_pence, dict_add_values, 
+	safe_deepget, int_safe, convert_str_to_pence, 
 	clean_product_name, standardise_packsize, regex)
 
 

@@ -20,18 +20,23 @@ class InterfacePromoKeys:
 class PromoProcessor:
 	# store: str = NotImplemented
 	keys: InterfacePromoKeys = NotImplemented
+
 	membership_price_promo_keyword: str = NotImplemented
+	multibuy_cheapest_free_keyword: str = NotImplemented
 
 	def __init__(
 			self, result: DSA, specific_promo: DSA):
 		self.entire_data = result
 		self.promo_data = specific_promo
 
-		self.strapline = specific_promo.get(self.keys.promo_description)
-		self.promo_id = specific_promo.get(self.keys.promo_id)
-		self.promo_type = specific_promo.get(self.keys.promo_type)
+		self.strapline: str = specific_promo.get(self.keys.promo_description) or ""
+		self.promo_id: str = specific_promo.get(self.keys.promo_id) or ""
+		self.promo_type: str = specific_promo.get(self.keys.promo_type) or ""
 
-		self._strapline_checks = [self.check_reduction, self.check_multibuy]
+		self._strapline_checks = [
+			self.check_reduction,
+			self.check_membership_price,
+			self.check_multibuy]
 
 		
 	def get_requires_membership(self):
@@ -77,10 +82,11 @@ class PromoProcessor:
 	def check_multibuy(self):
 		"""
 		Check description for match of "buy [X] for [Y]"
+		Check description for match of "any [x] for [y]"
 
-		-- or, if no match --
-
-		Check description for match of "any [x] for [y]
+		Check description for match of either of the above,
+		where y is an amount and includes
+		"cheapest item free" [`multibuy_cheapest_free_keyword`]
 		"""
 		if (not self.strapline): return
 
@@ -89,6 +95,13 @@ class PromoProcessor:
 		if (not groups):
 			groups = self._query_regex(regex.ANYFOR, self.strapline)
 			if (not groups): return
+		
+		if (self.multibuy_cheapest_free_keyword in self.strapline.lower()):
+			return {
+				"offer_type": OFFER_TYPES.any_for,
+				"any_count": int(groups[0]),
+				"for_count": int(groups[1])
+			}
 
 		return {
 			"offer_type": OFFER_TYPES.any_for,
@@ -97,11 +110,11 @@ class PromoProcessor:
 		}
 	
 	
-	def check_membership_price(self):
-		...
+	def check_membership_price(self) -> DSA:
+		raise NotImplementedError
 
-	def check_pricematch(self):
-		...
+	def check_pricematch(self) -> DSA:
+		raise NotImplementedError
 
 		
 
@@ -123,6 +136,8 @@ class PromoProcessor:
 		# PROCESSING BY TYPE DID NOT WORK, USE STRAPLINE/DESCRIPTION:
 		if (not self.strapline): return {}
 
+		# EACH STRAPLINE ONLY SHOWS ONE OFFER. break WHEN FOUND.
+		# CALL process_promo MULTIPLE TIMES FOR DIFFERENT STRAPLINES.
 		for check in self._strapline_checks:
 			result = check()
 			if (result): break

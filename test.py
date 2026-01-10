@@ -4,18 +4,18 @@ import asyncio
 import json
 import time
 
-from backend_collection.collectors import algolia, graphql, clusters#, akamai
-from backend_collection.constants import ASDA_ENDPOINT, TESCO_ENDPOINT, MORRISONS_ENDPOINT, SAINSBURYS_ENDPOINT, StoreNames
+from backend_collection.collectors import algolia, graphql, clusters, akamai
+from backend_collection.constants import ASDA_ENDPOINT, MORRISONS_ENDPOINT, SAINSBURYS_ENDPOINT, StoreNames
 
 import os
 print(os.getcwd())
 
-config ={"TESCO_XAPI_KEY": 1}# dotenv_values(".config")
-env = {"CFW_E": f"[\"{TESCO_ENDPOINT}\"]", "CFW_S": "", "CFW_A": "{}", "CFW": ""}#dotenv_values(".env")
+config = dotenv_values(".config")
+env = dotenv_values(".env")
 RESULTS_PER_SEARCH = 100
 
 #asda = algolia.AlgoliaCollector(env, config, ASDA_ENDPOINT, "ASDA_PRODUCTS", StoreNames.asda, RESULTS_PER_SEARCH) # good cfw
-tesco = graphql.GQLCollector(env, config, TESCO_ENDPOINT, StoreNames.tesco, RESULTS_PER_SEARCH) # good cfw
+tesco = graphql.GQLCollector(env, config, RESULTS_PER_SEARCH) # good cfw
 #mor = clusters.ClusterCollector(env, config, MORRISONS_ENDPOINT, StoreNames.morrisons, RESULTS_PER_SEARCH) # good cfw
 #sains = akamai.AKMCollector(env, config, SAINSBURYS_ENDPOINT, StoreNames.sainsburys, RESULTS_PER_SEARCH) # bad cfw
 
@@ -268,9 +268,6 @@ async def main():
 
 	with open(f"TestDSA_{int(time.time())}.json", "w") as f:
 		json.dump(result, f, indent = 2)
-
-
-
 
 asyncio.run(main())
 

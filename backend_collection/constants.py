@@ -1,20 +1,19 @@
 from datetime import time as dtime
 from threading import Thread
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 import re
 
 import logging
 import logging.handlers
 
 
-from backend_collection.mytypes import Number
+from backend_collection.mytypes import Number, SDG_Key
 
 COLLECT_START_TIME = "02:00"
 
 
 
 ASDA_ENDPOINT = "https://8i6wskccnv-dsn.algolia.net/1/indexes/*/queries"
-TESCO_ENDPOINT = "https://xapi.tesco.com"
 MORRISONS_ENDPOINT = "https://groceries.morrisons.com/api/webproductpagews/v6/product-pages/search"
 SAINSBURYS_ENDPOINT = "https://www.sainsburys.co.uk/groceries-api/gol-services/product/v1/product" # SEARCH ENDPOINT. (SAME AS PRODUCT?)
 
@@ -30,11 +29,12 @@ class regex:
 	CLEAN_STR = r"(?: {2,})|(?:^ +)|(?: +$)|(?:\( *\))|(?:\[ *\])|(?:\{ *\})"
 
 	# MATCHES £4.29, £4, 29p
-	PRICE = r"((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p))" # CAPTURE GROUP
+	PRICE = r"((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p))" # ONE CAPTURE GROUP
+	PRICE_FLEX = r"((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p)|(?:\d+\.\d+)|(?:\d+))" # ALLOWS NUMBER WITHOUT £ or p
 	
-	ANYFOR = rf"any (\d+) for {PRICE}"
-	REDUCTION = rf"now {PRICE}, was {PRICE}"
-	MULTIBUY = rf"buy (\d+) for {PRICE}"
+	ANYFOR = rf"any (\d+) for {PRICE_FLEX}"
+	REDUCTION = rf"now {PRICE},? was {PRICE}"
+	MULTIBUY = rf"buy (\d+) for {PRICE_FLEX}"
 
 	# MATCHES DIGITS FOLLOWED BY CHAR UNITS.
 	PACKSIZE_ONE = r"([\d\.]+)([A-z]+)"
@@ -81,27 +81,52 @@ class CustomLogFH(logging.handlers.TimedRotatingFileHandler):
 		return f"{fn}-{date}.{ext}"
 	
 
-class CustomLogSH(logging.StreamHandler): # type: ignore
+class CustomLogSH(logging.StreamHandler):
 	formatter = LOG_FORMATTER
+
+def sdg_dict_filter(filter_key: dict[Any, Any], data: list[Any]):
+	def filterer(v: Any):
+		if (not (isinstance(v, dict) or isinstance(v, list))): return
+
+		# MATCH ALL KEYS/VALUES. FIRST FAIL = RETURN.
+		for fk, fv in filter_key.items():
+			try:
+				if (v[fk] != fv): return False
+			except: pass
+		
+		return True
+	
+	return list(filter(filterer, data))[0]
 
 
 
 def safe_deepget(
-		data: dict[Any, Any], path: list[Any],
+		data: dict[Any, Any], path: SDG_Key,
 		default_value: Any = None) -> Any:
+	"""
+	Safe method to get nested values of `data` by following `path`
+	`path` a list of keys (usually str or int), or callable to filter a list,
+	or dict to filter list where all keys/values must match child.
+	"""
 	
 	if (not path): return default_value
 	
 	for key in path:
-		if (callable(key) and isinstance(data, list)):
-			data = choose_child(data, key) # type: ignore
-			continue
+		try:
+			if (callable(key) and isinstance(data, list)):
+				results: Iterable[Any] = filter(key, data)
+				data = list(results)[0]
+				continue
 
-		try: data = data[key] # NOT .get(), NEED LIST[index] TOO.
+			if (isinstance(key, dict) and isinstance(data, list)):
+				data = sdg_dict_filter(key, data) # type: ignore
+				continue
+
+			data = data[key] # NOT .get(), NEED list[index] TOO.
+
 		except: return default_value
 	
 	return data
-
 
 def choose_child(data: list[Any], check: Callable[[Any], bool]):
 	for child in data:

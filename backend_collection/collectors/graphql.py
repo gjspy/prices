@@ -5,10 +5,10 @@ from uuid import uuid4
 
 
 from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.mytypes import DSA
+from backend_collection.mytypes import DSA, Result, SDG_Key
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence, 
-	clean_product_name, standardise_packsize, regex, OFFER_TYPES)
+	clean_product_name, standardise_packsize, regex, OFFER_TYPES, StoreNames)
 from backend_collection.promo_processor2 import InterfacePromoKeys, PromoProcessor
 
 
@@ -25,64 +25,57 @@ class TSCPromoKeys(InterfacePromoKeys):
 
 class TSCPromoProcessor(PromoProcessor):
 	keys = TSCPromoKeys()
-	membership_price_promo_keyword = "clubcard price"
 
-	path_to_competitors: list[str | Callable[[Any], bool]] = [
-		"details", "components",
-		lambda x: x["__typename"] == "CompetitorsInfo", "competitors"]
+	membership_price_promo_keyword = "clubcard price"
+	multibuy_cheapest_free_keyword = "cheapest product free"
 
 	def get_requires_membership(self):
 		promo_attributes = self.promo_data.get("attributes")
 		return (promo_attributes and "CLUBCARD_PRICING" in promo_attributes)
 
-	def check_membership_price(self):
+	def check_membership_price(self) -> DSA:
 		"""
 		Check match for "[X] Clubcard price"
 		MUST BE LAST, AS other promos may include the keyword.
 		"""
-		if (not self.strapline): return
-		if (not self.membership_price_promo_keyword in self.strapline.lower()): return
+		if (not self.strapline): return {}
+		if (not self.membership_price_promo_keyword in self.strapline.lower()): return {}
 
 		price = self._query_regex(regex.PRICE, self.strapline)
-		if (not price): return
+		if (not price): return {}
 
 		return {
 			"offer_type": OFFER_TYPES.simple_reduction,
 			"member_reduced_price": convert_str_to_pence(price[0])
 		}
 
-	def check_pricematch(self):
-		""" Check for pricematch with competitors. """
-
-		competitors = safe_deepget(self.entire_data, self.path_to_competitors)
-
-		# TODO: put this in normal place, not promos
-		for competitor in competitors:
-			return {
-				"matching_store": competitor["id"]
-			}
-
-
-
 
 
 
 class GQLCollector(BaseCollector):
-	def __init__(
-			self, env: DSA, config: DSA, endpoint: str,
-			store: str, results_per_search: int):
+	PromoProcessor = TSCPromoProcessor
 
-		super().__init__() # nothing happens here?
+	store = StoreNames.tesco
+	endpoint = "https://xapi.tesco.com"
+	http_method = "POST"
+	
+	path_results_from_resp = [0, "data", "search", "results"]
+	path_promos_from_result = ["sellers", "results", 0, "promotions"]
 
-		self.endpoint = endpoint
+	path_price_from_result = ["sellers", "results", 0]
+	path_reviews_from_result = ["reviews", "stats"]
+	path_competitors_from_result = [
+		"details", "components",
+		{"__typename": "CompetitorsInfo"}, "competitors"]
+	
+
+	def __init__(self, env: DSA, config: DSA, results_per_search: int):
 		self.__HEADERS = {
 			"Accept": "application/json",
 			"x-apikey": config["TESCO_XAPI_KEY"]
 		}
-		self.http_method = "POST"
 		self._compute_cfw_e(env)
 
-		self.store = store
 		self.results_per_search = results_per_search
 		self._base_search_request: list[DSA] = [
 			{
@@ -131,14 +124,6 @@ class GQLCollector(BaseCollector):
 			}
 		]
 
-		self.promo_processor = TSCPromoProcessor
-
-		self.results_path = [0, "data", "search", "results"]
-		self.price_from_result = ["sellers", "results", 0]
-		self.promos_path = ["sellers", "results", 0, "promotions"]
-		self.reviews_from_result = ["reviews", "stats"]
-		self.membership_price_promo_keyword = "clubcard price"
-
 
 	def get_postable_search_body(
 			self, query: str) -> list[DSA]:
@@ -147,47 +132,15 @@ class GQLCollector(BaseCollector):
 
 		return v
 
+	def check_pricematch(self, result: DSA) -> list[DSA]:
+		""" Check for pricematch with competitors. """
 
-	"""def process_promos(self, result: DSA) -> DSA:		
-		promo_data: dict[str, str] | None = safe_deepget(result, self.promo_from_result)
+		competitors = safe_deepget(result, self.path_competitors_from_result)
+		if (not competitors): return []
 
-		if (not promo_data): return {}
-		
-		offer_value = promo_data.get("description") or ""
-		requires_membership = safe_deepget(
-			promo_data, self.first_attribute_from_promo) == "CLUBCARD_PRICING"
-
-		formatted_data = {
-			"start_date": promo_data.get("startDate"), # TODO: datetime string format
-			"end_date": promo_data.get("endDate"), # datetime string format
-			"requires_membership": requires_membership,
-			"store_given_id": promo_data.get("id") # ANY X.. CAN MIX AND MATCH OTHER PRODUCTS
-		}
-
-		# IS "Any X for £X"		
-		
-
-		# THIS MUST BE THE LAST EVALUATION
-		# AS OTHERS LIKE "ANY FOR" INCLUDE THE KEYWORD.
-		if (self.membership_price_promo_keyword in offer_value.lower()):
-			price_found = re.match(regex.ANY_PRICE, offer_value.lower())
-			if (not price_found): return {}
-
-			price_str = price_found.group(0)
-			if (not price_str): return {}
-
-			return dict_add_values(
-				formatted_data,
-				member_reduced_price = convert_str_to_pence(price_str)
-			)
-
-		
-
-		
-		# TODO: LOG THIS
-		formatted_data["unknown_offer_type"] = offer_value
-		return formatted_data
-	"""
+		return [
+			{"matching_store": competitor["id"]} for competitor in competitors if competitor.get("id")
+		]
 
 
 	def parse_packsize(self, result: DSA, product_name: str):
@@ -226,11 +179,11 @@ class GQLCollector(BaseCollector):
 		if (not result): return []
 
 		# TODO: filter list for marketplace?
-		sale_data: DSA = safe_deepget(result, self.price_from_result, {})
+		sale_data: DSA = safe_deepget(result, self.path_price_from_result, {})
 		price: DSA | None = sale_data.get("price")
 		if (not price): return []
 
-		rating_data: DSA = safe_deepget(result, self.reviews_from_result, {})
+		rating_data: DSA = safe_deepget(result, self.path_reviews_from_result, {})
 
 		brand_name = result.get("brandName") or ""
 		name = result.get("title") or ""
@@ -239,6 +192,11 @@ class GQLCollector(BaseCollector):
 
 		promos_data = self.process_promos(result)
 		promo_objects = [{"type": "offer", "data": v} for v in promos_data]
+
+		price_matches = self.check_pricematch(result)
+		promo_objects = [
+			*promo_objects,
+			*({"type": "offer", "data": v} for v in price_matches)]
 
 		return [
 			{
@@ -309,7 +267,8 @@ class GQLCollector(BaseCollector):
 		return headers
 
 
-		
-
+# CONFIRMED price[price_pence] is BEFORE discount
+# CONFIRMED price match offers are created
+# CONFIRMED offers work well -> CHEAPEST PRODUCT FREE WORKS.
 
 

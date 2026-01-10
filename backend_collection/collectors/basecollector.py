@@ -28,14 +28,14 @@ async def async_executor(func: partial[Any]):
 
 
 class BaseCollector:
+	PromoProcessor: type[PromoProcessor]
+
 	endpoint: str
 	store: str
 	http_method: str
 
-	promo_processor: type[PromoProcessor]
-
-	promos_path: list[Any]
-	results_path: list[Any]
+	path_results_from_resp: list[Any]
+	path_promos_from_result: list[Any]
 
 	async def __request(self, options: DSA):
 		if (not self._cfwt):
@@ -138,6 +138,9 @@ class BaseCollector:
 
 	def get_storables_from_result(self, result: DSA) -> list[DSA]:
 		raise NotImplementedError
+	
+	def find_price_matches(self, result: DSA) -> list[DSA]:
+		raise NotImplementedError
 
 
 	def parse_packsize(self, result: DSA, product_name: str) -> tuple[int, Number, str]:
@@ -190,7 +193,7 @@ class BaseCollector:
 
 	def parse_data(self, data: DSA) -> list[list[DSA]]:
 		results: list[DSA] | None
-		results = safe_deepget(data, self.results_path)
+		results = safe_deepget(data, self.path_results_from_resp)
 
 		if (not results): return []
 
@@ -208,10 +211,10 @@ class BaseCollector:
 	def process_promos(self, data: DSA):
 		gathered_promos: list[DSA] = []
 
-		promotions: list[DSA] = safe_deepget(data, self.promos_path)
+		promotions: list[DSA] = safe_deepget(data, self.path_promos_from_result)
 
 		for promo in (promotions or []):
-			processor = self.promo_processor(data, promo)
+			processor = self.PromoProcessor(data, promo)
 
 			try: promo = processor.process_promo()
 			except: pass

@@ -1,3 +1,5 @@
 {
-	"typeCheckingMode": "strict"
+	"typeCheckingMode": "strict",
+	"reportUnusedImport": "information",
+	"reportUnusedVariable": "information"
 }
