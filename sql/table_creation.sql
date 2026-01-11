@@ -8,7 +8,9 @@ CREATE TABLE Products (
     PS_Unit VARCHAR(2),
     
     EntryCreatedDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    EntryUpdatedDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+    EntryUpdatedDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+	DetailsVerified BOOL DEFAULT False,
     
     PRIMARY KEY (PID),
     FOREIGN KEY (BrandID) REFERENCES Brands(ID),
@@ -72,11 +74,16 @@ CREATE TABLE Offers (
     OfferType TINYINT UNSIGNED NOT NULL DEFAULT 0,
     StartDate DATETIME,
     EndDate DATETIME,
+
     AF_AnyCount TINYINT UNSIGNED,
     AF_ForPrice SMALLINT UNSIGNED,
     AF_ForCount TINYINT UNSIGNED,
+
     RR_NewPrice SMALLINT UNSIGNED,
+	SavePerc TINYINT UNSIGNED,
+	
     RequiresMembership BOOL,
+	OnlineExclusive BOOL,
     
     PRIMARY KEY (ID),
     FOREIGN KEY (StoreID) REFERENCES Stores(ID)

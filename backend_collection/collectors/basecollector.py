@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor as TPE
 #from urllib import parse as urlparse
 from asyncio import get_running_loop
 from functools import partial
-from typing import Any
+from typing import Any, Optional
 from requests import Response
 import requests
 import time
@@ -28,14 +28,16 @@ async def async_executor(func: partial[Any]):
 
 
 class BaseCollector:
+	_HEADERS: dict[str, str] = {}
+
 	PromoProcessor: type[PromoProcessor]
 
 	endpoint: str
 	store: str
 	http_method: str
 
-	path_results_from_resp: list[Any]
-	path_promos_from_result: list[Any]
+	_path_results_from_resp: list[Any]
+	_path_promos_from_result: list[Any]
 
 	async def __request(self, options: DSA):
 		if (not self._cfwt):
@@ -134,7 +136,7 @@ class BaseCollector:
 
 
 	def get_headers(self) -> dict[str, str]:
-		raise NotImplementedError
+		return self._HEADERS
 
 	def get_storables_from_result(self, result: DSA) -> list[DSA]:
 		raise NotImplementedError
@@ -143,7 +145,8 @@ class BaseCollector:
 		raise NotImplementedError
 
 
-	def parse_packsize(self, result: DSA, product_name: str) -> tuple[int, Number, str]:
+	def parse_packsize(
+			self, result: DSA, product_name: str) -> tuple[int, Number, str]:
 		"""
 		This method parses all possible methods of finding PACKSIZE and
 		decides which one to keep.
@@ -193,7 +196,7 @@ class BaseCollector:
 
 	def parse_data(self, data: DSA) -> list[list[DSA]]:
 		results: list[DSA] | None
-		results = safe_deepget(data, self.path_results_from_resp)
+		results = safe_deepget(data, self._path_results_from_resp)
 
 		if (not results): return []
 
@@ -211,7 +214,8 @@ class BaseCollector:
 	def process_promos(self, data: DSA):
 		gathered_promos: list[DSA] = []
 
-		promotions: list[DSA] = safe_deepget(data, self.path_promos_from_result)
+		promotions: list[DSA] = safe_deepget(
+			data, self._path_promos_from_result)
 
 		for promo in (promotions or []):
 			processor = self.PromoProcessor(data, promo)
@@ -219,8 +223,91 @@ class BaseCollector:
 			try: promo = processor.process_promo()
 			except: pass
 			else: gathered_promos.append(promo)
+		
+		# RUN ENTIRE
+		#processor = self.PromoProcessor(data, {})
+		#other = processor.run_entire_checks()
+
+		#if (other): gathered_promos = [*gathered_promos, *other]
 
 		return gathered_promos
+	
+
+	def _build_storables(
+			self, 
+			product_name: Optional[str], 
+			brand_name: Optional[str], 
+			ps_count: Optional[int],
+			ps_sizeeach: Optional[Number], 
+			ps_unit: Optional[str], 
+			thumb: Optional[str], 
+			upcs: Optional[list[int]], 
+			cin: Optional[int],
+			price_pence: Optional[int], 
+			is_available: Optional[bool], 
+			rating_avg: Optional[float],
+			rating_count: Optional[int], 
+			category: Optional[str], 
+			dept: Optional[str],
+			promos: Optional[list[DSA]], 
+			labels: Optional[list[DSA]]) -> list[DSA]:
+		""" Creates `dict` objects ready for databse storage. """
+		
+		product = {
+			"type": "product",
+			"data": {
+				"name": product_name,
+				"brand_name": brand_name,
+				"packsize": {
+					"count": ps_count,
+					"sizeeach": ps_sizeeach,
+					"unit": ps_unit
+				}
+			}
+		}
+
+		image = {
+			"type": "image",
+			"data": { "url": thumb, "store_name": self.store }
+		}
+
+		links = [{
+			"type": "link",
+			"data": { "upc": upc, "store_name": self.store, "cin": cin }
+		} for upc in upcs] if (upcs) else []
+
+		price = {
+			"type": "price",
+			"data": {
+				"price_pence": price_pence,
+				"available": is_available,
+				"store_name": self.store
+			}
+		}
+
+		rating = {
+			"type": "rating",
+			"data": {
+				"avg": rating_avg,
+				"count": rating_count,
+				"store_name": self.store
+			}
+		}
+
+		cat = {
+			"category": category,
+			"department": dept,
+			"store_name": self.store
+		}
+
+		promo_objs = [ { "type": "offer", "data": v } for v in (promos or []) ]
+		label_objs = [ { "type": "label", "data": v } for v in (labels or []) ]
+
+		return [
+			product, image, price, rating, cat,
+			*links, *promo_objs, *label_objs
+		]
+
 
 
 	async def search(self, query: str, debug: bool = False) -> list[list[DSA]]:
@@ -248,14 +335,6 @@ class BaseCollector:
 			print("error loading JSON from response", err)
 
 		if (debug):
-			with open(
-				f"{self.store}DebugResponse_{int(time.time())}b.json", "wb"
-			) as f: f.write(result.content)
-
-			with open(
-				f"{self.store}DebugResponse_{int(time.time())}t.json", "w"
-			) as f: f.write(result.text)
-
 			with open(
 				f"{self.store}DebugResponse_{int(time.time())}j.json", "w"
 			) as f: json.dump(data, f)

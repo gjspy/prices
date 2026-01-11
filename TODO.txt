@@ -12,6 +12,8 @@ class Parser(parserInterface):
 class GraphQLParser(Parser):
 	...
 
+ruler: {"column": 79, "color": "#c7ca0a9f"}
+
 
 for CMP: User.name in ("Bob", "James")
 and NOT keyword, look at other dunder methods. (__invert__?)
@@ -21,7 +23,7 @@ LIKE keyword: eg Name LIKE '%i%' = any record including the letter i.
 MAKE .config UPDATE EVERY TIME ITS NEEDED? INSTEAD OF GLOBAL "API_KEY", HAVE get_api_key(), SO CAN UPDATE WITHOUT RESTARTING CODE
 LOTS OF ERR HANDLING + LOGGING + SEND TO DISCORD. API GETS UPDATED, I NEED TO KNOW.
 HOW TO CLEANLY SHUT DOWN CODE?
-HAVE .state FILE SO IT CAN PICK BACK UP??
+HAVE .state FILE SO IT CAN PICK BACK UP?? ****************************
 
 ON MY GRAPH OF PRICE HISTORY, SHADE REGIONS WHERE AN OFFER WAS APPLIED
 GRAPH BKG IS WHITE, THEN WHEN "ANy X" WAS ON, LIGHT RED SHADING, CNA HOVER
@@ -37,3 +39,10 @@ need some cleanup for unlinked products. if one of our productids doesnt have a 
 have in admin panel!
 
 tesco may be seriously different delivery vs instore
+
+
+
+need some sort of "equivalents" field in link table
+when i start matching own-brand products, don't want to consider them completely identical
+
+ASK: how do upcs work for own-brand?

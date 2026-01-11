@@ -1,41 +1,97 @@
-from copy import deepcopy
-import urllib
-import re
-
-
 from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.mytypes import DSA
+from backend_collection.mytypes import DSA, Result, SDG_Key
 from backend_collection.constants import (
-	safe_deepget, int_safe, convert_str_to_pence, 
-	clean_product_name, standardise_packsize, regex)
+	safe_deepget, int_safe, convert_str_to_pence, clean_product_name,
+	StoreNames, regex, OFFER_TYPES, convert_fracorperc_to_perc)
+from backend_collection.promo_processor2 import InterfacePromoKeys, PromoProcessor
+
+class MORPromoKeys(InterfacePromoKeys):
+	promo_id = "retailerPromotionId"
+	promo_description = "description"
+	promo_type = None
+
+	start_date = None
+	end_date = None
+	requires_membership = None
+
+class MORPromoProcessor(PromoProcessor):
+	keys = MORPromoKeys()
+
+	online_exclusive_keyword = "online exclusive"
+	pricematch_keyword = "price match"
+
+	# DATA DOES NOT SPECIFY WITH WHOM THE PRICE IS MATCHED
+	# MORRISONS WEBSITE: "essentials price matched to Aldi and Lidl"
+	pricematching_store = "UnspecificAldiLidl"
+
+	def __init__(self, result: DSA, specific_promo: DSA):
+		super().__init__(result, specific_promo)
+
+		self._strapline_checks.append(self.check_pricematch)
+
+	@property
+	def promo_online_exclusive(self):
+		return self.online_exclusive_keyword in self.strapline.lower()
+	
+
+	def check_multibuy(self):
+		"""
+		Check description for match of "buy [X] for [Y]"
+		Check description for match of "any [x] for [y]"
+
+		Check description for match of either of the above,
+		where y is an amount and includes
+		"cheapest item free" [`multibuy_cheapest_free_keyword`]
+
+		ALSO checks for "Buy [X] Save [Y]%"
+		"""
+		normal = super().check_multibuy()
+		if (normal): return normal
+
+		groups = self._query_regex(regex.MULTIBUY_SAVE, self.strapline)
+		if (not groups): return
+
+		return {
+			"offer_type": OFFER_TYPES.any_for,
+			"any_count": int(groups[0]),
+			"save_perc": convert_fracorperc_to_perc(groups[1])
+		}
+
+
+
+	def check_pricematch(self):
+		""" Check for presence of pricematch keyword. """
+		if (not self.strapline): return
+
+		if (self.pricematch_keyword in self.strapline.lower()): return {
+			"matching_store": self.pricematching_store
+		}
+
 
 
 class ClusterCollector(BaseCollector):
-	def __init__(
-			self, env: DSA, config: DSA, endpoint: str,
-			store: str, results_per_search: int):
-		
-		super().__init__()
+	PromoProcessor = MORPromoProcessor
 
-		self.endpoint = endpoint
-		self.__HEADERS = {
+	store = StoreNames.morrisons
+	endpoint = "https://groceries.morrisons.com/api/webproductpagews/v6/product-pages/search"
+	http_method = "GET"
+
+	#_path_results_from_resp = None
+	_path_promos_from_result = ["promotions"]
+
+	_path_best_img_res = ["imageConfig", "availableResolutions",-1]
+	_path_img_format = ["imageConfig", "availableFormats", 0]
+	_path_clean_img = ["imagePaths", -1]
+	_path_img_url_fmt = "{path}/{resolution}.{fmt}"
+
+	def __init__(self, env: DSA, config: DSA, results_per_search: int):
+		self._HEADERS = {
 			"Accept": "application/json"
 		}
-		self.http_method = "GET"
 		self._compute_cfw_e(env)
 
-		self.store = store
 		self.results_per_search = results_per_search
 
-		self.best_img_res_path = ["imageConfig", "availableResolutions",-1]
-		self.img_format_path = ["imageConfig", "availableFormats", 0]
-		self.clean_img_path = ["imagePaths", -1]
-		self.image_url = "{path}/{resolution}.{fmt}"
-
-		self.price_match_keyword = "price match"
-
-	def get_headers(self):
-		return self.__HEADERS
 		
 	def get_gettable_search_params(self, query: str):
 		return {
@@ -44,29 +100,6 @@ class ClusterCollector(BaseCollector):
 			"maxPageSize": self.results_per_search,
 			"q": query
 		}
-	
-
-	def process_promo(self, result: DSA) -> DSA:
-		promotions = result.get("promotions")
-		if (not promotions): return {}
-
-		promo: DSA = promotions[0] # NEVER SEEN MORE THAN ONE ANYWHERE
-		promo_id = promo.get("retailerPromotionId")
-		promo_description: str | None = promo.get("description")
-
-		if ((not promo_id) or (not promo_description)): return {}
-
-		if (self.price_match_keyword in promo_description.lower()):
-			# PROMO_ID IS NOT INT. DON'T CARE ABOUT IT
-			# NO promoPrice, SO CAN'T GET "was_price".
-
-			return {
-				"offer_type": "_PriceMatch"
-			}
-
-		# REDUCTION
-		# MULTIBUY
-
 
 
 	def parse_packsize(self, result: DSA, product_name: str):
@@ -85,76 +118,69 @@ class ClusterCollector(BaseCollector):
 		return self._parse_packsize_str(product_name)
 	
 
-	def get_storable_from_result(self, result: DSA) -> DSA:
+	def get_storables_from_result(self, result: DSA) -> list[DSA]:
 		name = result.get("name") or ""
 		brand_name = result.get("brand") or ""
 		count, size_each, unit = self.parse_packsize(result, name)
 
-		img_resolution = safe_deepget(result, self.best_img_res_path)
-		img_format = safe_deepget(result, self.img_format_path)
-		img_path = safe_deepget(result, self.clean_img_path)
+		img_resolution = safe_deepget(result, self._path_best_img_res)
+		img_format = safe_deepget(result, self._path_img_format)
+		img_path = safe_deepget(result, self._path_clean_img)
 		img = ""
 
 		if (img_resolution and img_format and img_path):
-			img = self.image_url.format(
+			img = self._path_img_url_fmt.format(
 				path = img_path,
 				resolution = img_resolution,
 				fmt = img_format
 			)
 
+		# IN TERMS OF REDUCTION,  result["promoPrice"] GIVES "NOW",
+		# result["price"] IS ALWAYS "WAS". WE STORE "WAS".
 		price_data: DSA = result.get("price") or {}
-		promo_price_data: DSA | None = result.get("promoPrice")
-		rating_data: DSA = result.get("ratingSummary") or {}
-		category_data: list[str] = result.get("categoryPath") or []
-
 		price = price_data.get("amount") 
-		if (promo_price_data):
-			promo_price = promo_price_data.get("amount")
-			price = promo_price or price
-		
-		price_pence = -1
+		if (not price): return []
+
 		# DATA FIELD IS "3.42", or "0.80". DOESNT HAVE £. NEEDED FOR HELPER.
-		if (price): price_pence = convert_str_to_pence(f"£{price}")
+		price_pence = convert_str_to_pence(f"£{price}")
 
-		cat_len = len(category_data) # ensure has 2+ so no errors later :)
-		if (cat_len < 2):
-			for _ in range(2 - cat_len):
-				category_data.append("")
+		# CATEGORY GIVEN AS LIST, TAKE FIRST 2
+		category_data: list[str] = result.get("categoryPath") or []
+		l = len(category_data)
 
-		return {
-			"product": {
-				"brand_name": brand_name,
-				"name": clean_product_name(name, brand_name),
-				"packsize": {
-					"count": count,
-					"sizeeach": size_each,
-					"unit": unit
-				}
-			},
-			"image": {
-				"url": img
-			},
-			"link": {
-				#"upc": ,
-				"store": self.store,
-				"cin": int_safe(result.get("retailerProductId"))
-			},
-			"price": {
-				"price_pence": price_pence,
-				"available": result.get("available") == True # NOT STOCK LEVELS. THEY'RE PER STORE.
-			},
-			"offer": self.process_promo(result),
-			"rating": {
-				"avg": float(rating_data.get("overallRating") or -1),
-				"count": int(rating_data.get("count") or -1)
-			},
-			"category": {
-				"category": category_data[0], # eg Chilled Food
-				"department": category_data[1] # eg Cheese
-				# also has aisle [Cheddar & Regional Cheese]
-				# and shelf [Mature Cheese] but thats too granular
-			}
-		}
+		category = category_data[0] if l >= 1 else ""
+		dept = category_data[1] if l >= 2 else ""
+
+		rating_data: DSA = result.get("ratingSummary") or {}
+
+		promos_data = self.process_promos(result)
+		price_matches = list(filter(
+			lambda x: x.get("matching_store"),
+			promos_data))
+		
+		promos_data = list(filter(
+			lambda x: not x.get("matching_store"),
+			promos_data))
+
+
+		return self._build_storables(
+			product_name = clean_product_name(name, brand_name),
+			brand_name = brand_name,
+			ps_count = count,
+			ps_sizeeach = size_each,
+			ps_unit = unit,
+			thumb = img, # BEST SIZE
+			upcs = None,
+			cin = int_safe(result.get("retailerProductId")),
+			price_pence = price_pence,
+			is_available = result.get("available") == True, # NOT STOCK LEVELS. THEY'RE PER STORE.
+			rating_avg = float(rating_data.get("overallRating") or -1),
+			rating_count = int(rating_data.get("count") or -1),
+			category = category,
+			dept = dept,
+			promos = promos_data,
+			labels = price_matches
+		)
 
 	
 	def parse_data(self, data: DSA) -> list[list[DSA]]:
@@ -178,13 +204,12 @@ class ClusterCollector(BaseCollector):
 
 		return results
 
-
+# CONFIRMED price[price_pence] is BEFORE discount
+# CONFIRMED price match offers are created
+# CONFIRMED offers work well
 
 """RESPONSE:
 productGroups[0] = decoratedProducts [type="featured"] (Sponsored results.)
 productGroups[1] = decoratedProducts [type="personalized"]
 each productGroup has a few products, and all seem related. scrolling on morrisons, saw same for first productgroup.
-
-
-
 """

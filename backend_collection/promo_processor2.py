@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable, Optional
 import re
 import traceback
 
@@ -6,23 +6,33 @@ from backend_collection.constants import regex, convert_str_to_pence, OFFER_TYPE
 from backend_collection.mytypes import DSA
 
 class InterfacePromoKeys:
-	promo_from_data = NotImplemented
+	"""
+	Class to describe keys in promo objects.
+	"""
 
+	# REQUIRED
 	promo_id = NotImplemented
 	promo_description = NotImplemented
-	promo_type = NotImplemented
+	promo_type = None # NOT REQUIRED
 
-	start_date = NotImplemented
-	end_date = NotImplemented
-	requires_membership = NotImplemented
+	# OTHER (NOT REQUIRED)
+	start_date = None
+	end_date = None
+	requires_membership = None
+	online_exclusive = None
 
 
 class PromoProcessor:
-	# store: str = NotImplemented
+	""" Class used to process one singular promotion. """
 	keys: InterfacePromoKeys = NotImplemented
 
-	membership_price_promo_keyword: str = NotImplemented
-	multibuy_cheapest_free_keyword: str = NotImplemented
+	# USED IN BASE CLASS
+	multibuy_cheapest_free_keyword: str | None = None
+
+	# ONLY USED IN SUBCLASS
+	membership_price_promo_keyword: str
+	online_exclusive_keyword: str
+	pricematch_keyword: str
 
 	def __init__(
 			self, result: DSA, specific_promo: DSA):
@@ -31,23 +41,53 @@ class PromoProcessor:
 
 		self.strapline: str = specific_promo.get(self.keys.promo_description) or ""
 		self.promo_id: str = specific_promo.get(self.keys.promo_id) or ""
-		self.promo_type: str = specific_promo.get(self.keys.promo_type) or ""
-
-		self._strapline_checks = [
-			self.check_reduction,
-			self.check_membership_price,
-			self.check_multibuy]
-
 		
-	def get_requires_membership(self):
-		return self.promo_data.get(self.keys.requires_membership)
+		self.promo_type: str = (
+			specific_promo.get(self.keys.promo_type) if (self.keys.promo_type)
+			else "") or ""
+
+		self._strapline_checks: list[Callable[[], DSA | None]] = [
+			self.check_reduction,
+			self.check_multibuy]
+		
+		self._entire_checks: list[Callable[[], DSA | None]] = []
+
+	
+	@property
+	def promo_start_date(self):
+		return ( 
+			None if (not self.keys.start_date)
+			else self.promo_data.get(self.keys.start_date)
+		)
+	
+	@property
+	def promo_end_date(self):
+		return (
+			None if (not self.keys.end_date)
+			else self.promo_data.get(self.keys.end_date)
+		)
+	
+	@property
+	def promo_requires_membership(self):
+		return (
+			None if (not self.keys.requires_membership)
+			else self.promo_data.get(self.keys.requires_membership)
+		)
+	
+	@property
+	def promo_online_exclusive(self):
+		return (
+			None if (not self.keys.online_exclusive)
+			else self.promo_data.get(self.keys.online_exclusive)
+		)
 
 	
 	def _build_initial_data(self):
 		return {
-			"start_date": self.promo_data.get(self.keys.start_date),
-			"end_date": self.promo_data.get(self.keys.end_date),
-			"requires_membership": self.get_requires_membership(),
+			"start_date": self.promo_start_date,
+			"end_date": self.promo_end_date,
+			"requires_membership": self.promo_requires_membership,
+			"online_exclusive": self.promo_online_exclusive,
 			"store_given_id": self.promo_id
 		}
 	
@@ -58,7 +98,7 @@ class PromoProcessor:
 		Automatically converts `string` to all lowercase as standard.
 		"""
 
-		regmatch = re.match(expression, string.lower())
+		regmatch = re.search(expression, string.lower())
 		if (not regmatch): return
 
 		return regmatch.groups()
@@ -66,7 +106,7 @@ class PromoProcessor:
 	
 
 
-	def check_reduction(self):
+	def check_reduction(self) -> Optional[DSA]:
 		""" Check description for match of "now [X], was [Y]" """
 		if (not self.strapline): return
 
@@ -75,11 +115,12 @@ class PromoProcessor:
 
 		return {
 			"offer_type": OFFER_TYPES.simple_reduction,
-			"was_price": convert_str_to_pence(groups[1])
+			"was_price": convert_str_to_pence(groups[1]),
+			"reduced_price": convert_str_to_pence(groups[0])
 		}
 
 
-	def check_multibuy(self):
+	def check_multibuy(self) -> Optional[DSA]:
 		"""
 		Check description for match of "buy [X] for [Y]"
 		Check description for match of "any [x] for [y]"
@@ -96,12 +137,13 @@ class PromoProcessor:
 			groups = self._query_regex(regex.ANYFOR, self.strapline)
 			if (not groups): return
 		
-		if (self.multibuy_cheapest_free_keyword in self.strapline.lower()):
-			return {
-				"offer_type": OFFER_TYPES.any_for,
-				"any_count": int(groups[0]),
-				"for_count": int(groups[1])
-			}
+		if (self.multibuy_cheapest_free_keyword):
+			if (self.multibuy_cheapest_free_keyword in self.strapline.lower()):
+				return {
+					"offer_type": OFFER_TYPES.any_for,
+					"any_count": int(groups[0]),
+					"for_count": int(groups[1])
+				}
 
 		return {
 			"offer_type": OFFER_TYPES.any_for,
@@ -109,47 +151,58 @@ class PromoProcessor:
 			"for_price": convert_str_to_pence(groups[1])
 		}
 	
+
+
+	def _process_by_type(self) -> Optional[DSA]:
+		raise NotImplementedError
 	
-	def check_membership_price(self) -> DSA:
-		raise NotImplementedError
 
-	def check_pricematch(self) -> DSA:
-		raise NotImplementedError
-
-		
-
-
-	def process_by_type(self) -> DSA:
-		raise NotImplementedError
+	def _run_strapline_checks(self):
+		"""
+		EACH STRAPLINE ONLY SHOWS ONE OFFER. RETURNS WHEN FOUND.
+		CREATE NEW PromoProcessor FOR DIFFERENT DATAS.
+		"""
+		for check in self._strapline_checks:
+			try: result = check()
+			except Exception as err: traceback.print_exception(err)
+			else:
+				if (result): return result
 
 
 	def process_promo(self) -> DSA:
 		initial_data = self._build_initial_data()
-
 		result = {}
 
 		if (self.promo_type):
-			try: result = self.process_by_type()
+			try: result = self._process_by_type()
 			except Exception as err: traceback.print_exception(err)
-			else: return {**initial_data, **result}
+			else:
+				if (result): return {**initial_data, **result}
 		
 		# PROCESSING BY TYPE DID NOT WORK, USE STRAPLINE/DESCRIPTION:
-		if (not self.strapline): return {}
+		if (self.strapline):
+			from_strapline = self._run_strapline_checks()
+			if (from_strapline): return from_strapline
+		
+		print(self.strapline)	
 
-		# EACH STRAPLINE ONLY SHOWS ONE OFFER. break WHEN FOUND.
-		# CALL process_promo MULTIPLE TIMES FOR DIFFERENT STRAPLINES.
-		for check in self._strapline_checks:
-			result = check()
-			if (result): break
-		
-		if (result): return {**initial_data, **result}
-		
 		return {
 			**initial_data,
 			"offer_type": OFFER_TYPES.unknown,
 			"data": self.promo_data,
 			"error": True
 		}
+	
+
+	def run_entire_checks(self) -> list[DSA]:
+		gathered: list[DSA] = []
+
+		for check in self._entire_checks:
+			result = check()
+
+			if (result): gathered.append(result)
+		
+		return gathered
 
 		
 
@@ -158,3 +211,4 @@ class PromoProcessor:
 		# MORRISONS ALSO HAS PRICE MATCHES.s
 		# CHECK WHEN SETTING PRODUCT PRICE THAT IT IS NON-DISCOUNTED PRICE.
 		# IN PROMO, STORE WAS_PRICE AND NEW_PRICE? IDK WHAT?
+		# TODO: ONLINE EXCLUSIVE

@@ -11,12 +11,6 @@ from backend_collection.mytypes import Number, SDG_Key
 
 COLLECT_START_TIME = "02:00"
 
-
-
-ASDA_ENDPOINT = "https://8i6wskccnv-dsn.algolia.net/1/indexes/*/queries"
-MORRISONS_ENDPOINT = "https://groceries.morrisons.com/api/webproductpagews/v6/product-pages/search"
-SAINSBURYS_ENDPOINT = "https://www.sainsburys.co.uk/groceries-api/gol-services/product/v1/product" # SEARCH ENDPOINT. (SAME AS PRODUCT?)
-
 class StoreNames:
 	tesco = "TESCO"
 	asda = "ASDA"
@@ -29,12 +23,21 @@ class regex:
 	CLEAN_STR = r"(?: {2,})|(?:^ +)|(?: +$)|(?:\( *\))|(?:\[ *\])|(?:\{ *\})"
 
 	# MATCHES £4.29, £4, 29p
-	PRICE = r"((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p))" # ONE CAPTURE GROUP
-	PRICE_FLEX = r"((?:£\d+\.\d+)|(?:£\d+)|(?:\d+p)|(?:\d+\.\d+)|(?:\d+))" # ALLOWS NUMBER WITHOUT £ or p
+	__PRICE = r"(?:£\d+\.\d+)|(?:£\d+)|(?:\d+p)" # DEFINITION, NO CAPTURE
+	PRICE = rf"({__PRICE})" # ONE CAPTURE GROUP
+
+	# ALLOWS NUMBER WITHOUT £ OR p, ALSO ALLOWS .95 (DECIMAL WITHOUT LEADING 0)
+	PRICE_FLEX = rf"({__PRICE}|(?:\d+\.\d+)|(?:\d+)|(?:\.\d+))" 
+
+	# MATCHES 1/3, 25%
+	FRACTION_OR_PERC = r"((?:\d+\/\d+)|(?:\d+%))"
 	
 	ANYFOR = rf"any (\d+) for {PRICE_FLEX}"
 	REDUCTION = rf"now {PRICE},? was {PRICE}"
 	MULTIBUY = rf"buy (\d+) for {PRICE_FLEX}"
+	MULTIBUY_SAVE = rf"buy (\d+),? save {FRACTION_OR_PERC}"
+
+	SAVE = rf"save {FRACTION_OR_PERC}"
 
 	# MATCHES DIGITS FOLLOWED BY CHAR UNITS.
 	PACKSIZE_ONE = r"([\d\.]+)([A-z]+)"
@@ -139,18 +142,40 @@ def int_safe(value: Any) -> int | None:
 	except: return None
 
 
+def pad_list(l: list[Any], value: Any, length: int):
+	"""
+	Backfill list `l` until its `len()` matches `length`.
+	Returns original `l` if `len()` >= `length`
+	"""
+
+	curr_l = len(l)
+
+	return l + [value] * (length - len(l)) if (curr_l < length) else l
 
 
+def convert_str_to_pence(value: str | None) -> int:
+	if (value is None): return -1
 
-def convert_str_to_pence(value: str) -> int:
 	if type(value) == int or type(value) == float: # type: ignore [JUST IN CASE]
 		print(f"assuming int value is £ {value}")
 		return value * 100 # pence
 	
+	if (value.startswith(".")): return int_safe(value.replace(".", "")) or -1
 	if ("£" in value): return int_safe(float(value.replace("£", "")) * 100) or -1
 	if ("p" in value): return int_safe(value.replace("p", "")) or -1
+	
+	print(f"assuming int value is £ {value}")
+	return int_safe(float(value) * 100) or -1 # pence
 
-	return -1
+def convert_fracorperc_to_perc(value: str):
+	if type(value) == int or type(value) == float: # type: ignore [JUST IN CASE]
+		return value
+	
+	if ("/" in value):
+		vals = value.split("/")
+		return round((int(vals[0]) / int(vals[1]))*100)
+	
+	if ("%" in value):  return int_safe(value.replace("%",""))
 
 
 def standardise_packsize(size: str | Number, unit: str):

@@ -5,39 +5,63 @@ from backend_collection.collectors.basecollector import BaseCollector
 from backend_collection.mytypes import Number, DSA
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence,
-	clean_product_name, regex)
+	clean_product_name, StoreNames, OFFER_TYPES)
+from backend_collection.promo_processor2 import PromoProcessor, InterfacePromoKeys
+
+class ASDPromoKeys(InterfacePromoKeys):
+	promo_id = "ID"
+	promo_description = "NAME"
+	promo_type = "TYPE"
+
+	start_date = "START_DATE"
+	end_date = "END_DATE"
+	requires_membership = None
+
+
+class ASDPromoProcessor(PromoProcessor):
+	keys = ASDPromoKeys()
+
+	# NOTHING EXTRA. WE PROCESS REDUCTION FOR ASD IN BaseCollector SUBCLASS NOW
+
+
+
 
 
 class AlgoliaCollector(BaseCollector):
-	def __init__(
-			self, env: DSA, config: DSA, endpoint: str,
-			algolia_index_name: str, store: str, results_per_search: int):
+	PromoProcessor = ASDPromoProcessor
 
-		super().__init__() # nothing happens here?
+	store = StoreNames.asda
+	endpoint = "https://8i6wskccnv-dsn.algolia.net/1/indexes/*/queries"
+	http_method = "POST"
 
-		self.endpoint = endpoint
-		self.__HEADERS = {
+	_algolia_index_name = "ASDA_PRODUCTS"
+	_image_url_fmt = "https://asdagroceries.scene7.com/is/image/asdagroceries/{0}"
+
+	_path_results_from_resp = ["results", 0, "hits"]
+	_path_promos_from_result = ["PROMOS", "EN"]
+	
+	_path_price_from_result = ["PRICES", "EN"]
+
+	def __init__(self, env: DSA, config: DSA, results_per_search: int):
+		self._HEADERS = {
 			"Accept": "*/*",
 			"x-algolia-api-key": config["ASDA_ALGOLIA_API_KEY"],
 			"x-algolia-application-id": config["ASDA_ALGOLIA_API_APP"]
 		}
-		self.http_method = "POST"
 		self._compute_cfw_e(env)
 
-		self.store = store
 		self.results_per_search = results_per_search
-		self.algolia_index_name = algolia_index_name
 		self._base_search_request = {
 			"requests": [
 				{
 					"query": "[UNSET]",
-					"indexName": algolia_index_name, # "ASDA_PRODUCTS"
+					"indexName": self._algolia_index_name,
 					"clickAnalytics": False,
 					"analytics": False,
 					"hitsPerPage": results_per_search,
 					"page": 0,
 					"typoTolerance": True,
-					"removeWordsIfNoDSAs": "allOptional",
+					"removeWordsIfNoResults": "allOptional",
 					"attributesToRetrieve": [
 						"STATUS",
 						"BRAND",
@@ -49,7 +73,7 @@ class AlgoliaCollector(BaseCollector):
 						"PRICES.EN",
 						"SALES_TYPE",
 						"MAX_QTY",
-						"STOCK.4565",
+						#"STOCK.4565",
 						"IS_FROZEN",
 						"IS_BWS",
 						"PROMOS.EN",
@@ -80,12 +104,6 @@ class AlgoliaCollector(BaseCollector):
 			]
 		}
 
-		self.results_path = ["results", 0, "hits"]
-		self.prices_from_result = ["PRICES", "EN"]
-		self.promo_from_result = ["PROMOS", "EN", 0]
-
-		self.image_url = "https://asdagroceries.scene7.com/is/image/asdagroceries/{0}"
-
 
 	def get_postable_search_body(
 			self, query: str) -> DSA:
@@ -93,59 +111,6 @@ class AlgoliaCollector(BaseCollector):
 		v["requests"][0]["query"] = query
 
 		return v
-
-
-	def process_promo(self, result: DSA) -> DSA:
-		prices_data: dict[str, str] | None = safe_deepget(result, self.prices_from_result)
-
-		if (prices_data):
-			offer_type = prices_data.get("OFFER")
-
-			if (offer_type and offer_type != "List"): # TODO, ARE THERE MORE THAN ROLLBACK THAT END UP HERE?
-				# Rollback, Dropped # TODO, WHAT IS store_given_data, WHERE IS store_given_id?
-				return {
-					"offer_type": "_Reduction",
-					"store_given_data": prices_data["OFFER"],
-					"was_price": prices_data["WASPRICE"] * 100
-				}
-		
-		# TODO CAN THEY DO ROLLBACK AND ANY X FOR????
-		promo_data: dict[str, str] | None = safe_deepget(result, self.promo_from_result)
-
-		if (not promo_data): return {}
-		
-		offer_value = promo_data.get("NAME")
-		if (not offer_value): return {}
-
-		# IS "Any X for £X"
-		match = re.match(regex.ANY_X_FOR_PROMO, offer_value.lower()) # TYPE 15
-
-		if (match):
-			groups = match.groups()
-
-			return {
-				"offer_type": "_AnyFor",
-				"any_count": int(groups[0]),
-				"for_price": convert_str_to_pence(groups[1]),
-				"store_given_id": promo_data.get("ID") # CAN MIX AND MATCH OTHER PRODUCTS
-			}
-		
-		# TODO: REFER BY TYPE
-		# PROMOS.EN.TYPE
-		#	= 15 -> Any X
-		#	= 12 -> Meal Deal
-		
-		# TODO: LOG THIS
-		return {
-			"unknown_offer_type": offer_value + "_" + str(promo_data.get("TYPE")),
-			"start_date": promo_data.get("START_DATE"),
-			"end_date": promo_data.get("END_DATE"), # TODO: THESE ARE UNIX STAMPS.
-			"store_given_id": promo_data.get("ID")
-		}
-
-
-	
-	
 
 	def parse_packsize(self, result: DSA, product_name: str):
 		"""
@@ -162,7 +127,7 @@ class AlgoliaCollector(BaseCollector):
 		packsize_text = result.get("PACK_SIZE") or ""
 		pst_count, pst_size_each, pst_unit = self._parse_packsize_str(packsize_text)
 
-		# NOW USUALLY "..NAME.. MULTIxMULTI (TOTAL)"
+		# GET FROM NAME, NOW USUALLY "{NAME} MULTIxMULTI (TOTAL)"
 		n_count, n_size_each, n_unit = self._parse_packsize_str(product_name)
 
 		# TAKE ANY NON-1 VALUE FOR COUNT, WE WANT MULTI IF IT EXISTS.
@@ -174,58 +139,64 @@ class AlgoliaCollector(BaseCollector):
 			) else (pst_count, pst_size_each, pst_unit)
 		)
 	
+	def promo_check_reduction(self, sale_data: DSA):
+		"""
+		Basic reductions ["Rollback", "Dropped"] are described
+		in price field, not as a promotion entry.
+		"""
+		
+		offer = sale_data.get("OFFER")
+		if (offer == None or offer == "List"): return
 
+		return {
+			"offer_type": OFFER_TYPES.simple_reduction,
+			"was_price": convert_str_to_pence(sale_data.get("WASPRICE") or ""),
+			"reduced_price": convert_str_to_pence(sale_data["PRICE"])
+		}
+	
 
-	def get_storable_from_result(self, result: DSA) -> DSA:
+	def get_storables_from_result(self, result: DSA) -> list[DSA]:
 		brand_name = result.get("BRAND") or ""
-		image_id = result.get("IMAGE_ID") or ""
+		image_id = result.get("IMAGE_ID") or "" # ALSO UPC
 
-		# ORIGINALLY GAVE SUPER CLEAN,
-		# NOW INCLUDES PACKSIZE :(
-		# CLEAN IT FOR FUTURE PROOFING
 		name = result.get("NAME") or ""
 
-		price_data: dict[str, str] = safe_deepget(result, self.prices_from_result) or {}
+		sale_data: dict[str, str] = safe_deepget(
+			result, self._path_price_from_result, {})
+		price = sale_data.get("WASPRICE") or sale_data.get("PRICE")
+		if (not price): return []
+
 		taxonomy: dict[str, str] = result.get("PRIMARY_TAXONOMY") or {}
 
 		count, size_each, unit = self.parse_packsize(result, name)
-		
-		return {
-			"product": {
-				"brand_name": brand_name, # CLEANEST, Title Case
-				"name": clean_product_name(name, brand_name),
-				"packsize": {
-					"count": count,
-					"sizeeach": size_each,
-					"unit": unit
-				}
-			},
-			"image": {
-				"url": self.image_url.format(image_id)
-				# ASDA IMAGES DO NOT HAVE ICONS!!
-			},
-			"link": {
-				"upc": int_safe(image_id),
-				"store": self.store,
-				"cin": int_safe(result.get("CIN"))
-			},
-			"price": {
-				"price_pence": convert_str_to_pence(price_data.get("PRICE") or ""),
-				"available": result.get("STATUS") == "A" # NOT STOCK LEVELS. THEY'RE PER STORE.
-			},
-			"offer": self.process_promo(result),
-			"rating": {
-				"avg": result.get("AVG_RATING"),
-				"count": result.get("RATING_COUNT")
-			},
-			"category": {
-				"category": taxonomy.get("CAT_NAME"), # eg Chilled Food
-				"department": taxonomy.get("DEPT_NAME") # eg Cheese
-				# also has aisle [Cheddar & Regional Cheese]
-				# and shelf [Mature Cheese] but thats too granular
-			}
-		}
 
+		promos_data = self.process_promos(result)
 
-	def get_headers(self) -> dict[str, str]:
-		return self.__HEADERS # easy here, other places require computation
+		reduction = self.promo_check_reduction(sale_data)
+		if (reduction): promos_data.append(reduction)
+
+		labels: list[DSA] = [] # NOTHIGN TO PUT HERE? NO PRICE MATCHES? (TODO CHECK)
+
+		upc = int_safe(image_id)
+
+		return self._build_storables(
+			product_name = clean_product_name(name, brand_name),
+			brand_name = brand_name,
+			ps_count = count,
+			ps_sizeeach = size_each,
+			ps_unit = unit,
+			thumb = self._image_url_fmt.format(image_id),
+			upcs = [upc] if upc else None,
+			cin = int_safe(result.get("CIN")),
+			price_pence = convert_str_to_pence(price),
+			is_available = result.get("STATUS") == "A",
+			rating_avg = result.get("AVG_RATING"),
+			rating_count = result.get("RATING_COUNT"),
+			category = taxonomy.get("CAT_NAME"),
+			dept = taxonomy.get("DEPT_NAME"),
+			promos = promos_data,
+			labels = labels
+		)
+
+# CONFIRMED price[price_pence] IS BEFORE DISCOUNT
+# CONFIRMED offers work well (DOES CHEAPEST PRODUCT FREE EXIST?)
