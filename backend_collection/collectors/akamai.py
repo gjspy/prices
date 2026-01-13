@@ -3,7 +3,7 @@ from backend_collection.mytypes import DSA, Result, SDG_Key
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence, clean_product_name,
 	regex, OFFER_TYPES, StoreNames, convert_fracorperc_to_perc, clean_string)
-from backend_collection.promo_processor2 import InterfacePromoKeys, PromoProcessor
+from backend_collection.promo_processor import InterfacePromoKeys, PromoProcessor
 
 import re
 

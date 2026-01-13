@@ -16,6 +16,7 @@ class StoreNames:
 	asda = "ASDA"
 	morrisons = "MORRISONS"
 	sainsburys = "SAINSBURYS"
+	aldi = "ALDI"
 
 class regex:
 	"""ALL MATCHES SHOULD USE .lower() FOR THE SEARCH STRING."""
@@ -248,13 +249,18 @@ def clean_product_name(name: str, brand_name: str | None = None):
 	return name
 
 
-def stringify_query(query_params: dict[str, str | Any]):
+def stringify_query(query_params: dict[str, str | Any], remove_quotes: bool = False):
 	"""
 	Created this method as an alternative to `urllib.parse.urlencode`
 	
 	Point of this method is to stringify query params without urlsafing characters.
+
+	Normal Response: "q='cheese'&limit=60"
+
+	Response `remove_quotes = True`: "q=cheese&limit=60
 	"""
-	return "&".join(f"{k}={repr(v)}" for k,v in query_params.items())
+	v = "&".join(f"{k}={repr(v)}" for k,v in query_params.items())
+	return v.replace("'", "") if remove_quotes else v
 
 class TaskThread(Thread):
 	"""

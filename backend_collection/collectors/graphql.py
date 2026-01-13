@@ -8,7 +8,7 @@ from backend_collection.mytypes import DSA, Result, SDG_Key
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence, 
 	clean_product_name, standardise_packsize, regex, OFFER_TYPES, StoreNames)
-from backend_collection.promo_processor2 import InterfacePromoKeys, PromoProcessor
+from backend_collection.promo_processor import InterfacePromoKeys, PromoProcessor
 
 
 class TSCPromoKeys(InterfacePromoKeys):
@@ -191,8 +191,8 @@ class GQLCollector(BaseCollector):
 		# TODO: filter list for marketplace?
 		sale_data: DSA = safe_deepget(
 			result, self._path_price_from_result, {})
-		price: DSA | None = sale_data.get("price")
-		if (not price): return []
+		price_data: DSA | None = sale_data.get("price")
+		if (not price_data): return []
 
 		rating_data: DSA = safe_deepget(
 			result, self._path_reviews_from_result, {})
@@ -200,7 +200,7 @@ class GQLCollector(BaseCollector):
 		brand_name = result.get("brandName") or ""
 		name = result.get("title") or ""
 
-		count, size_each, unit = self.parse_packsize(price, name)
+		count, size_each, unit = self.parse_packsize(price_data, name)
 
 		promos_data = self.process_promos(result)
 		price_matches = self.check_pricematch(result)
@@ -216,7 +216,7 @@ class GQLCollector(BaseCollector):
 			thumb = result.get("defaultImageUrl"), # HAS ICONS :( # TODO: STANDARDISE IMAGE SIZE. TESCO HAVE ?h=x&w=x, ASDA?
 			upcs = [upc] if upc else None,
 			cin = int_safe(result.get("tpnc")), # TSC PROD NUM C, A AND B EXIST, B GIVEN, C = WEBSITE PAGE ID.
-			price_pence = round(float(price.get("price") or -1) * 100),
+			price_pence = round(float(price_data.get("price") or -1) * 100),
 			is_available = sale_data.get("isForSale") == True, # NOT STOCK LEVELS. THEY'RE PER STORE.
 			rating_avg = rating_data.get("overallRating"),
 			rating_count = rating_data.get("noOfReviews"),

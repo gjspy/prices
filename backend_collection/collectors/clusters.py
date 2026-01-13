@@ -3,7 +3,7 @@ from backend_collection.mytypes import DSA, Result, SDG_Key
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence, clean_product_name,
 	StoreNames, regex, OFFER_TYPES, convert_fracorperc_to_perc)
-from backend_collection.promo_processor2 import InterfacePromoKeys, PromoProcessor
+from backend_collection.promo_processor import InterfacePromoKeys, PromoProcessor
 
 class MORPromoKeys(InterfacePromoKeys):
 	promo_id = "retailerPromotionId"

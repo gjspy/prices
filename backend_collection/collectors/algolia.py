@@ -6,7 +6,7 @@ from backend_collection.mytypes import Number, DSA
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence,
 	clean_product_name, StoreNames, OFFER_TYPES)
-from backend_collection.promo_processor2 import PromoProcessor, InterfacePromoKeys
+from backend_collection.promo_processor import PromoProcessor, InterfacePromoKeys
 
 class ASDPromoKeys(InterfacePromoKeys):
 	promo_id = "ID"

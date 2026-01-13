@@ -4,7 +4,7 @@ import asyncio
 import json
 import time
 
-from backend_collection.collectors import algolia, graphql, clusters, akamai
+from backend_collection.collectors import algolia, graphql, clusters, akamai, aldi
 from backend_collection.constants import regex
 
 import os
@@ -18,18 +18,24 @@ asda = algolia.AlgoliaCollector(env, config, RESULTS_PER_SEARCH) # good cfw
 tesco = graphql.GQLCollector(env, config, RESULTS_PER_SEARCH) # good cfw
 mor = clusters.ClusterCollector(env, config, RESULTS_PER_SEARCH) # good cfw
 sains = akamai.AKMCollector(env, config, RESULTS_PER_SEARCH) # bad cfw
+ald = aldi.ALDCollector(env, config, 60) # "Page limit must be equal to some of there values: [12,16,24,30,32,48,60]"
 
 async def main():
-	#result = await sains.search("cheese", True)
+	#result = await ald.search("cheese", True)
 	#print(result)
 	
-	d = json.load(open("SAINSBURYSDebugResponse_1768149743j.json","r"))
-	result = sains.parse_data(d)
+	d = json.load(open("ALDIDebugResponse_1768250557j.json","r"))
+	result = ald.parse_data(d)
 
 	with open(f"TestResult_{int(time.time())}.json", "w") as f:
 		json.dump(result, f, indent = 2)
-
+##
 asyncio.run(main())
+
+#ata = json.load(open("test.json","r"))
+#print(data, data.get("url"))
+
+# TODO: IN STORAGE WRITER, DEAL WITH "NOT NULL". ALDI: RATINGS_COUNT AND AVG DO NOT EXIST, BUT STILL CREATE STORABLE.
 
 # TODO: verify UPC, ensure is x digits, incase any change (ASDA IMAGE_ID stress)
 """from urllib import parse
@@ -65,7 +71,7 @@ ASDA and TESCO seem complete:
 	check TODOS. theres quite a few :)
 
 	
-eventually want to have //TESCO, //ASDA, //MORRISONS, //SAINSBURYS, ALDI.
+eventually want to have //TESCO, //ASDA, //MORRISONS, //SAINSBURYS, //ALDI.
 //DECIDE if we want many promos per product. wouldnt be effort?
 
 https://api.aldi.co.uk/v3/product-search?currency=GBP&serviceType=walk-in&q=Milk&limit=30&offset=0&sort=relevance&servicePoint=C092

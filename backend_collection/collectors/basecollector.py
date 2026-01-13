@@ -14,7 +14,7 @@ from backend_collection.mytypes import Number, DSA
 from backend_collection.constants import (
 	safe_deepget, regex, split_packsize_str, standardise_packsize,
 	stringify_query)
-from backend_collection.promo_processor2 import PromoProcessor
+from backend_collection.promo_processor import PromoProcessor
 
 
 # WE HAVE EXECUTOR AS requests IS NOT NATIVELY ASYNCHRONOUS.
@@ -35,6 +35,10 @@ class BaseCollector:
 	endpoint: str
 	store: str
 	http_method: str
+
+	# FOR HTTP "GET", WHEN CREATING STRING QUERY PARAMS, WHETHER TO HAVE
+	# "q='cheese'&limit=60" OR "q=cheese&limit=60"
+	_get_query_remove_quotes = False 
 
 	_path_results_from_resp: list[Any]
 	_path_promos_from_result: list[Any]
@@ -74,11 +78,12 @@ class BaseCollector:
 
 	async def _get(
 			self, query_params: dict[str, str] = {}) -> Response:
+		print(stringify_query(query_params,))
 		
 		r = await self.__request({
 			"m": "GET",
 			"h": self.get_headers(),
-			"p": stringify_query(query_params)
+			"p": stringify_query(query_params, self._get_query_remove_quotes)
 		})
 
 		return r
@@ -155,7 +160,7 @@ class BaseCollector:
 		raise NotImplementedError
 	
 
-	def _parse_packsize_str(self, packsize: str) -> tuple[int, Number, str]:
+	def _parse_packsize_str(self, packsize: str | None) -> tuple[int, Number, str]:
 		"""
 		This method parses an individual PACKSIZE string, to separate values:
 
@@ -319,9 +324,9 @@ class BaseCollector:
 			result = await self._post(body = req_body)
 		
 		if (self.http_method == "GET"):
-			endpoint = self.get_gettable_search_params(query)
+			params = self.get_gettable_search_params(query)
 
-			result = await self._get(endpoint)
+			result = await self._get(params)
 		#data = result.json(kwds={"ensure_ascii": True}) # ensure_ascii so \u00a3 -> £ !!
 
 		if (result == None):
