@@ -2,7 +2,7 @@ from copy import deepcopy
 import re
 
 from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.mytypes import Number, DSA
+from backend_collection.types import Number, DSA
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence,
 	clean_product_name, StoreNames, OFFER_TYPES)

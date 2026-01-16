@@ -10,7 +10,7 @@ import json
 import re
 
 
-from backend_collection.mytypes import Number, DSA
+from backend_collection.types import Number, DSA
 from backend_collection.constants import (
 	safe_deepget, regex, split_packsize_str, standardise_packsize,
 	stringify_query)
@@ -263,11 +263,9 @@ class BaseCollector:
 			"data": {
 				"name": product_name,
 				"brand_name": brand_name,
-				"packsize": {
-					"count": ps_count,
-					"sizeeach": ps_sizeeach,
-					"unit": ps_unit
-				}
+				"packsize_count": ps_count,
+				"packsize_sizeeach": ps_sizeeach,
+				"packsize_unit": ps_unit
 			}
 		}
 
@@ -279,7 +277,13 @@ class BaseCollector:
 		links = [{
 			"type": "link",
 			"data": { "upc": upc, "store_name": self.store, "cin": cin }
-		} for upc in upcs] if (upcs) else []
+		} for upc in upcs] if (upcs) else [{
+			"type": "link",
+			"data": {
+				"store_name": self.store,
+				"cin": cin
+				}
+			}]
 
 		price = {
 			"type": "price",

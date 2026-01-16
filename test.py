@@ -2,10 +2,15 @@ from dotenv import dotenv_values
 import asyncio
 
 import json
+import copy
 import time
 
 from backend_collection.collectors import algolia, graphql, clusters, akamai, aldi
 from backend_collection.constants import regex
+from backend_collection.storer import Writer
+import backend_collection.dbclasses as objs
+from dbmanager.engine import Database
+from dbmanager.process import DBThread
 
 import os
 print(os.getcwd())
@@ -13,6 +18,149 @@ print(os.getcwd())
 config = dotenv_values(".config")
 env = dotenv_values(".env")
 RESULTS_PER_SEARCH = 100
+
+import sshtunnel
+import logging
+
+logger = logging.getLogger("main-logger") # GETS OR CREATES
+logger.setLevel(logging.DEBUG)
+
+console = logging.StreamHandler()
+logger.addHandler(console)
+
+SSH_USER = env["SSH_USER"]
+SSH_HOST = env["SSH_HOST"]
+SSH_PORT = env["SSH_PORT"]
+SSH_KEY = env["SSH_KEY"]
+DB_HOST = env["DB_HOST"]
+DB_PORT = env["DB_PORT"]
+DB_USER = env["DB_USER"]
+DB_PASS = env["DB_PASS"]
+DB_SCHM = env["DB_SCHM"]
+
+from dbmanager import misc
+
+"""# TESTING uid FOR DUPLICATES
+a = [misc.uid() for i in range(100_000)]
+
+print(len(set(a)) == len(a))
+print(len(set(a)))"""
+print(objs.Brand.table_name)
+print(objs.NestedBrand.db_id.table_row_model)
+
+Writer._query_brand_with_name(None, "test")
+raise
+
+
+
+async def main(tunnel: sshtunnel.SSHTunnelForwarder):
+	db = Database(
+		DB_HOST, tunnel.local_bind_port, DB_SCHM, DB_USER, DB_PASS, logger # type: ignore
+	)
+
+	db.declare_table_row_models(
+		objs.Product, objs.ProductLink, objs.PriceEntry,# objs.Offer,
+		objs.Rating, objs.Image
+	)
+
+	succ = db.connect()
+	print(succ, "connected:", db.is_connected)
+
+	DB_PROCESS = DBThread(logger, db, asyncio.get_event_loop())
+	DB_PROCESS.start()
+
+	manager = Writer(DB_PROCESS)
+	# TODO: WRAP ALL WITH TRY/CATCH
+
+	await manager.write_storable_group([
+    {
+      "type": "product",
+      "data": {
+        "name": "Mature Cheddar Cheese",
+        "brand_name": "CATHEDRAL CITY",
+        "packsize_count": 1,
+        "packsize_sizeeach": 350.0,
+        "packsize_unit": "g"
+      }
+    },
+    {
+      "type": "image",
+      "data": {
+        "url": "https://dm.emea.cms.aldi.cx/is/image/aldiprodeu/product/jpg/scaleWidth/1500/a3a42a2b-c96f-447c-8b7a-336fa01778b2/",
+        "store_name": "ALDI"
+      }
+    },
+    {
+      "type": "price",
+      "data": {
+        "price_pence": 339,
+        "available": True,
+        "store_name": "ALDI"
+      }
+    },
+    {
+      "type": "rating",
+      "data": {
+        "avg": None,
+        "count": None,
+        "store_name": "ALDI"
+      }
+    },
+    {
+      "category": "Chilled Food",
+      "department": "Cheese",
+      "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 482344002
+      }
+    }
+  ])
+	db.disconnect()
+
+	return
+
+	collector = AlgoliaCollector(CONFIG, "ASDA_PRODUCTS", "ASDA", 100)
+
+	storables = await this.search("cheese")
+	print("res",storables)
+
+	print("\n\n\n\n")
+
+	for r in storables:
+		print(r)
+
+
+
+
+
+
+
+with sshtunnel.SSHTunnelForwarder(
+		(SSH_HOST, int(SSH_PORT)), ssh_username = SSH_USER, ssh_pkey = SSH_KEY,
+		remote_bind_address = (DB_HOST, int(DB_PORT))) as tunnel:
+
+	assert tunnel
+	print("tunnel active: ", tunnel and tunnel.is_active)
+
+	asyncio.run(main(tunnel))
+
+
+
+
+
+
+
+
+
+raise
+
+
+
+
 
 asda = algolia.AlgoliaCollector(env, config, RESULTS_PER_SEARCH) # good cfw
 tesco = graphql.GQLCollector(env, config, RESULTS_PER_SEARCH) # good cfw

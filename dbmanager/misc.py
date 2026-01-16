@@ -1,10 +1,13 @@
 from datetime import datetime
 from typing import Any, Iterable
+import random
 
 from dbmanager.types import DSA
 
 ASCENDING_SQL = "ASC"
 DESCENDING_SQL = "DESC"
+CHARS_URLSAFE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890"
+NUMS = "1234567890"
 
 class ENVStrucutre():
 	host = "DB_HOST"
@@ -87,3 +90,12 @@ def get_k_from_v(d: DSA, value: Any):
 
 def flatten(ls: Iterable[list[Any]]) -> list[Any]:
 	return [vv for v in ls for vv in v]
+
+
+def uid(l: int = 12):
+	id_ = ""
+
+	while (id_ == "" or id_[0] in NUMS):
+		id_ = "".join(random.choice(CHARS_URLSAFE) for _ in range(l))
+	
+	return id_

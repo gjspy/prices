@@ -5,11 +5,9 @@
       "data": {
         "name": "Manchego Cheese D.",
         "brand_name": "SPECIALLY SELECTED",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 175.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 175.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -39,6 +37,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 282692002
+      }
     }
   ],
   [
@@ -47,11 +52,9 @@
       "data": {
         "name": "Grated Cheddar Cheese",
         "brand_name": "EVERYDAY ESSENTIALS",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 500.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 500.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -81,6 +84,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 417607001
+      }
     }
   ],
   [
@@ -89,11 +99,9 @@
       "data": {
         "name": "Grated Mozzarella Cheese",
         "brand_name": "EVERYDAY ESSENTIALS",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 500.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 500.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -123,6 +131,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 417607002
+      }
     }
   ],
   [
@@ -131,11 +146,9 @@
       "data": {
         "name": "Mild Cheese Spread",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 150.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 150.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -165,6 +178,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 418129002
+      }
     }
   ],
   [
@@ -173,11 +193,9 @@
       "data": {
         "name": "French Goats' Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 180.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 180.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -207,6 +225,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 422367001
+      }
     }
   ],
   [
@@ -215,11 +240,9 @@
       "data": {
         "name": "Hard Goats' Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 130.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 130.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -249,6 +272,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 422367002
+      }
     }
   ],
   [
@@ -257,11 +287,9 @@
       "data": {
         "name": "Classic Grilling Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -291,6 +319,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 549702002
+      }
     }
   ],
   [
@@ -299,11 +334,9 @@
       "data": {
         "name": "Somerset Brie Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 135.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 135.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -333,6 +366,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 584602001
+      }
     }
   ],
   [
@@ -341,11 +381,9 @@
       "data": {
         "name": "Somerset Goat's Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 85.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 85.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -375,6 +413,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 584602003
+      }
     }
   ],
   [
@@ -383,11 +428,9 @@
       "data": {
         "name": "Wensleydale with Cranberry Cheese",
         "brand_name": "SPECIALLY SELECTED",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -417,6 +460,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 632143001
+      }
     }
   ],
   [
@@ -425,11 +475,9 @@
       "data": {
         "name": "Truffle Cheddar Cheese",
         "brand_name": "SPECIALLY SELECTED",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -459,6 +507,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 632143003
+      }
     }
   ],
   [
@@ -467,11 +522,9 @@
       "data": {
         "name": "Chilli Grilling cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -501,6 +554,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 549702001
+      }
     }
   ],
   [
@@ -509,11 +569,9 @@
       "data": {
         "name": "Mature Cheddar Cheese",
         "brand_name": "CATHEDRAL CITY",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 350.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 350.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -543,6 +601,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 482344002
+      }
     }
   ],
   [
@@ -551,11 +616,9 @@
       "data": {
         "name": "Original Spreadable Cheese",
         "brand_name": "SERIOUSLY",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 110.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 110.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -585,6 +648,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 462929001
+      }
     }
   ],
   [
@@ -593,11 +663,9 @@
       "data": {
         "name": "Lighter Spreadable Cheese",
         "brand_name": "SERIOUSLY",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 110.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 110.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -627,6 +695,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 462929002
+      }
     }
   ],
   [
@@ -635,11 +710,9 @@
       "data": {
         "name": "Vintage Spreadable Cheese",
         "brand_name": "SERIOUSLY",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 110.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 110.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -669,6 +742,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 462929003
+      }
     }
   ],
   [
@@ -677,11 +757,9 @@
       "data": {
         "name": "British Mild Cheddar Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 400.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 400.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -711,6 +789,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 423477
+      }
     }
   ],
   [
@@ -719,11 +804,9 @@
       "data": {
         "name": "Greek Style Salad cheese",
         "brand_name": "EVERYDAY ESSENTIALS",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -753,6 +836,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 467426
+      }
     }
   ],
   [
@@ -761,11 +851,9 @@
       "data": {
         "name": "Cheese Singles",
         "brand_name": "EVERYDAY ESSENTIALS",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 225.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 225.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -795,6 +883,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 494377
+      }
     }
   ],
   [
@@ -803,11 +898,9 @@
       "data": {
         "name": "British Mature Cheddar Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 400.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 400.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -837,6 +930,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 522537
+      }
     }
   ],
   [
@@ -845,11 +945,9 @@
       "data": {
         "name": "Cheese 'a' Peel",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 80.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 80.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -879,6 +977,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 546314
+      }
     }
   ],
   [
@@ -887,11 +992,9 @@
       "data": {
         "name": "Barrel Aged Feta Cheese",
         "brand_name": "SPECIALLY SELECTED",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -921,6 +1024,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 558048
+      }
     }
   ],
   [
@@ -929,11 +1039,9 @@
       "data": {
         "name": "Cheese 'a' Peel",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 160.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 160.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -963,6 +1071,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 632163
+      }
     }
   ],
   [
@@ -971,11 +1086,9 @@
       "data": {
         "name": "Cheese Triangles",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 140.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 140.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1005,6 +1118,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 282123001
+      }
     }
   ],
   [
@@ -1013,11 +1133,9 @@
       "data": {
         "name": "Cheese Slices",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1047,6 +1165,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 282227001
+      }
     }
   ],
   [
@@ -1055,11 +1180,9 @@
       "data": {
         "name": "Baked Camembert French Cheese",
         "brand_name": "SPECIALLY SELECTED",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 250.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 250.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1089,6 +1212,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 283099005
+      }
     }
   ],
   [
@@ -1097,11 +1227,9 @@
       "data": {
         "name": "French Soft Goat's Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 150.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 150.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1131,6 +1259,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 422367003
+      }
     }
   ],
   [
@@ -1139,11 +1274,9 @@
       "data": {
         "name": "Grated Lighter Cheddar Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 250.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 250.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1173,6 +1306,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 422926001
+      }
     }
   ],
   [
@@ -1181,11 +1321,9 @@
       "data": {
         "name": "Mozzarella Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 250.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 250.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1215,6 +1353,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 422938001
+      }
     }
   ],
   [
@@ -1223,11 +1368,9 @@
       "data": {
         "name": "British Smoky Cheddar Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1257,6 +1400,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 423346001
+      }
     }
   ],
   [
@@ -1265,11 +1415,9 @@
       "data": {
         "name": "British Wensleydale & Cranberry Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1299,6 +1447,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 423346003
+      }
     }
   ],
   [
@@ -1307,11 +1462,9 @@
       "data": {
         "name": "Burland Bloom British Cheese",
         "brand_name": "SPECIALLY SELECTED",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 150.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 150.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1341,6 +1494,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 423865002
+      }
     }
   ],
   [
@@ -1349,11 +1509,9 @@
       "data": {
         "name": "Stratford Blue British Cheese",
         "brand_name": "SPECIALLY SELECTED",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 165.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 165.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1383,6 +1541,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 423865003
+      }
     }
   ],
   [
@@ -1391,11 +1556,9 @@
       "data": {
         "name": "Beacon Blue British Cheese",
         "brand_name": "SPECIALLY SELECTED",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 115.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 115.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1425,6 +1588,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 423865006
+      }
     }
   ],
   [
@@ -1433,11 +1603,9 @@
       "data": {
         "name": "British Medium Cheddar Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 400.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 400.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1467,6 +1635,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 542401001
+      }
     }
   ],
   [
@@ -1475,11 +1650,9 @@
       "data": {
         "name": "Low Fat Cottage Cheese",
         "brand_name": "EVERYDAY ESSENTIALS",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 300.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 300.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1509,6 +1682,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 416217
+      }
     }
   ],
   [
@@ -1517,11 +1697,9 @@
       "data": {
         "name": "Full Fat Soft Cheese",
         "brand_name": "THE CHEESE EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1551,6 +1729,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 416748
+      }
     }
   ],
   [
@@ -1559,11 +1744,9 @@
       "data": {
         "name": "Extra Mature Cheddar Cheese",
         "brand_name": "CATHEDRAL CITY",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 350.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 350.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1593,6 +1776,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 482344001
+      }
     }
   ],
   [
@@ -1601,11 +1791,9 @@
       "data": {
         "name": "Dewlay Cheesemakers Crumbly Lancashire Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 250.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 250.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1635,6 +1823,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 423411
+      }
     }
   ],
   [
@@ -1643,11 +1838,9 @@
       "data": {
         "name": "Belton Farm Crumbly Cheshire Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 250.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 250.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1677,6 +1870,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 423412
+      }
     }
   ],
   [
@@ -1685,11 +1885,9 @@
       "data": {
         "name": "British Mild White Cheddar Cheese",
         "brand_name": "EVERYDAY ESSENTIALS",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 900.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 900.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1719,6 +1917,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 487119
+      }
     }
   ],
   [
@@ -1727,11 +1932,9 @@
       "data": {
         "name": "British Mature White Cheddar Cheese",
         "brand_name": "EVERYDAY ESSENTIALS",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 900.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 900.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1761,6 +1964,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 495240
+      }
     }
   ],
   [
@@ -1769,11 +1979,9 @@
       "data": {
         "name": "British Extra Mature Cheddar Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 400.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 400.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1803,6 +2011,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 522620
+      }
     }
   ],
   [
@@ -1811,11 +2026,9 @@
       "data": {
         "name": "Light Cheese Triangles",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 140.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 140.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1845,6 +2058,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 282123002
+      }
     }
   ],
   [
@@ -1853,11 +2073,9 @@
       "data": {
         "name": "Light Cheese Slices",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1887,6 +2105,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 282227002
+      }
     }
   ],
   [
@@ -1895,11 +2120,9 @@
       "data": {
         "name": "Le Gruy\u00e9re AOP Reserve Cheese",
         "brand_name": "SPECIALLY SELECTED",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 170.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 170.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1929,6 +2152,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 282692001
+      }
     }
   ],
   [
@@ -1937,11 +2167,9 @@
       "data": {
         "name": "12 Months Matured Comt\u00e9 Cheese",
         "brand_name": "SPECIALLY SELECTED",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 180.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 180.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -1971,6 +2199,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 282692004
+      }
     }
   ],
   [
@@ -1979,11 +2214,9 @@
       "data": {
         "name": "Garlic & Herbs Mini Roule Cheese",
         "brand_name": "SPECIALLY SELECTED",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 100.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 100.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2013,6 +2246,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 304786001
+      }
     }
   ],
   [
@@ -2021,11 +2261,9 @@
       "data": {
         "name": "Pineapple & Almond Mini Roule Cheese",
         "brand_name": "SPECIALLY SELECTED",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 100.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 100.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2055,6 +2293,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 304786003
+      }
     }
   ],
   [
@@ -2063,11 +2308,9 @@
       "data": {
         "name": "Dewlay Cheesemakers Double Gloucester Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 250.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 250.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2097,6 +2340,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 417200001
+      }
     }
   ],
   [
@@ -2105,11 +2355,9 @@
       "data": {
         "name": "Belton Farm Crumbly Wensleydale Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 250.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 250.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2139,6 +2387,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 417200002
+      }
     }
   ],
   [
@@ -2147,11 +2402,9 @@
       "data": {
         "name": "Spreadable Strong Mature Cheddar Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 150.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 150.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2181,6 +2434,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 418129001
+      }
     }
   ],
   [
@@ -2189,11 +2449,9 @@
       "data": {
         "name": "Full Fat Plain Cottage Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 300.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 300.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2223,6 +2481,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 422469001
+      }
     }
   ],
   [
@@ -2231,11 +2496,9 @@
       "data": {
         "name": "Fat Free Plain Cottage Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 300.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 300.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2265,6 +2528,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 422469002
+      }
     }
   ],
   [
@@ -2273,11 +2543,9 @@
       "data": {
         "name": "Reduced Fat Soft Cheese Lighter",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2307,6 +2575,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 422498002
+      }
     }
   ],
   [
@@ -2315,11 +2590,9 @@
       "data": {
         "name": "Grated Half Fat Cheddar Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 250.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 250.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2349,6 +2622,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 422926002
+      }
     }
   ],
   [
@@ -2357,11 +2637,9 @@
       "data": {
         "name": "British Spicy Cheddar Cheese with Chilli",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2391,6 +2669,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 423346002
+      }
     }
   ],
   [
@@ -2399,11 +2684,9 @@
       "data": {
         "name": "British Cheddar with Pickled Onion Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 200.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 200.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2433,6 +2716,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 423346006
+      }
     }
   ],
   [
@@ -2441,11 +2731,9 @@
       "data": {
         "name": "Dutch Emmental Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 400.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 400.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2475,6 +2763,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 423384001
+      }
     }
   ],
   [
@@ -2483,11 +2778,9 @@
       "data": {
         "name": "Dutch Maasdam Cheese",
         "brand_name": "EMPORIUM",
-        "packsize": {
-          "count": 1,
-          "sizeeach": 400.0,
-          "unit": "g"
-        }
+        "packsize_count": 1,
+        "packsize_sizeeach": 400.0,
+        "packsize_unit": "g"
       }
     },
     {
@@ -2517,6 +2810,13 @@
       "category": "Chilled Food",
       "department": "Cheese",
       "store_name": "ALDI"
+    },
+    {
+      "type": "link",
+      "data": {
+        "store_name": "ALDI",
+        "cin": 423384002
+      }
     }
   ]
 ]

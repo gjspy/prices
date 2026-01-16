@@ -3,7 +3,7 @@ import re
 import traceback
 
 from backend_collection.constants import regex, convert_str_to_pence, OFFER_TYPES, safe_deepget
-from backend_collection.mytypes import DSA
+from backend_collection.types import DSA
 
 class InterfacePromoKeys:
 	"""

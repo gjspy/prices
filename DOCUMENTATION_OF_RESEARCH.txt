@@ -34,3 +34,13 @@ changed get_storable_from_result return format to allow for multiple Link entrie
 wanted to have a proxy
 researched and found cloudflare workers
 set up, discovered akamai blocks. built workaround.
+
+
+
+
+
+# TESTING uid FOR DUPLICATES
+a = [misc.uid() for i in range(100_000)]
+
+print(len(set(a)) == len(a))
+print(len(set(a)))

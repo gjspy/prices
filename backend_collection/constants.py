@@ -7,11 +7,12 @@ import logging
 import logging.handlers
 
 
-from backend_collection.mytypes import Number, SDG_Key
+from backend_collection.types import Number, SDG_Key
 
 COLLECT_START_TIME = "02:00"
 
 class StoreNames:
+	unknown = "UNKNOWN"
 	tesco = "TESCO"
 	asda = "ASDA"
 	morrisons = "MORRISONS"

@@ -14,7 +14,7 @@ class GraphQLParser(Parser):
 
 ruler: {"column": 79, "color": "#c7ca0a9f"}
 
-
+ON DELETE BEHAVIOUR FOR DEFINED FKs
 for CMP: User.name in ("Bob", "James")
 and NOT keyword, look at other dunder methods. (__invert__?)
 

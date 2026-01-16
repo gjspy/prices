@@ -2,10 +2,10 @@ from datetime import datetime
 from logging import Logger
 
 from functools import wraps
-from copy import copy
+from copy import copy, deepcopy
 from os import getenv
 
-from typing import Any, Callable, Self, Type, Generic
+from typing import Any, Callable, Self, Type, Generic, Union
 
 import mysql.connector
 from mysql.connector import Error as MySQLError
@@ -17,7 +17,7 @@ from mysql.connector.pooling import PooledMySQLConnection
 
 from dbmanager.misc import (
 	Errors, ExecutionException, ASCENDING_SQL, DESCENDING_SQL, ENVStrucutre,
-	flatten)
+	flatten, uid)
 from dbmanager.types import O, P, T, QP, DSA, DST, DSS
 
 
@@ -32,6 +32,12 @@ SQL_DATETIME_FMT = "%Y-%m-%d %H:%M:%S"
 # EVERY TIME.
 def error_handling(
 		self: "Database", e: Exception | MySQLError, rethrow: bool = False):
+	"""
+	HANDLES ERRORS FOR DB METHODS
+	PREVENTS WRITING TRY/EXCEPT AROUND EVERY EXECUTION
+	
+	AUTOMATICALLY CLOSES CURSORS AND ROLLS BACK CONNECTIONS.
+	"""
 	is_fatal: bool = type(e) == MySQLError and e.errno in FATAL_ERROR_CODES
 	fatal_str: str = "[FATAL] " if is_fatal else ""
 
@@ -55,6 +61,13 @@ def error_handling(
 
 
 def db_error_safe_catcher(func: Callable[P, O]) ->  Callable[P, O | None]:
+	"""
+	Wrapper to catch exceptions raised by various DB methods.
+
+	Handler automatically closes cursors, and rolls back connections.
+
+	This method does not re-raise, just fails silently.
+	"""
 
 	@wraps(func)
 	def wrapper(self: "Database", *args: P.args, **kwargs: P.kwargs) -> O | None:
@@ -69,6 +82,13 @@ def db_error_safe_catcher(func: Callable[P, O]) ->  Callable[P, O | None]:
 
 
 def db_error_catcher_rethrows(func: Callable[P, O]) ->  Callable[P, O | None]:
+	"""
+	Wrapper to catch exceptions raised by various DB methods.
+
+	Handler automatically closes cursors, and rolls back connections.
+
+	This method re-raises the exception, for later functions to deal with.
+	"""
 
 	@wraps(func)
 	def wrapper(
@@ -83,6 +103,35 @@ def db_error_catcher_rethrows(func: Callable[P, O]) ->  Callable[P, O | None]:
 	return wrapper # type: ignore
 
 
+"""class ValueValidator():
+	def __init__(self, db_type: str, value: Any, unsigned: bool | None = None):
+		self.db_type = db_type
+		self.value = value
+		self.unsigned = unsigned
+	
+
+	def CHAR(self, size: int): return len(self.value) == size
+	def VARCHAR(self, size_exc: int): return len(self.value) < size_exc
+
+	def TINYTEXT(self): return self.VARCHAR(255)
+	def MEDIUMTEXT(self): return self.VARCHAR(16_777_216) # 2**24
+	def LONGTEXT(self): return self.VARCHAR(4_294_967_296) # 2**32
+
+	def _NUMBER(self, signed_max_exc: int):
+		if (self.unsigned): return self.value < (signed_max_exc * 2)
+		else: return self.value >= -signed_max_exc and self.value < signed_max_exc
+	
+	def TINYINT(self): return self._NUMBER(128)
+	def SMALLINT(self): return self._NUMBER(32_768)
+	def MEDIUMINT(self): return self._NUMBER(8_388_608)
+	def INT(self): return self._NUMBER(2_147_483_648)
+
+	def validate(self):"""
+
+
+
+
+
 class CMP():
 	""" Class used to help define query statements. """
 
@@ -91,7 +140,7 @@ class CMP():
 		self.b = b
 		self.symbol = symbol
 	
-	def _convert_to_str(self, v: Any | "TableColumn[Any]") -> str:
+	def _convert_to_str(self, v: Union[Any, "TableColumn[Any]"]) -> str:
 		if (isinstance(v, datetime)):
 			v = f"{v.strftime(SQL_DATETIME_FMT)}"
 		
@@ -141,7 +190,7 @@ class Join():
 
 	def __init__(
 			self, joining_table_row_model: type["TableRow"],
-			condition: CMP | str, join_type: str = "LEFT",
+			condition: CMP | str, join_type: str = "LEFT"
 			):
 		"""
 		## Define a JOIN statement. ##
@@ -243,6 +292,10 @@ class TableRow(metaclass = TableRowMeta):
 	>>> 	pkeys = ["ID"]
 	"""
 
+	table_name: str
+	pkeys: list[str]
+	_uid: str = ""
+
 	def __init__(self):
 		# NOT PRIVATE BECAUSE USER DEFINED IT IN THEIR SUBCLASS
 		self.table_name: str
@@ -251,6 +304,7 @@ class TableRow(metaclass = TableRowMeta):
 		# PRIVATE
 		self._py_fields: DST # FIELD -> PY TYPE MAP WITH PYTHON KEYS (EG user_name)
 		self._db_fields: DSS # FIELD -> PY PROPERTY MAP WITH DB KEYS (EG USERNAME)
+		#self._db_types: DSS = {} # FIELD -> PY PROPERTY TO DB TYPE STR
 
 		self._autoincrement_keys: list[str]
 
@@ -274,20 +328,27 @@ class TableRow(metaclass = TableRowMeta):
 					v.joins.table_row_model, v == v.joins))
 				continue
 
-			setattr(self, k, None) # TODO: COULD USE PLCAEHOLDER? EG 0, ""?
+			#self._db_types[k] = v.db_type
+
+			setattr(self, k, None) # REMOVE TABLECOLUMN OBJECTS
+
+
+	#def __validate_setattr(self, name: str, value: Any) -> None:
+		# VALIDATE TYPES
+		
 
 
 
 	def __setattr__(self, name: str, value: Any) -> None:
 		# OVERWRITE THIS TO DETECT CHANGES, FOR UPDATE STATEMENTS.
 
-		super().__setattr__(name, value)
+		super().__setattr__(name, value) # ACCEPT ANYTHING
 
 		if (not hasattr(self, "_py_fields")): return
 		if (self._py_fields.get(name) == None): return # type: ignore
 
 		if (not hasattr(self, "_autoincrement_keys")): return
-		if (name in self._autoincrement_keys): return
+		if (name in self._autoincrement_keys): return	
 
 		self._changes[name] = value
 
@@ -434,13 +495,119 @@ class TableRow(metaclass = TableRowMeta):
 
 	def _db_value_to_py(self, db_value: Any, required_type: type) -> Any:
 		if (required_type == bool and (db_value == 1 or db_value == 0)): ... # TODO
+	
+	@classmethod
+	def duplicate(cls, use_uid: bool = True) -> type[Self]:
+		"""
+		Really clunky way to duplicate class.
+		Only needed if table has a self-referential join.
+
+		When building SQL statement, requires unique identifier as table name
+		is the same.
+
+		Args
+		--------
+		use_uid: bool
+			Optional, define whether to use a unique ID instead of original
+			table_name. Required if you want to query a self-reference.
+			Default True
+		"""
+
+		print(cls)
+
+		clone = type(cls.__name__, deepcopy(cls.__bases__), dict(cls.__dict__))
+		if (use_uid): clone._uid = uid()
+
+		return clone # type: ignore
+	
+	@classmethod
+	def as_str(cls):
+		return (
+			f"{cls.table_name} AS {cls._uid}" if cls._uid # type: ignore
+			else cls.table_name)
+
+
+
+	@classmethod
+	def from_py_dict(cls, data: DSA) -> Self:
+		"""
+		Load values into object from a dictionary of py_attr: value.
+		"""
+		# INSTANTIATION. TableColumns REMOVED HERE.
+		this = cls()
+
+		col_types = this.get_py_fields()
+
+		for py_attr, py_type in col_types.items():
+			existing_value: Join | None = None
+
+			try: existing_value = getattr(this, py_attr)
+			except: pass
+
+			# GET VALUE IN data WHICH WILL BE USED TO FILL OBJ.
+			# DO THIS BEFORE CHECKING FOR JOIN, ROW MAY NOT HAVE
+			# VALUE TO REFERENCE.
+
+			v: Any = data.get(py_attr)
+			if (not v):
+				# REMOVE JOIN OBJ.
+				if (existing_value): setattr(this, py_attr, None)
+
+				continue
+
+			got_type: type[Any] = type(v) # type: ignore
+
+			if (got_type != py_type):
+				try:
+					print(got_type(v))
+					v = py_type(v)
+					got_type = type(v) # type: ignore
+				except: pass
+
+			# STRICT TYPE CONTROL, RAISE EXCEPTION
+			assert py_type == Any or got_type == py_type, \
+				f"dict key {py_attr} value type {got_type} does not match required {py_type}"
+
+			del data[py_attr] # PREVENTS CIRCULAR REFERENCES
+
+			if (existing_value):
+				# CREATES OBJECT FOR JOINED COLUMN
+				# IF DATA DOESN'T EXIST (CIRCULAR, OR WASNT JOINED)
+				# IN SELECT, CREATES PARTIAL OBJ WITH JUST THE ID.
+
+				joining_model = existing_value.joining_table_row_model
+
+				child = joining_model.from_dict(data)
+				child_primary_key = child.get_primary_key_value()
+
+				if (len(child_primary_key) == 0 or None in child_primary_key):
+					this_column = cls.get_column(py_attr)
+					assert this_column and this_column.joins
+
+					child = joining_model.partial_from_id(v, this_column.joins)
+
+				v = child
+
+			setattr(this, py_attr, v)
+
+		this._load_status = "complete"
+		this.commit() # CLEAR changes, BECAUSE WE'VE JUST SET INITIAL VALUES.
+
+		return this
+
+
 
 	@classmethod
 	def from_dict(cls, data: DSA) -> Self:
 		"""
 		Load values into object from dictionary provided by `mysql-connector`.
+		(dict of db_field: value.)
+
 		Works by iterating through all annotated types of `self`, any which have
 		values in `data` are written to.
+
+		Automatically joins any tables defined as foreign keys, so long as
+		JOIN was present in the query which generated the `mysql-connector` dict.
 		"""
 
 		# INSTANTIATION. TableColumns REMOVED HERE.
@@ -514,13 +681,15 @@ class TableRow(metaclass = TableRowMeta):
 
 
 
-
+# COULD DECIPHER py_type FROM db_type, BUT WANT TYPEHINTING
+# WITH Generic[T], SO NEED IT AS PARAM.
 class TableColumn(Generic[T]):
 	def __init__(
-			self, db_field: str, py_type: Type[T],
+			self, db_field: str, db_type: str, py_type: Type[T],
 			required: bool = False, autoincrement: bool = False):
 		self._db_field: str = db_field
 		self._py_type: type = py_type
+		self._db_type = db_type
 		self.required = required
 		self.autoincrement = autoincrement
 
@@ -534,6 +703,9 @@ class TableColumn(Generic[T]):
 
 	@property # READ-ONLY
 	def py_type(self): return self._py_type
+
+	@property # READ ONLY
+	def db_type(self): return self._db_type
 
 	@property # NO PRIVATE PROPERTY, READ-ONLY
 	def table_name(self): return self._table_row_model.table_name
@@ -674,6 +846,10 @@ class Table():
 		if (join_all): join_on.extend(self._joins)
 		tables_involved: list[type[TableRow]] = [
 			self.row_model, *( v.joining_table_row_model for v in join_on )]
+		
+		print([id(v) for v in tables_involved])
+		
+
 
 		all_columns = flatten( v.list_column_objs() for v in tables_involved )
 		what_to_select = ", ".join( f"{v} AS \'{v}\'" for v in all_columns )
@@ -695,6 +871,7 @@ class Table():
 			"query": sql + ";",
 			"expect_response": "fetchall",
 			"objectify_from_table": self.name,
+			#"joins_info": 
 			"debug": ("select", "from " + self.name)
 		}
 

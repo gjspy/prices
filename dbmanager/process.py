@@ -2,7 +2,7 @@ from threading import Thread
 from typing import Any
 from logging import Logger
 
-from asyncio import Future, AbstractEventLoop
+from asyncio import Future, BaseEventLoop
 import asyncio
 
 import time
@@ -23,7 +23,7 @@ class DBThread(Thread):
 
 	def __init__(
 			self, logger: Logger, engine_: engine.Database,
-			event_loop: AbstractEventLoop | None):
+			event_loop: BaseEventLoop | None):
 		"""
 		Args
 		--------
@@ -33,7 +33,7 @@ class DBThread(Thread):
 		engine_: DBManager.engine.Database
 			Database for using .execute()
 		
-		event_loop: asyncio.AbstractEventLoop
+		event_loop: asyncio.BaseEventLoop
 			Optional, only required if expect to receive results of queries.
 		"""
 		super().__init__(
@@ -45,7 +45,7 @@ class DBThread(Thread):
 		self._staged_queue: misc.Queue
 		self._engine: engine.Database
 		self._active: bool
-		self._event_loop = AbstractEventLoop | None
+		self._event_loop: BaseEventLoop | None
 		
 		self._logger = logger
 		self._staged_queue = misc.Queue()
@@ -66,7 +66,7 @@ class DBThread(Thread):
 	def event_loop(self): return self._event_loop
 
 	@event_loop.setter
-	def set_event_loop(self, new: AbstractEventLoop):
+	def set_event_loop(self, new: BaseEventLoop):
 		self._event_loop = new
 	
 
@@ -151,7 +151,7 @@ class DBThread(Thread):
 				f"db queue ignoring task {next_item.get("id")}, no data.")
 			self._staged_queue.remove_first()
 
-			return False
+			return True # ACTIVE
 		
 		future: Future[Any] | None = data.get("future")
 
@@ -163,9 +163,9 @@ class DBThread(Thread):
 		success_str: str = ""
 		if (success): success_str = f" {len(result)} results returned."
 
-		if (future):
-			self._event_loop.call_soon_threadsafe( # type: ignore
-				future.set_result, result) # type: ignore
+		if (future and self._event_loop is not None):
+			self._event_loop.call_soon_threadsafe(
+				future.set_result, result)
 			
 		self._staged_queue.remove_first()
 
@@ -173,7 +173,7 @@ class DBThread(Thread):
 			f"db completed task {next_item.get("id")} ({message}) "
 			f"with {ql - 1} left. success: {success}{success_str}")
 		
-		return True
+		return True # ACTIVE
 
 
 
@@ -195,6 +195,21 @@ class DBThread(Thread):
 			"payload": payload,
 			"future": future
 		})
+
+
+	async def query(self, query: DSA):
+		"""
+		Wrapper for `self.stage` which contains `asyncio.Future` logic.
+
+		This should be used to wait for a response, else use `stage` to
+		declare a query to run and "walk away"
+		"""
+		future = self.create_future()
+
+		self.stage(query, future)
+		response = await future
+
+		return response
 	
 	
 
