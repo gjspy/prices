@@ -68,13 +68,7 @@ print(a.this) # 3
 
 #Brands2 = Brands.as_alias("brands2")
 #Brands.row.parent.references = Brands2.row.db_id
-#Brands.row.parent.references = Brands.row.db_id
-
-
-x = Brands.row.new()
-x.parent.references = Brands.row.db_id
-
-Brands2 = Table("brands2", x) # need to NEVER have non instanitated tablerow, so remove table(row_model_), put table(row) and do table.row = row.new()
+Brands.row.parent.references = Brands.row.db_id
 
 
 #Brands.row.best_product.references = Products.row.db_id # WORKS

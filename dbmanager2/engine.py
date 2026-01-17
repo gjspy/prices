@@ -244,20 +244,18 @@ class TableColumn(Generic[T]):
 	@property
 	def field(self): return self._db_field
 
-	
-
-	def duplicate(self, table):
+	def duplicate(self, table: "Table[Any]"):
 		return self.__class__(
 			self._db_field, self._db_type, self._py_type, self._required,
 			self._default_value, self._is_pk,
-			self._references, True, False, table
+			self._references, True, True, table
 		)
 
 	def _create_value_holder(self, table: "Table[Any]"):
 		return self.__class__(
 			self._db_field, self._db_type, self._py_type, self._required,
 			self._default_value, self._is_pk,
-			self._references, True, True, table
+			self._references, True, False, table
 		)
 	
 
@@ -315,7 +313,7 @@ class TableRow():
 		self._table = table
 		self._columns: list[str] = []
 		self._pkeys: list[str] = []
-		self._joins: list[Join] = []
+		#self._joins: list[Join] = []
 
 		self._is_template: bool = True
 
@@ -323,29 +321,50 @@ class TableRow():
 			v = getattr(self, k)
 
 			if (not isinstance(v, TableColumn)): continue
+			vv = v.duplicate(table)
 
-			if (not v._table): v._table = table # type: ignore
-			v._row_instantiated = True # type: ignore
-			v._row_template = True # type: ignore
+			assert id(v) != id(vv), f"{id(v)} {id(vv)}"
+
+			setattr(self, k, vv)
+
+			#v._table = table # type: ignore
+			#v._row_instantiated = True # type: ignore
+			#v._row_template = True # type: ignore
 
 			self._columns.append(k)
-			if (v.is_primary_key): self._pkeys.append(k)
+			if (vv.is_primary_key): self._pkeys.append(k)
 			
-			if (v.references):
+			"""if (v.references):
 				print(table.name, k, "references", v.references.table.name, v.references._db_field)
 				other_table = v.references.table
 
 				#if (id(self._table) == id(other_table) and not other_table.alias):#other_table.name == self._table.name): # id() == id() ?
 				#	other_table = other_table.as_alias(uid())
 
-				self._joins.append(Join(other_table, v == v.references))
+				self._joins.append(Join(other_table, v == v.references))"""
 
 
 	# READ-ONLY FOR THE USER
 	# USE METHODS, NOT SETTERS, TO DISTINGUISH FROM TableColumn ATTRS.
 	def is_value_holder(self): return self._is_template
-	def get_joins(self): return self._joins
+	#def get_joins(self): return self._joins
 	def get_columns(self): return self._columns
+
+	def get_joins(self):
+		joins: list[Join] = []
+
+		for attr in self._columns:
+			v = getattr(self, attr)
+
+			if (not v.references): continue
+			other_table = v.references.table			
+
+			if (id(self._table) == id(other_table)):#o   and not other_table.alias  ther_table.name == self._table.name): # id() == id() ?
+				other_table = other_table.as_alias(uid())
+			
+			joins.append(Join(other_table, v == v.references))
+		
+		return joins
 
 
 
@@ -427,11 +446,13 @@ class Table(Generic[TableRowType]):
 		print(db_name,_alias, id(row_model))
 		self._row_model = row_model
 		self._alias = _alias
+
+		self._row = row_model(self)
 	
 
 	# READ-ONLY FOR THE USER
 	@property
-	def row(self) -> TableRowType: return self._row_model(self)
+	def row(self) -> TableRowType:  return self._row#return self._row_model(self)#
 
 	@property
 	def name(self): return self._db_name
@@ -612,7 +633,10 @@ class Table(Generic[TableRowType]):
 		if (self._alias):
 			raise AttributeError("This table has already been aliased.")
 		
-		return self.__class__(self._db_name, self._row_model, alias)
+		cloned = self.__class__.__new__(self.__class__)
+		cloned.__init__(self._db_name, self._row_model, alias)
+		
+		return cloned
 
 	
 	def __str__(self):
