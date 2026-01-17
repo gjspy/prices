@@ -212,19 +212,16 @@ class TableColumn(Generic[T]):
 				"Table.row.TableColumn"
 			)
 		
-		if (not self.is_template):
+		if (not (self.is_template and other.is_template)):
 			raise AttributeError(
 				"You may not define references from value holder instances "
 				"of TableColumn. You are running your Table.row.new().TableColumn, "
-				"but you may only define Table.row.TableColumn"
+				"but you may only define Table.row.TableColumn.references"
 			)
+		
+		#if (id(self.table) == id(other.table)):
+		#	other._table = other._table.as_alias(uid())
 
-		if (False and other.is_template): # check for other.table more important
-			#Brand.best_product.references = Products.row.db_id works
-			raise AttributeError(
-				"Reference must be a TableColumn value holder instance, "
-				"not template. You are working with 'TableRow.TableColumn' "
-				"but should use 'Table.row.TableColumn'")
 		self._references = other
 	
 
@@ -249,6 +246,12 @@ class TableColumn(Generic[T]):
 
 	
 
+	def duplicate(self, table):
+		return self.__class__(
+			self._db_field, self._db_type, self._py_type, self._required,
+			self._default_value, self._is_pk,
+			self._references, True, False, table
+		)
 
 	def _create_value_holder(self, table: "Table[Any]"):
 		return self.__class__(
@@ -288,16 +291,12 @@ class TableColumn(Generic[T]):
 
 
 	def __str__(self) -> str:
-		return f"{self.table}.{self._db_field}"
+		if (not self.table):
+			raise AttributeError(
+				"TableRow is not instantiated, why are you here"
+			)
 
-
-
-
-
-
-class TableRowMeta(type):
-	def __new__(cls, name: str, bases: tuple[type, ...], attrs: DSA):
-		
+		return f"{self.table.identifier}.{self._db_field}"
 
 
 
@@ -325,7 +324,7 @@ class TableRow():
 
 			if (not isinstance(v, TableColumn)): continue
 
-			v._table = table # type: ignore
+			if (not v._table): v._table = table # type: ignore
 			v._row_instantiated = True # type: ignore
 			v._row_template = True # type: ignore
 
@@ -333,11 +332,11 @@ class TableRow():
 			if (v.is_primary_key): self._pkeys.append(k)
 			
 			if (v.references):
-				print(v.references)
+				print(table.name, k, "references", v.references.table.name, v.references._db_field)
 				other_table = v.references.table
 
-				if (other_table.name == self._table.name):
-					other_table = other_table.as_alias(uid())
+				#if (id(self._table) == id(other_table) and not other_table.alias):#other_table.name == self._table.name): # id() == id() ?
+				#	other_table = other_table.as_alias(uid())
 
 				self._joins.append(Join(other_table, v == v.references))
 
@@ -384,6 +383,17 @@ class TableRow():
 		new = self.new()
 
 	
+	def duplicate(self):
+		new = self.__class__(self._table)
+		new._is_template = True
+
+		for attr in new._columns:
+			column: TableColumn[Any] = getattr(new, attr)
+
+			new_column = column.duplicate(self._table) # type: ignore
+			setattr(new, attr, new_column)
+		
+		return new
 
 	def new(self):
 		"""
@@ -414,6 +424,7 @@ class Table(Generic[TableRowType]):
 	def __init__(
 			self, db_name: str, row_model: type[TableRowType], _alias: str = ""):
 		self._db_name = db_name
+		print(db_name,_alias, id(row_model))
 		self._row_model = row_model
 		self._alias = _alias
 	
@@ -424,6 +435,9 @@ class Table(Generic[TableRowType]):
 
 	@property
 	def name(self): return self._db_name
+
+	@property
+	def alias(self): return self._alias
 
 
 
@@ -590,18 +604,32 @@ class Table(Generic[TableRowType]):
 
 
 
+	# NAMING FUNCTIONS
 
-
-	
 	def as_alias(self, alias: str):
+		""" Create new instance of Table with alias. """
+
 		if (self._alias):
 			raise AttributeError("This table has already been aliased.")
 		
 		return self.__class__(self._db_name, self._row_model, alias)
 
-		
+	
 	def __str__(self):
+		""" Always returns `str` db_name. """
 		return self._db_name
 	
 	def id_statement(self):
+		"""
+		Statement for a FROM or JOIN to identify a table.
+		
+		Either: "TableName" OR "TableName AS Alias"
+		"""
 		return f"{self._db_name} AS {self._alias}" if self._alias else str(self)
+	
+	@property
+	def identifier(self) -> str:
+		"""
+		`str` identifier of the table. alias if exists, else name.
+		"""
+		return self._alias if self._alias else str(self)
