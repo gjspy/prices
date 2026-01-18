@@ -123,4 +123,3 @@ CREATE TABLE Ratings (
 	FOREIGN KEY (StoreID) REFERENCES Stores(ID),
 	UNIQUE (PID, StoreID)
 );
-

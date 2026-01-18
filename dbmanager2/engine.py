@@ -1,4 +1,33 @@
-from dbmanager2.types import Generic, Type, T, Any, Optional, Literal, DSS, DSA, Union, overload, TypeVar
+"""
+# DBManager #
+Python Package to connect to a MySQL database with ORM.
+
+### Example Usage ###
+>>> from dbmanager import engine
+>>> 
+>>> class Book(engine.TableRow):
+>>> 	db_id = engine.TableColumn("ID", "INT UNSIGNED", int, primary_key = True)
+>>> 	name = engine.TableColumn("BookName", "MEDIUMTEXT", str, required = True)
+>>> 	author = engine.TableColumn("AuthorID", "INT UNSIGNED", int, required = True)
+>>> 	category = engine.TableColumn("Category", "MEDIUMTEXT", str)
+>>> 
+>>> class Author(engine.TableRow):
+>>> 	db_id = engine.TableColumn("ID", "INT UNSIGNED", int, primary_key = True)
+>>> 	name = engine.TableColumn("AuthorName", "MEDIUMTEXT", str, required = True)
+>>> 
+>>> Books = engine.Table("Books", Book)
+>>> Authors = engine.Table("Authors", Author)
+>>> 
+>>> Books.row.author.references = Authors.row.db_id
+>>> 
+>>> Books.select(
+>>> 	where = Books.row.category == "Fiction",
+>>> 	join_all = True,
+>>> 	limit = 10)
+"""
+
+
+from dbmanager2.types import Generic, Type, T, Any, Optional, Literal, DSS, DSA, Union, overload, TypeVar, Self
 from dbmanager2.misc import uid, flatten
 
 from datetime import datetime
@@ -38,6 +67,16 @@ class Validator():
 		"CHAR", "VARCHAR", "TINYTEXT", "MEDIUMTEXT", "LONGTEXT",
 		"TINYINT", "TINYINT UNSIGNED", "SMALLINT", "SMALLINT UNSIGNED",
 		"MEDIUMINT", "MEDIUMINT UNSIGNED", "INT", "INT UNSIGNED"]
+	
+	def is_valid(self):
+		try: return getattr(self, self.db_type)()
+		except:
+			print("DB TYPE", self.db_type, "NOT RECOGNISED")
+			return None
+	
+	def make_valid(self, py_type: type[Any]):
+		try: return py_type(self.value)
+		except: return None
 
 
 
@@ -45,7 +84,11 @@ class Validator():
 
 
 class CMP():
-	""" Class used to help define query statements. """
+	"""
+	Class used to help define query statements.
+
+	Internal, shouldn't usually be created manually outside of dbmanager
+	"""
 
 	def __init__(self, a: Any, b: Any, symbol: str):
 		self.a = a
@@ -75,8 +118,6 @@ class CMP():
 
 	# BITWISE OPERATIONS BEING OVERWRITTEN!
 	# DO THIS SO CAN WRITE Table1.uid == Table2.uid & Table1.name != "Jim"
-
-	
 	def __and__(self, value: object):
 		return CMP(self, value, " AND ")
 
@@ -103,6 +144,12 @@ class NOT(CMP):
 
 
 class Join():
+	"""
+	Use this class to define a JOIN statement.
+	
+	This may be created manually, but also happens automatically when
+	`join_all` is true in `Table.select()`
+	"""
 
 	def __init__(
 			self, joining_table: "Table[Any]",
@@ -153,14 +200,76 @@ class Join():
 # row_instantiated = False always, unless TableColumn accessed by Table.row.new().TableColumn
 
 class TableColumn(Generic[T]):
+	"""
+	Class to describe a field/column of a database.
+
+	TableColumn is never used uninstantiated.
+
+	Three types of TableColumn:
+	1) **Child of uninstantiated TableRow**
+		- This is in the TableRow subclass definition
+		- Never apply anything to this instance, as it only receives
+		required information (such as parent Table) upon TableRow initialisation.
+	2) **Child of instantiated TableRow, template**
+		- This is accessed through Table.row
+		- Apply references (joins) to this instance so they are replicated
+		to future instances
+		- Do not apply values, as these should be individual and would be
+		copied to any future instances.
+	3) **Child of instantiated TableRow, value holder**
+		- This is accessed through Table.row.new()
+		- Do not apply references as these would not be given to other
+		Table.row.new() instances
+		- Apply values, as these will be individual.
+	
+		
+	You may not subclass this, as that will break its logic. (.duplicate())
+	"""
+
 	def __init__(
-			self, db_field: str, db_type: Validator.TYPES_CHECKING,
-			py_type: type[T], required: bool = False,
-			default_value: Optional[T] = None, primary_key: bool = False,
+			self,
+			db_field: str,
+			db_type: Validator.TYPES_CHECKING,
+			py_type: type[T],
+			required: bool = False,
+			default_value: Optional[T] = None,
+			primary_key: bool = False,
 			reference: Optional["TableColumn[Any]"] = None,
 			_row_instantiated: bool = False,
 			_row_template: bool = True,
-			_table: Optional["Table[Any]"] = None):
+			_table: Optional["Table[Any]"] = None,
+			_attr_name: Optional[str] = None):
+		"""
+		Define new TableColumn of TableRow.
+		This should only be used in your initial TableRow subclass definition.
+
+		Args
+		----
+		db_field: str
+			Name of field in Database.
+		
+		db_type: Literal[...]
+			MySQL string definition for the datatype of the field.
+
+		py_type: type[Any]
+			Python `type` object for the datatype of the field.
+		
+		required: bool = False
+			Whether field is `NOT NULL`
+		
+		default_value: Optional[Any]
+			Any value to automatically apply to TableColumn.value,
+			where its type must match `py_type`.
+		
+		primary_key: bool = False
+			Whether field is involved in the `PRIMARY KEY` of the TableRow.
+		
+		reference: Optional[TableColumn]
+			Which TableColumn a field is the foreign key of.
+
+			Usually more convenient to define using
+			Table.row.TableColumn.references = X later.
+		"""
 		
 		self._db_type: Validator.TYPES_CHECKING = db_type
 		self._db_field = db_field
@@ -171,12 +280,19 @@ class TableColumn(Generic[T]):
 		self._row_instantiated = _row_instantiated
 		self._row_template = _row_template
 
-		self._value = default_value if _row_instantiated else None
+		self._value =  None
+		if (default_value): self.value = default_value
 		self._value_changed = False
 
+		self._table = _table
+		self._references = reference
+		self._attr_name = _attr_name
+	
 
-		self._table: Optional[Table[Any]] = _table
-		self._references: Optional[TableColumn[Any]] = reference
+	def _set_value(self, v: T, set_changed: bool = True):
+		# TODO: VALIDATION
+		self._value = v
+		if (set_changed): self._value_changed = True
 
 
 	@property
@@ -190,13 +306,23 @@ class TableColumn(Generic[T]):
 	
 	@value.setter
 	def value(self, v: T):
-		if (not self._row_instantiated):
+		# DO NOT APPLY TO CHILDREN OF UNINSTANTIATED TableRow, OR TEMPLATES.
+		if ((not self._row_instantiated) or self._row_template):
 			raise AttributeError(
 				"Cannot set the value of TableColumn templates, "
 				"must be value holder instance")
 		
-		self._value = v
-		self._value_changed = True
+		validator = Validator(self.db_type, v)
+
+		if (validator.is_valid() == False):
+			new_v = validator.make_valid(self._py_type)
+
+			if (not new_v):
+				raise TypeError(f"TableColumn {self} has type {self.db_type} "
+					f"{self._py_type}, which does not match "
+					f"type {type(v)} of {v}")
+		
+		self._set_value(v)
 	
 
 	@property
@@ -204,23 +330,30 @@ class TableColumn(Generic[T]):
 	
 	@references.setter
 	def references(self, other: "TableColumn[Any]"):
-		if (not other.is_row_instantiated):
+		"""
+		Define field which this TableColumn is a foreign key of.
+		Always define for TableColumn template instances,
+		children of instantiated TableRows.
+
+		(use Table.row.TableColumn.references = Table2.row.TableColumn).
+		"""
+
+		# ONLY APPLY REFERENCES TO TableColumn CHILDREN OF INSTANTIATED TableRow
+		if (not (self.is_row_instantiated and other.is_row_instantiated)):
 			raise AttributeError(
-				"Reference (other) must be a TableColumn from an instantiated "
-				"TableRow. You are working with your "
+				"Reference (other) and self must be TableColumns from "
+				"instantiated TableRows. You are working with your "
 				"type[TableRow].TableColumn, but you must use your "
 				"Table.row.TableColumn"
 			)
 		
+		# ONLY APPLY REFERENCES TO TEMPLATES, REJECT IF IS VALUE HOLDER
 		if (not (self.is_template and other.is_template)):
 			raise AttributeError(
 				"You may not define references from value holder instances "
 				"of TableColumn. You are running your Table.row.new().TableColumn, "
 				"but you may only define Table.row.TableColumn.references"
 			)
-		
-		#if (id(self.table) == id(other.table)):
-		#	other._table = other._table.as_alias(uid())
 
 		self._references = other
 	
@@ -239,25 +372,36 @@ class TableColumn(Generic[T]):
 	def value_changed(self): return self._value_changed
 
 	@property
+	def db_type(self): return self._db_type
+
+	@property
 	def table(self): return self._table
 
 	@property
-	def field(self): return self._db_field
-
-	def duplicate(self, table: "Table[Any]"):
-		return self.__class__(
-			self._db_field, self._db_type, self._py_type, self._required,
-			self._default_value, self._is_pk,
-			self._references, True, True, table
-		)
-
-	def _create_value_holder(self, table: "Table[Any]"):
-		return self.__class__(
-			self._db_field, self._db_type, self._py_type, self._required,
-			self._default_value, self._is_pk,
-			self._references, True, False, table
-		)
+	def field(self):
+		""" DB field name """
+		return self._db_field
 	
+	@property
+	def name(self):
+		""" py attr name """
+		return self._attr_name or ""
+
+	@property
+	def default(self):
+		""" Returns default value of TableColumn. """
+		return self._default_value
+
+	def duplicate(self, table: "Table[Any]", attr: str):
+		"""
+		Creates new instance of TableColumn with all the same properties.
+		"""
+
+		return self.__class__(
+			self._db_field, self._db_type, self._py_type, self._required,
+			self._default_value, self._is_pk,
+			self._references, True, True, table, attr # KEEPS OLD TC REFERENCE HERE, TODO: BAD?
+		)
 
 
 
@@ -289,10 +433,8 @@ class TableColumn(Generic[T]):
 
 
 	def __str__(self) -> str:
-		if (not self.table):
-			raise AttributeError(
-				"TableRow is not instantiated, why are you here"
-			)
+		if (not self.table): # ROW NOT INSTANTIATED, WHY ARE YOU HERE?
+			return self._db_field
 
 		return f"{self.table.identifier}.{self._db_field}"
 
@@ -303,77 +445,87 @@ class TableColumn(Generic[T]):
 class TableRow():
 	"""
 	TableRow contains all TableColumns of a Table.
-	Always access through `Table.rows`.
+	Always access through `Table.row`.
 
 	Create one through `Table.rows.new()`, with this instance
-	you can assign new values
+	you can assign new values to columns.
 	"""
 
 	def __init__(self, table: "Table[Any]"):
 		self._table = table
 		self._columns: list[str] = []
 		self._pkeys: list[str] = []
-		#self._joins: list[Join] = []
 
 		self._is_template: bool = True
 
 		for k in dir(self):
-			v = getattr(self, k)
+			v = self.get_column(k)
 
 			if (not isinstance(v, TableColumn)): continue
-			vv = v.duplicate(table)
-
-			assert id(v) != id(vv), f"{id(v)} {id(vv)}"
+			vv = v.duplicate(table, k)
 
 			setattr(self, k, vv)
 
-			#v._table = table # type: ignore
-			#v._row_instantiated = True # type: ignore
-			#v._row_template = True # type: ignore
-
 			self._columns.append(k)
 			if (vv.is_primary_key): self._pkeys.append(k)
-			
-			"""if (v.references):
-				print(table.name, k, "references", v.references.table.name, v.references._db_field)
-				other_table = v.references.table
-
-				#if (id(self._table) == id(other_table) and not other_table.alias):#other_table.name == self._table.name): # id() == id() ?
-				#	other_table = other_table.as_alias(uid())
-
-				self._joins.append(Join(other_table, v == v.references))"""
 
 
 	# READ-ONLY FOR THE USER
 	# USE METHODS, NOT SETTERS, TO DISTINGUISH FROM TableColumn ATTRS.
 	def is_value_holder(self): return self._is_template
-	#def get_joins(self): return self._joins
 	def get_columns(self): return self._columns
+	def get_column(self, name: str):
+		v: Optional[TableColumn[Any]] = getattr(self, name)
+
+		if (not isinstance(v, TableColumn)): return None
+		return v
+
 
 	def get_joins(self):
 		joins: list[Join] = []
 
 		for attr in self._columns:
-			v = getattr(self, attr)
+			v = self.get_column(attr)
+			assert v
 
-			if (not v.references): continue
-			other_table = v.references.table			
+			ref = v.references
+			if (not ref): continue
 
-			if (id(self._table) == id(other_table)):#o   and not other_table.alias  ther_table.name == self._table.name): # id() == id() ?
+			other_table = ref.table
+			if (not other_table): continue # CONCERNING IF THIS HAPPENS
+
+			if (id(self._table) == id(other_table)):
 				other_table = other_table.as_alias(uid())
+				ref = other_table.row.get_column(ref.name)
 			
-			joins.append(Join(other_table, v == v.references))
+			joins.append(Join(other_table, v == ref))
 		
 		return joins
 
 
 
-	def get_changes(self):
+	def get_changes(self, include_defaults: bool = False):
+		"""
+		Returns `dict` of changes made to instances values,
+		ready to be written in UPDATE or INSERT statement.
+
+		Args
+		----
+		include_defaults: bool = False
+			If the result of this method will be used for a table INSERT,
+			use include_defaults = True to add default values, adding
+			protection for required fields being omitted.
+		"""
 		changes: DSA = {}
 
 		for attr in self._columns:
 			column: TableColumn[Any] = getattr(self, attr)
-			if (not column.value_changed): continue
+
+			if (not column.value_changed):
+				if (include_defaults):
+					changes[attr] = column.value or column.default
+
+				continue
 
 			changes[attr] = column.value
 		
@@ -401,18 +553,17 @@ class TableRow():
 
 		new = self.new()
 
-	
-	def duplicate(self):
-		new = self.__class__(self._table)
-		new._is_template = True
-
 		for attr in new._columns:
-			column: TableColumn[Any] = getattr(new, attr)
+			col = new.get_column(attr)
+			if (not col): continue
 
-			new_column = column.duplicate(self._table) # type: ignore
-			setattr(new, attr, new_column)
-		
-		return new
+			value = data.get(col.field if from_db else col.name)
+
+			ref = col.references
+
+
+
+
 
 	def new(self):
 		"""
@@ -440,19 +591,27 @@ class TableRow():
 
 
 class Table(Generic[TableRowType]):
+	"""
+	This class encapsulates all query logic (`SELECT`, `UPDATE`, `INSERT`)
+
+	Always use an instance of this class, and use Table.row
+	to access the TableRow object.
+
+	Use Table.as_alias() to clone the table and use with an alias. Happens
+	automatically if a TableRow self-references, but can also be useful manually.
+	"""
 	def __init__(
 			self, db_name: str, row_model: type[TableRowType], _alias: str = ""):
 		self._db_name = db_name
-		print(db_name,_alias, id(row_model))
-		self._row_model = row_model
 		self._alias = _alias
 
+		self._row_model = row_model
 		self._row = row_model(self)
 	
 
 	# READ-ONLY FOR THE USER
 	@property
-	def row(self) -> TableRowType:  return self._row#return self._row_model(self)#
+	def row(self) -> TableRowType: return self._row
 
 	@property
 	def name(self): return self._db_name
@@ -463,9 +622,13 @@ class Table(Generic[TableRowType]):
 
 
 	def select(
-			self, columns: Optional[list[TableColumn[Any]]] = None,
-			distinct: bool = False, where: CMP | None = None,
-			join_all: bool = False, join_on: list[Join] = [], limit: int = 1000,
+			self,
+			columns: list[TableColumn[Any]] = [],
+			distinct: bool = False,
+			where: CMP | None = None,
+			join_all: bool = False,
+			join_on: list[Join] = [],
+			limit: int = 1000,
 			order_by: list[TableColumn[Any] | str] = []) -> DSA:
 		"""
 		### Build `SELECT` STATEMENT. ###
@@ -509,7 +672,7 @@ class Table(Generic[TableRowType]):
 		tables_involved: list[Table[Any]] = [
 			self, *( v.joining_table for v in join_on )]
 
-		all_columns = columns
+		all_columns: list[TableColumn[Any]] = columns
 		if (not columns):
 			all_columns = []
 			
@@ -524,8 +687,9 @@ class Table(Generic[TableRowType]):
 
 		# BUILD str STATEMENT:
 		what_to_select = ", ".join( f"{v} AS \'{v}\'" for v in all_columns )
+		distinct_statement = " DISTINCT" if distinct else ""
 
-		sql: str = f"SELECT {what_to_select} FROM {self}" # BASE
+		sql: str = f"SELECT{distinct_statement} {what_to_select} FROM {self}" # BASE
 
 		for join in join_on: sql += f" {join}" # ADD JOINS
 
@@ -628,7 +792,12 @@ class Table(Generic[TableRowType]):
 	# NAMING FUNCTIONS
 
 	def as_alias(self, alias: str):
-		""" Create new instance of Table with alias. """
+		"""
+		Create new instance of Table with alias.
+
+		Happens automatically when a TableRow self-references, but may also
+		be useful manually.
+		"""
 
 		if (self._alias):
 			raise AttributeError("This table has already been aliased.")
