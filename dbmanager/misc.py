@@ -9,14 +9,6 @@ DESCENDING_SQL = "DESC"
 CHARS_URLSAFE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890"
 NUMS = "1234567890"
 
-class ENVStrucutre():
-	host = "DB_HOST"
-	port = "DB_PORT"
-	user = "DB_USER"
-	pswd = "DB_PASS"
-	schm = "DB_SCHM"
-
-
 class Errors():
 	PKMissing = "You must define the primary key structure."
 	PKNoPy = "PK is missing a python property."

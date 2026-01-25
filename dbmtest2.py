@@ -1,4 +1,4 @@
-from dbmanager2 import engine
+from dbmanager import engine
 
 class Book(engine.TableRow):
 	db_id = engine.TableColumn("ID", "INT UNSIGNED", int, primary_key = True)

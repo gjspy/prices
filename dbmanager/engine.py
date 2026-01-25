@@ -1,12 +1,30 @@
-from datetime import datetime
-from logging import Logger
+"""
+# DBManager #
+Python Package to connect to a MySQL database with ORM.
 
-from functools import wraps
-from copy import copy, deepcopy
-from os import getenv
-
-from typing import Any, Callable, Self, Type, Generic, Union
-
+### Example Usage ###
+>>> from dbmanager import engine
+>>> 
+>>> class Book(engine.TableRow):
+>>> 	db_id = engine.TableColumn("ID", "INT UNSIGNED", int, primary_key = True)
+>>> 	name = engine.TableColumn("BookName", "MEDIUMTEXT", str, required = True)
+>>> 	author = engine.TableColumn("AuthorID", "INT UNSIGNED", int, required = True)
+>>> 	category = engine.TableColumn("Category", "MEDIUMTEXT", str)
+>>> 
+>>> class Author(engine.TableRow):
+>>> 	db_id = engine.TableColumn("ID", "INT UNSIGNED", int, primary_key = True)
+>>> 	name = engine.TableColumn("AuthorName", "MEDIUMTEXT", str, required = True)
+>>> 
+>>> Books = engine.Table("Books", Book)
+>>> Authors = engine.Table("Authors", Author)
+>>> 
+>>> Books.row.author.references = Authors.row.db_id
+>>> 
+>>> Books.select(
+>>> 	where = Books.row.category == "Fiction",
+>>> 	join_all = True,
+>>> 	limit = 10)
+"""
 import mysql.connector
 from mysql.connector import Error as MySQLError
 
@@ -15,17 +33,28 @@ from mysql.connector.abstracts import (
 from mysql.connector.types import RowType as MySQLRowType
 from mysql.connector.pooling import PooledMySQLConnection
 
+from datetime import datetime
+from functools import wraps
+from logging import Logger
+from os import getenv
+
+
+from dbmanager.types import (
+	Generic, Type, T, Any, Optional, Literal, Union, overload, TypeVar, Self,
+	Callable,
+	DSS, DSA, QueryParams)
 from dbmanager.misc import (
-	Errors, ExecutionException, ASCENDING_SQL, DESCENDING_SQL, ENVStrucutre,
-	flatten, uid)
-from dbmanager.types import O, P, T, QP, DSA, DST, DSS
+	Errors, ExecutionException, ASCENDING_SQL, DESCENDING_SQL, uid)
+
+TableRowType = TypeVar("TableRowType", bound = "TableRow")
+EH = TypeVar("EH", bound = Callable[..., Any])
+
+
 
 
 FATAL_ERROR_CODES: list[int] = [2006, 2013, 2055]
 MAX_IDLE_TIME: int = 30 # TICKS
-
 SQL_DATETIME_FMT = "%Y-%m-%d %H:%M:%S"
-
 
 
 # ERROR CATCHING FOR VARIOUS DB METHODS, TO SAVE REWRITING TRY/EXCEPT
@@ -60,28 +89,28 @@ def error_handling(
 	if (rethrow): raise ExecutionException(e, is_fatal)
 
 
-def db_error_safe_catcher(func: Callable[P, O]) ->  Callable[P, O | None]:
+def db_error_safe_catcher(func: EH) -> EH:
 	"""
 	Wrapper to catch exceptions raised by various DB methods.
 
 	Handler automatically closes cursors, and rolls back connections.
 
-	This method does not re-raise, just fails silently.
+	This method does not re-raise, just fails after logging.
 	"""
 
 	@wraps(func)
-	def wrapper(self: "Database", *args: P.args, **kwargs: P.kwargs) -> O | None:
+	def wrapper(self: "Database", *args: Any, **kwargs: Any) -> Any:
 
 		try:
-			return func(self, *args, **kwargs) # type: ignore
+			return func(self, *args, **kwargs)
 
 		except Exception as e: # CATCH ERROR CAUSED BY func, HANDLE IT NOW.
 			error_handling(self, e)
 
-	return wrapper # type: ignore
+	return wrapper # type: ignore[reportReturnType]
 
 
-def db_error_catcher_rethrows(func: Callable[P, O]) ->  Callable[P, O | None]:
+def db_error_catcher_rethrows(func: EH) -> EH:
 	"""
 	Wrapper to catch exceptions raised by various DB methods.
 
@@ -91,485 +120,442 @@ def db_error_catcher_rethrows(func: Callable[P, O]) ->  Callable[P, O | None]:
 	"""
 
 	@wraps(func)
-	def wrapper(
-		self, *args: P.args, **kwargs: P.kwargs) -> O | None: # type: ignore
+	def wrapper(self: "Database", *args: Any, **kwargs: Any) -> Any:
 
 		try:
-			return func(self, *args, **kwargs) # type: ignore
+			return func(self, *args, **kwargs)
 
 		except Exception as e: # CATCH ERROR CAUSED BY func, HANDLE IT NOW.
-			error_handling(self, e, True) # type: ignore
+			error_handling(self, e, True)
 
-	return wrapper # type: ignore
+	return wrapper # type: ignore[reportReturnType]
 
 
 
 
 
-class TableRow(metaclass = TableRowMeta):
-	"""
-	## Definition of the object a `SELECT * FROM ...` should return. ##
-	Use this to describe the python name, db name and python type of each
-	column in the table.
-	Also, use this to define the table's name in the db, and the primary key.
 
-	Example:
-	--------
-	>>> class User(TableRow):
-	>>>		# DEFINE TABLE NAME.
-	>>> 	table_name = "USERS"
-	>>>
-	>>> 	# DEFINE ALL COLUMNS
-	>>> 	user_id = TableColumn("ID", int)
-	>>> 	name = TableColumn("NAME", str)
-	>>> 	email = TableColumn("EMAIL", str)
-	>>>
-	>>> 	# DEFINE PRIMARY/COMPOSITE KEY
-	>>> 	pkeys = ["ID"]
-	"""
+class Validator():
+	def __init__(self, db_type: str | tuple[str, int], value: Any):
+		if (type(db_type) == str):
+			self.db_type = db_type.replace(" UNSIGNED", "")
+			self.size = 0
+			
+		elif (type(db_type) == tuple):
+			self.db_type = db_type[0]
+			self.size = db_type[1]
 
-	table_name: str
-	pkeys: list[str]
-	_uid: str = ""
-
-	def __init__(self):
-		# NOT PRIVATE BECAUSE USER DEFINED IT IN THEIR SUBCLASS
-		self.table_name: str
-		self.pkeys: list[str] # LIST OF DB KEYS
-
-		# PRIVATE
-		self._py_fields: DST # FIELD -> PY TYPE MAP WITH PYTHON KEYS (EG user_name)
-		self._db_fields: DSS # FIELD -> PY PROPERTY MAP WITH DB KEYS (EG USERNAME)
-		#self._db_types: DSS = {} # FIELD -> PY PROPERTY TO DB TYPE STR
-
-		self._autoincrement_keys: list[str]
-
-		self._changes: DSA = {}
-		self._load_status = "intialised"
-
-		assert self.table_name, Errors.TBNMissing
-		assert self.pkeys, Errors.PKMissing
-
-		# __init__ RUNNING, SO IS INSTANTIATED.
-		# CLEAR AWAY TableColumn VALUES.
-		k: Any
-		for k in dir(self):
-			if (k.startswith("_")): continue
-
-			v: Any = getattr(self, k)
-			if (not isinstance(v, TableColumn)): continue
-
-			if (v.joins):
-				setattr(self, k, Join(
-					v.joins.table_row_model, v == v.joins))
-				continue
-
-			#self._db_types[k] = v.db_type
-
-			setattr(self, k, None) # REMOVE TABLECOLUMN OBJECTS
-
-
-	#def __validate_setattr(self, name: str, value: Any) -> None:
-		# VALIDATE TYPES
-		
-
-
-
-	def __setattr__(self, name: str, value: Any) -> None:
-		# OVERWRITE THIS TO DETECT CHANGES, FOR UPDATE STATEMENTS.
-
-		super().__setattr__(name, value) # ACCEPT ANYTHING
-
-		if (not hasattr(self, "_py_fields")): return
-		if (self._py_fields.get(name) == None): return # type: ignore
-
-		if (not hasattr(self, "_autoincrement_keys")): return
-		if (name in self._autoincrement_keys): return	
-
-		self._changes[name] = value
-
-
-	# MAKE THE FOLLOWING PROPERTIES REQUIRE METHODS TO ACCESS
-	# TO DISTINGUISH PROPERTIES WITH TableColumn VALUES FROM
-	# BUILTIN ONES.
-
-	# WE WANT TO USE THEM WITHOUT INSTANTIATING THE CLASS.
-	# CLASSMETHODS STILL WORK WHEN INSTANTIATED TOO!
-	# NO SETTERS BECAUSE THEY'RE READ-ONLY.
-	@classmethod
-	def get_db_fields(cls) -> DSA:
-		""" db_fields is a dict[db_column_name: py_property_name] """
-
-		try: return cls._db_fields # type: ignore
-		except: return {}
-
-	@classmethod
-	def get_py_fields(cls) -> DSA:
-		""" py_fields is a dict[py_property_name: required_type] """
-
-		try: return cls._py_fields # type: ignore
-		except: return {}
-
-	@classmethod
-	def get_autoincrement_keys(cls) -> list[str]:
-		return cls._autoincrement_keys # type: ignore
-
-
-	@classmethod
-	def list_column_objs(cls) -> list["TableColumn[Any]"]:
-		return [
-			getattr(cls, v) for v in cls.get_py_fields() if hasattr(cls, v)]
-
-	@classmethod
-	def get_column(cls, py_field: str) -> "TableColumn[Any]":
-		return getattr(cls, py_field)
-
-
-	# IS INSTANTIATED NOW.
-	# KEEP WRITE ACCESS PRIVATE
-	def get_changes(self): return self._changes
-	def commit(self): self._changes = {}
-
-	def is_loaded(self): return self._load_status == "complete"
-	def is_partial(self): return self._load_status == "partial"
-	def is_only_initial(self):
-		"""Equivalent of `not self.is_loaded() and not self.is_partial()`"""
-		return self._load_status == "initialised"
-
-	def get_primary_key_value(self) -> list[Any]:
-		db_fields = self.get_db_fields()
-		pkeys = self.pkeys # list ALLOWS FOR COMPOSITE KEYS
-
-		primary_key: list[Any] = []
-
-		for key in pkeys:
-			py_prop = db_fields.get(key)
-			assert py_prop, \
-				f"PRIMARY KEY {key} DOES NOT HAVE PYTHON PROPERTY"
-
-			primary_key.append(getattr(self, py_prop))
-
-		return primary_key
-
-
-	def to_dict(self) -> DSA:
-		"""
-		Convert object into `dict` ready to store in the database.
-		"""
-		result: DSA = vars(self)
-
-		for k in copy(list(result.keys())): # IS .keys() A GENERATOR? MIGHT CHANGE WHILE ITERATING
-			if (not k.startswith("_")): continue
-
-			# TODO: handle joined tables
-
-			del result[k]
-
-		return result
-
-
-
-	def to_storable_tuple(self, db_keys: list[str]) -> QP:
-		"""
-		Convert object into `tuple` ready to store in the database.
-		"""
-		result: list[Any] = []
-
-		db_fields = self.get_db_fields()
-		autoincrement_keys = self.get_autoincrement_keys()
-
-		for k in db_keys:
-			if (k in autoincrement_keys): continue
-
-			py_field: str | None = db_fields.get(k)
-
-			if (not py_field):
-				result.append(None)
-
-			if (not py_field or py_field.startswith("_")): continue
-
-			v: Any = None
-
-			try: v = getattr(self, py_field)
-			except: pass
-
-			# TODO: handle joined tables
-
-			result.append(v)
-
-		print(result)
-
-		return tuple(result)
-
-
-
-	def set_autoincrement_value(self, db_field: str, id_: int):
-		assert db_field in self.get_autoincrement_keys(), Errors.NotAI
-
-		py_prop = self.get_db_fields().get(db_field)
-		assert py_prop, Errors.PKNoPy
-
-		setattr(self, py_prop, id_)
-
-
-
-	@classmethod
-	def partial_from_id(cls, id_: Any, column: "TableColumn[Any]") -> Self:
-		this = cls()
-
-		db_fields = cls.get_db_fields()
-		py_prop = db_fields[column.db_field]
-
-		setattr(this, py_prop, id_)
-
-		this._load_status = "partial"
-
-		this.commit() # CLEAR changes, BECAUSE WE'VE JUST SET INITIAL VALUES.
-
-		return this
-
-
-	def _db_value_to_py(self, db_value: Any, required_type: type) -> Any:
-		if (required_type == bool and (db_value == 1 or db_value == 0)): ... # TODO
+		self.value = value
+		self.unsigned = "UNSIGNED" in db_type
 	
-	@classmethod
-	def duplicate(cls, use_uid: bool = True) -> type[Self]:
-		"""
-		Really clunky way to duplicate class.
-		Only needed if table has a self-referential join.
 
-		When building SQL statement, requires unique identifier as table name
-		is the same.
+	def CHAR(self): return type(self.value) == str and len(self.value) == self.size
+	def VARCHAR(self, size: int = 0):
+		return type(self.value) == str and len(self.value) <= self.size or size
+
+	def TINYTEXT(self): return self.VARCHAR(255) # 2 ** 8
+	def TEXT(self): return self.VARCHAR(65_535) # 2 ** 16
+	def MEDIUMTEXT(self): return self.VARCHAR(16_777_215) # 2**24
+	def LONGTEXT(self): return self.VARCHAR(4_294_967_295) # 2**32
+
+	def _NUMBER(self, signed_max_exc: int):
+		if (not type(self.value) in [int, float]): return False
+
+		if (self.unsigned): return self.value < (signed_max_exc * 2)
+		else: return self.value >= -signed_max_exc and self.value < signed_max_exc
+	
+	def TINYINT(self): return self._NUMBER(128) # 2 ** 7
+	def SMALLINT(self): return self._NUMBER(32_768) # 2 ** 15
+	def MEDIUMINT(self): return self._NUMBER(8_388_608) # 2 ** 24
+	def INT(self): return self._NUMBER(2_147_483_648) # 2 ** 31
+	def BIGINT(self): return self._NUMBER(9223372036854775808) # 2 ** 63
+
+	def FLOAT(self): return type(self.value) == float # I DON'T UNDERSTAND IT SO JUST SAY YES
+	def BOOL(self): return type(self.value) == bool
+
+	def TIMESTAMP(self): return type(self.value) == str # TODO: make match fmt
+
+	TYPES_CHECKING = Literal[
+		"CHAR", "VARCHAR", "TINYTEXT", "MEDIUMTEXT", "TEXT", "LONGTEXT",
+		"TINYINT", "TINYINT UNSIGNED", "SMALLINT", "SMALLINT UNSIGNED",
+		"MEDIUMINT", "MEDIUMINT UNSIGNED", "INT", "INT UNSIGNED",
+		"BIGINT", "BIGINT UNSIGNED", "FLOAT", "FLOAT UNSIGNED", "BOOL",
+		"TIMESTAMP"]
+	
+	def is_valid(self):
+		try: return getattr(self, self.db_type)()
+		except:
+			print("DB TYPE", self.db_type, "NOT RECOGNISED")
+			return None
+	
+	def make_valid(self, py_type: type[Any]):
+		if (py_type == datetime):
+			return datetime.strftime(self.value, SQL_DATETIME_FMT)
+		
+		try: return py_type(self.value)
+		except: return None
+
+
+
+
+
+
+class CMP():
+	"""
+	Class used to help define query statements.
+
+	Internal, shouldn't usually be created manually outside of dbmanager
+	"""
+
+	def __init__(self, a: Any, b: Any, symbol: str):
+		self.a = a
+		self.b = b
+		self.symbol = symbol
+	
+	def _convert_to_str(self, v: Union[Any, "TableColumn[Any]"]) -> str:
+		if (isinstance(v, datetime)):
+			v = f"{v.strftime(SQL_DATETIME_FMT)}"
+		
+		if (not isinstance(v, TableColumn) and not isinstance(v, CMP)):
+			v = f"\'{v}\'" # MUST RUN FOR DATETIME TOO.
+		
+		if (not isinstance(v, str)): # int, str, float, TableColumn
+			v = str(v) # type: ignore
+		
+		return v
+	
+
+	def __str__(self):
+		a = self._convert_to_str(self.a)
+		b = self._convert_to_str(self.b)
+
+		
+		return f"({a}{self.symbol}{b})"
+
+
+	# BITWISE OPERATIONS BEING OVERWRITTEN!
+	# DO THIS SO CAN WRITE Table1.uid == Table2.uid & Table1.name != "Jim"
+	def __and__(self, value: object):
+		return CMP(self, value, " AND ")
+
+	def __or__(self, value: object):
+		return CMP(self, value, " OR ")
+	
+	def __invert__(self):
+		return NOT(self)
+
+class METHOD(CMP):
+	method = ""
+
+	def __init__(self, value: Any):
+		self.a = value
+	
+	def __str__(self):
+		a = self._convert_to_str(self.a)
+
+		return f"{self.method}({a})"
+
+	def __eq__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
+		return CMP(self, value, "=")
+	
+	def __ne__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
+		return CMP(self, value, "<>")
+
+class NOT(METHOD): method = "NOT"
+class UPPER(METHOD): method = "UPPER"
+class LOWER(METHOD): method = "LOWER"
+
+
+
+
+class Join():
+	"""
+	Use this class to define a JOIN statement.
+	
+	This may be created manually, but also happens automatically when
+	`join_all` is true in `Table.select()`
+	"""
+
+	def __init__(
+			self, joining_table: "Table[Any]",
+			condition: CMP | str, join_type: str = "LEFT"):
+		"""
+		Define a JOIN statement.
 
 		Args
 		--------
-		use_uid: bool
-			Optional, define whether to use a unique ID instead of original
-			table_name. Required if you want to query a self-reference.
-			Default True
+		joining_table: Table
+			type object of the TableRow of the table
+			you're joining into this statement.
+
+		condition: CMP | str
+			Query str to define how the joined table relates to this.
+			Usually linking primary / foreign keys.
+
+		join_type: str
+			Optional, can be INNER, LEFT, RIGHT, CROSS.
+			Default is LEFT
 		"""
 
-		print(cls)
-
-		clone = type(cls.__name__, deepcopy(cls.__bases__), dict(cls.__dict__))
-		if (use_uid): clone._uid = uid()
-
-		return clone # type: ignore
-	
-	@classmethod
-	def as_str(cls):
-		return (
-			f"{cls.table_name} AS {cls._uid}" if cls._uid # type: ignore
-			else cls.table_name)
+		self.join_type = join_type
+		self.joining_table = joining_table
+		self.condition = condition
 
 
 
-	@classmethod
-	def from_py_dict(cls, data: DSA) -> Self:
-		"""
-		Load values into object from a dictionary of py_attr: value.
-		"""
-		# INSTANTIATION. TableColumns REMOVED HERE.
-		this = cls()
+	def __str__(self):
+		join_type: str = self.join_type
+		if (join_type): join_type += " "
 
-		col_types = this.get_py_fields()
-
-		for py_attr, py_type in col_types.items():
-			existing_value: Join | None = None
-
-			try: existing_value = getattr(this, py_attr)
-			except: pass
-
-			# GET VALUE IN data WHICH WILL BE USED TO FILL OBJ.
-			# DO THIS BEFORE CHECKING FOR JOIN, ROW MAY NOT HAVE
-			# VALUE TO REFERENCE.
-
-			v: Any = data.get(py_attr)
-			if (not v):
-				# REMOVE JOIN OBJ.
-				if (existing_value): setattr(this, py_attr, None)
-
-				continue
-
-			got_type: type[Any] = type(v) # type: ignore
-
-			if (got_type != py_type):
-				try:
-					print(got_type(v))
-					v = py_type(v)
-					got_type = type(v) # type: ignore
-				except: pass
-
-			# STRICT TYPE CONTROL, RAISE EXCEPTION
-			assert py_type == Any or got_type == py_type, \
-				f"dict key {py_attr} value type {got_type} does not match required {py_type}"
-
-			del data[py_attr] # PREVENTS CIRCULAR REFERENCES
-
-			if (existing_value):
-				# CREATES OBJECT FOR JOINED COLUMN
-				# IF DATA DOESN'T EXIST (CIRCULAR, OR WASNT JOINED)
-				# IN SELECT, CREATES PARTIAL OBJ WITH JUST THE ID.
-
-				joining_model = existing_value.joining_table_row_model
-
-				child = joining_model.from_dict(data)
-				child_primary_key = child.get_primary_key_value()
-
-				if (len(child_primary_key) == 0 or None in child_primary_key):
-					this_column = cls.get_column(py_attr)
-					assert this_column and this_column.joins
-
-					child = joining_model.partial_from_id(v, this_column.joins)
-
-				v = child
-
-			setattr(this, py_attr, v)
-
-		this._load_status = "complete"
-		this.commit() # CLEAR changes, BECAUSE WE'VE JUST SET INITIAL VALUES.
-
-		return this
+		return f"{join_type}JOIN {self.joining_table.id_statement()} ON {self.condition}"
 
 
 
-	@classmethod
-	def from_dict(cls, data: DSA) -> Self:
-		"""
-		Load values into object from dictionary provided by `mysql-connector`.
-		(dict of db_field: value.)
-
-		Works by iterating through all annotated types of `self`, any which have
-		values in `data` are written to.
-
-		Automatically joins any tables defined as foreign keys, so long as
-		JOIN was present in the query which generated the `mysql-connector` dict.
-		"""
-
-		# INSTANTIATION. TableColumns REMOVED HERE.
-		this = cls()
-
-		col_types = this.get_py_fields()
-		print("making", cls.table_name)
-
-		db_col: str
-		py_prop: str
-		for db_col, py_prop in this.get_db_fields().items():
-			existing_value: Join | None = None
-
-			try: existing_value = getattr(this, py_prop)
-			except: pass
-
-			# GET VALUE IN data WHICH WILL BE USED TO FILL OBJ.
-			# DO THIS BEFORE CHECKING FOR JOIN, ROW MAY NOT HAVE
-			# VALUE TO REFERENCE.
-			key = f"{cls.table_name}.{db_col}"
-
-			v: Any = data.get(key)
-			if (not v):
-				# REMOVE JOIN OBJ.
-				if (existing_value): setattr(this, py_prop, None)
-
-				continue
-
-			required_type = col_types[py_prop]
-			got_type: type[Any] = type(v) # type: ignore
-
-			print(required_type, got_type)
-
-			if (got_type != required_type):
-				try:
-					print(got_type(v))
-					v = required_type(v)
-					got_type = type(v) # type: ignore
-				except: pass
-
-			# STRICT TYPE CONTROL, RAISE EXCEPTION
-			assert required_type == Any or got_type == required_type, \
-				f"dict key {db_col} value type {got_type} does not match required {required_type}"
-
-			del data[key] # PREVENTS CIRCULAR REFERENCES
-
-			if (existing_value):
-				# CREATES OBJECT FOR JOINED COLUMN
-				# IF DATA DOESN'T EXIST (CIRCULAR, OR WASNT JOINED)
-				# IN SELECT, CREATES PARTIAL OBJ WITH JUST THE ID.
-
-				joining_model = existing_value.joining_table_row_model
-
-				child = joining_model.from_dict(data)
-				child_primary_key = child.get_primary_key_value()
-
-				if (len(child_primary_key) == 0 or None in child_primary_key):
-					this_column = cls.get_column(py_prop)
-					assert this_column and this_column.joins
-
-					child = joining_model.partial_from_id(v, this_column.joins)
-
-				v = child
-
-			setattr(this, py_prop, v)
-
-		this._load_status = "complete"
-		this.commit() # CLEAR changes, BECAUSE WE'VE JUST SET INITIAL VALUES.
-
-		return this
 
 
 
-# COULD DECIPHER py_type FROM db_type, BUT WANT TYPEHINTING
-# WITH Generic[T], SO NEED IT AS PARAM.
+
+
+# USE _row_instantiated BCS OTHERWISE, IF SET .value, WOULD BE SAME FOR ALL
+# INSTANCES AND CLASS.
+# id(TableColumn.attribute) == id(TableColumn().attribute)!!!!!
+
+
+
+# row_instantiated = False always, unless TableColumn accessed by Table.row.new().TableColumn
+
 class TableColumn(Generic[T]):
+	"""
+	Class to describe a field/column of a database.
+
+	TableColumn is never used uninstantiated.
+
+	Three types of TableColumn:
+	1) **Child of uninstantiated TableRow**
+		- This is in the TableRow subclass definition
+		- Never apply anything to this instance, as it only receives
+		required information (such as parent Table) upon TableRow initialisation.
+	2) **Child of instantiated TableRow, template**
+		- This is accessed through Table.row
+		- Apply references (joins) to this instance so they are replicated
+		to future instances
+		- Do not apply values, as these should be individual and would be
+		copied to any future instances.
+	3) **Child of instantiated TableRow, value holder**
+		- This is accessed through Table.row.new()
+		- Do not apply references as these would not be given to other
+		Table.row.new() instances
+		- Apply values, as these will be individual.
+	
+		
+	You may not subclass this, as that will break its logic. (.duplicate())
+	"""
+
 	def __init__(
-			self, db_field: str, db_type: str, py_type: Type[T],
-			required: bool = False, autoincrement: bool = False):
-		self._db_field: str = db_field
-		self._py_type: type = py_type
+			self,
+			db_field: str,
+			db_type: Validator.TYPES_CHECKING | tuple[Validator.TYPES_CHECKING, int],
+			py_type: type[T],
+			required: bool = False,
+			default_value: Optional[T] = None,
+			primary_key: bool = False,
+			reference: Optional["TableColumn[Any]"] = None,
+			autoincrement: bool = False,
+			_row_instantiated: bool = False,
+			_row_template: bool = True,
+			_table: "Table[Any]" = None, # type: ignore[reportArgumentType]
+			_attr_name: Optional[str] = None):
+		"""
+		Define new TableColumn of TableRow.
+		This should only be used in your initial TableRow subclass definition.
+
+		Args
+		----
+		db_field: str
+			Name of field in Database.
+		
+		db_type: Literal[...]
+			MySQL string definition for the datatype of the field.
+
+		py_type: type[Any]
+			Python `type` object for the datatype of the field.
+		
+		required: bool = False
+			Whether field is `NOT NULL`
+		
+		default_value: Optional[Any]
+			Any value to automatically apply to TableColumn.value,
+			where its type must match `py_type`.
+		
+		primary_key: bool = False
+			Whether field is involved in the `PRIMARY KEY` of the TableRow.
+		
+		reference: Optional[TableColumn]
+			Which TableColumn a field is the foreign key of.
+
+			Usually more convenient to define using
+			Table.row.TableColumn.references = X later.
+		"""
+		
 		self._db_type = db_type
-		self.required = required
-		self.autoincrement = autoincrement
+		self._db_field = db_field
+		self._py_type = py_type
+		self._required = required
+		self._default_value = default_value
+		self._is_pk = primary_key
+		self._row_instantiated = _row_instantiated
+		self._row_template = _row_template
+		self._autoincrement = autoincrement
 
-		self._table_row_model: type[TableRow]
-		self._relationship: TableColumn[Any] | None = None
+		self._value =  None
+		if (default_value): self.value = default_value
+		self._value_changed = False
+
+		self._table = _table
+		self._references = reference
+		self._attr_name = _attr_name
+	
+
+	def _set_value(self, v: T, set_changed: bool = True):
+		# TODO: VALIDATION
+		self._value = v
+		if (set_changed): self._value_changed = True
 
 
+	@property
+	def value(self):
+		if (not self._row_instantiated):
+			raise AttributeError(
+				"TableColumn templates do not have values, "
+				"only value holder instances do")
+		
+		return self._value
+	
+	@value.setter
+	def value(self, v: T):
+		# DO NOT APPLY TO CHILDREN OF UNINSTANTIATED TableRow, OR TEMPLATES.
+		if ((not self._row_instantiated) or self._row_template):
+			raise AttributeError(
+				"Cannot set the value of TableColumn templates, "
+				"must be value holder instance")
+		
+		validator = Validator(self.db_type, v)
 
-	@property # READ-ONLY
-	def db_field(self): return self._db_field
+		if (validator.is_valid() == False):
+			new_v = validator.make_valid(self._py_type)
 
-	@property # READ-ONLY
-	def py_type(self): return self._py_type
+			if (not new_v):
+				raise TypeError(f"TableColumn {self} has type {self.db_type} "
+					f"{self._py_type}, which does not match "
+					f"type {type(v)} of {v}")
+		
+		self._set_value(v)
+	
 
-	@property # READ ONLY
+	@property
+	def references(self): return self._references
+	
+	@references.setter
+	def references(self, other: "TableColumn[Any]"):
+		"""
+		Define field which this TableColumn is a foreign key of.
+		Always define for TableColumn template instances,
+		children of instantiated TableRows.
+
+		(use Table.row.TableColumn.references = Table2.row.TableColumn).
+		"""
+
+		# ONLY APPLY REFERENCES TO TableColumn CHILDREN OF INSTANTIATED TableRow
+		if (not (self.is_row_instantiated and other.is_row_instantiated)):
+			raise AttributeError(
+				"Reference (other) and self must be TableColumns from "
+				"instantiated TableRows. You are working with your "
+				"type[TableRow].TableColumn, but you must use your "
+				"Table.row.TableColumn"
+			)
+		
+		# ONLY APPLY REFERENCES TO TEMPLATES, REJECT IF IS VALUE HOLDER
+		if (not (self.is_template and other.is_template)):
+			raise AttributeError(
+				"You may not define references from value holder instances "
+				"of TableColumn. You are running your Table.row.new().TableColumn, "
+				"but you may only define Table.row.TableColumn.references"
+			)
+
+		self._references = other
+	
+
+	# READ-ONLY FOR THE USER
+	@property
+	def is_primary_key(self): return self._is_pk
+
+	@property
+	def is_template(self): return self._row_template
+
+	@property
+	def is_row_instantiated(self): return self._row_instantiated
+
+	@property
+	def is_autoincrement(self): return self._autoincrement
+
+	@property
+	def value_changed(self): return self._value_changed
+
+	@property
 	def db_type(self): return self._db_type
 
-	@property # NO PRIVATE PROPERTY, READ-ONLY
-	def table_name(self): return self._table_row_model.table_name
+	@property
+	def table(self): return self._table
 
-	@property # READ-ONLY
-	def table_row_model(self): return self._table_row_model
+	@property
+	def field(self):
+		""" DB field name """
+		return self._db_field
+	
+	@property
+	def name(self):
+		""" py attr name """
+		return self._attr_name or ""
 
-	@property # FOR USER TO DEFINE LATER, READ AND WRITE
-	def joins(self): return self._relationship
+	@property
+	def default(self):
+		""" Returns default value of TableColumn. """
+		return self._default_value
 
-	@joins.setter
-	def joins(self, other: "TableColumn[Any]"):
-		self._relationship = other
+	def duplicate(self, table: "Table[Any]", attr: str):
+		"""
+		Creates new instance of TableColumn with all the same properties.
+		Does not preserve `self.value`.
+		"""
+
+		return self.__class__(
+			self._db_field, self._db_type, self._py_type, self._required, # type: ignore
+			self._default_value, self._is_pk,
+			self._references, self._is_pk, True, True, table, attr # KEEPS OLD TC REFERENCE HERE, TODO: BAD?
+		)
+	
+	def commit(self):
+		"""
+		Set `self._value_changed` to False.
+		You should usually run `TableRow.commit()` to commit all `TableColumn`s.
+		"""
+
+		self._value_changed = False
 
 
 
 
-	# OVERWRITE DEFAULT COMPARISONS, AS ISNT NECESSARY.
-	# WHEN INSTANTIATED, TableColumn OBJECTS ARE REMOVED.
-	# NEVER COMPARED TOGETHER, ONLY USED TO FORM SELECT STATEMENTS.
 
 	def in_(self, objects: list[Any]) -> CMP:
 		return CMP(self, objects, "IN")
+	
+	def like_(self, objects: list[Any]) -> CMP:
+		return CMP(self, objects, "LIKE")
 
-	def __eq__(self, value: object) -> CMP: # type: ignore
+	def __eq__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
 		return CMP(self, value, "=")
 
-	def __ne__(self, value: object) -> CMP: # type: ignore
+	def __ne__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
 		return CMP(self, value, "<>")
 
 	def __lt__(self, value: object) -> CMP:
@@ -583,12 +569,7 @@ class TableColumn(Generic[T]):
 
 	def __ge__(self, value: object) -> CMP:
 		return CMP(self, value, ">=")
-
-
-	def __str__(self) -> str:
-		return f"{self.table_name}.{self.db_field}"
-
-
+	
 	@property
 	def ascending(self) -> str:
 		""" Returns ORDER_BY query for this column, ascending. """
@@ -599,61 +580,305 @@ class TableColumn(Generic[T]):
 		""" Returns ORDER_BY query for this column, descending. """
 		return str(self) + " " + DESCENDING_SQL
 
+	def __str__(self) -> str:
+		if (not self.table): # ROW NOT INSTANTIATED, WHY ARE YOU HERE?
+			return self._db_field
+
+		return f"{self.table.identifier}.{self._db_field}"
 
 
 
-class Table():
-	def __init__(self, db_name: str, row_model: type[TableRow]):
-		self.name: str
-		self._row_model: type[TableRow]
-		self._db_keys: list[str]
-		#self._joins: dict[str, TableColumn]
-		self._joins: list[Join]
-
-		self.name = db_name
-
-		self.set_row_model(row_model)
 
 
-	@property # READ AND WRITE, BUT USE METH FOR SETTER.
-	def row_model(self): return self._row_model
+class TableRow():
+	"""
+	TableRow contains all TableColumns of a Table.
+	Always access through `Table.row`.
 
-	@property # WRITE ACCESS PRIVATE.
-	def db_keys(self): return self._db_keys
+	Create one through `Table.rows.new()`, with this instance
+	you can assign new values to columns.
+	"""
+
+	def __init__(self, table: "Table[Any]"):
+		self._table = table
+		self._columns: list[str] = []
+		self._db_fields: list[str] = []
+		self._pkeys: list[str] = []
+		self._ai: list[str] = []
+		self._db_field_to_col: DSS = {}
+
+		self._is_template: bool = True
+
+		for k in dir(self):
+			v = self.get_column(k)
+
+			if (not isinstance(v, TableColumn)): continue
+			vv = v.duplicate(table, k)
+
+			setattr(self, k, vv)
+
+			self._columns.append(k)
+			self._db_fields.append(vv.field)
+			if (vv.is_primary_key): self._pkeys.append(vv.field)
+			if (vv.is_autoincrement): self._ai.append(vv.field)
+
+			self._db_field_to_col[vv.field] = k
 
 
-	# COULD USE SETTER, BUT WANT TO BE EXPLICIT METH
-	# BECAUSE IT CHANGES MORE THAN ONE PROPERTY. DB_KEYS
-	# DOESN'T HAVE A SETTER.
-	def set_row_model(self, new_row_model: type[TableRow]):
-		self._row_model = new_row_model
-		self._db_keys = list(new_row_model.get_db_fields().keys())
+	# READ-ONLY FOR THE USER
+	# USE METHODS, NOT SETTERS, TO DISTINGUISH FROM TableColumn ATTRS.
+	def is_value_holder(self): return self._is_template
+	def get_column_names(self): return self._columns
+	def get_column(self, name: str):
+		v: Optional[TableColumn[Any]] = getattr(self, name)
 
-		self._joins = []
+		if (not isinstance(v, TableColumn)): return None
+		return v
+	
+	def get_columns(self):
+		return list(filter(
+			None, # RETURN ALL WHERE BOOL(v) is True
+			(self.get_column(k) for k in self.get_column_names())
+		))
+	
+	def get_fields(self): return self._db_fields
 
-		for field in new_row_model.get_py_fields().keys():
-			column: TableColumn[Any] | None = None
 
-			try: column = getattr(new_row_model, field)
-			except: pass
+	def get_joins(self):
+		joins: list[Join] = []
 
-			if ((not column) or (not column.joins)): continue
+		for attr in self._columns:
+			v = self.get_column(attr)
+			assert v
 
-			#if (joins): self._joins[field] = joins
-			self._joins.append(Join(
-				column.joins.table_row_model, column == column.joins))
+			ref = v.references
+			if (not ref): continue
+
+			other_table = ref.table
+			if (not other_table): continue # CONCERNING IF THIS HAPPENS
+
+			if (id(self._table) == id(other_table)):
+				other_table = other_table.as_alias(uid())
+				ref = other_table.row.get_column(ref.name)
+			
+			joins.append(Join(other_table, v == ref))
+		
+		return joins
+
+
+
+	def get_changes(self, include_defaults: bool = False):
+		"""
+		Returns `dict` of changes made to instances values,
+		ready to be written in UPDATE or INSERT statement.
+
+		Args
+		----
+		include_defaults: bool = False
+			If the result of this method will be used for a table INSERT,
+			use include_defaults = True to add default values, adding
+			protection for required fields being omitted.
+		"""
+		changes: DSA = {}
+
+		for attr in self._columns:
+			column: Optional[TableColumn[Any]] = self.get_column(attr)
+			if (not column): continue
+
+			if (not column.value_changed):
+				if (include_defaults):
+					changes[attr] = column.value or column.default
+
+				continue
+
+			changes[attr] = column.value
+		
+		return changes
+	
+	def to_storable(self) -> QueryParams:
+		changes = self.get_changes(True)
+		ai = self.get_autoincrement_keys()
+		storable: list[Any] = []
+
+		for field in self._db_fields:
+			if (field in ai): continue
+
+			col_name = self.get_col_from_field(field)
+			storable.append(changes[col_name])
+		
+		return tuple(storable)
+
+
+
+
+
+	
+	def commit(self):
+		"""
+		Commit all changes of TableRows.
+		This sets `TableColumn.value_changed` to False.
+		"""
+
+		for attr in self._columns:
+			col: TableColumn[Any] = getattr(self, attr)
+
+			col.commit()
+	
+
+	def get_autoincrement_keys(self):
+		"""
+		Returns list of `db_field` where
+		its `TableColumn.is_autoincrement` is True.
+		"""
+		return self._ai
+	
+	def get_primarykey_fields(self):
+		"""
+		Returns list of `db_field` where
+		its `TableColumn.is_primary_key` is True
+		"""
+		return self._pkeys
+	
+	def get_col_from_field(self, field: str):
+		""" Returns column name from db_field. """
+		return self._db_field_to_col[field]
+		
+
+
+
+	# INSTANCE CREATORS
+
+	def from_dict(self, data: DSA, from_db: bool = False):
+		"""
+		Creates new `TableRow` object with value holder `TableColumns`
+		Also sets values of each `TableColumn` based on `data`
+
+		Args
+		--------
+		data: dict[str, Any]
+			Data to apply to `TableRow`
+		
+		from_db: bool = False
+			Declare where `data` originated.
+			True = from `mysql-connector`, `data` keys are db columns.
+			False = user-generated, `data` keys are py attrs.
+			References will not be queried if `from_db` is False. Only
+			partials will be created.
+		"""
+
+		new: Self = self.new()
+		column_types_applied_to: list[bool] = []
+
+		for attr in new._columns:
+			col = new.get_column(attr)
+			if (not col): continue
+
+			ref = col.references
+
+			if (ref):
+				other_row: Self = ref.table.row
+				created = other_row.from_dict(data, from_db)
+				
+				col.value = created
+				continue
+
+			key = col.field if from_db else col.name
+			value = data.get(key)
+			if (not value): continue
+
+			col.value = value
+			del data[key] # PREVENT CIRCULAR RECURSION
+			column_types_applied_to.append(col.is_primary_key)
+		
+		# column_types.. = list[is primary key? t/f]
+		#if (all(column_types_applied_to)): # ALL PKS
+			# TODO: set partial if needed.
+		
+		new.commit() # SAVE CHANGES
+
+		return new
+
+
+
+
+
+	def new(self):
+		"""
+		Returns new `TableRow` object where
+		each `TableColumn` may hold a value.
+
+		This method is required to prevent issues
+		with shared references in Python.
+		"""
+
+		new = self.__class__(self._table)
+		new._is_template = False
+
+		for attr in new._columns:
+			column: TableColumn[Any] = getattr(new, attr)
+
+			new_column = column._create_value_holder(self._table) # type: ignore
+			setattr(new, attr, new_column)
+		
+		return new
+
+
+
+
+
+
+class Table(Generic[TableRowType]):
+	"""
+	This class encapsulates all query logic (`SELECT`, `UPDATE`, `INSERT`)
+
+	Always use an instance of this class, and use Table.row
+	to access the TableRow object.
+
+	Use Table.as_alias() to clone the table and use with an alias. Happens
+	automatically if a TableRow self-references, but can also be useful manually.
+	"""
+	def __init__(
+			self, db_name: str, row_model: type[TableRowType], _alias: str = ""):
+		self._db_name = db_name
+		self._alias = _alias
+
+		self._row_model = row_model
+		self._row = row_model(self)
+	
+
+	# READ-ONLY FOR THE USER
+	@property
+	def row(self) -> TableRowType: return self._row
+
+	@property
+	def name(self): return self._db_name
+
+	@property
+	def alias(self): return self._alias
+
 
 
 	def select(
-			self, condition: CMP | None = None, join_all: bool = False,
-			join_on: list[Join] = [], limit: int = 1000,
-			order_by: list[str | TableColumn[Any]] = []) -> DSA:
+			self,
+			columns: list[TableColumn[Any]] = [],
+			distinct: bool = False,
+			where: CMP | None = None,
+			join_all: bool = False,
+			join_on: list[Join] = [],
+			limit: int = 1000,
+			order_by: list[TableColumn[Any] | str] = []) -> DSA:
 		"""
 		### Build `SELECT` STATEMENT. ###
 
 		Args
 		--------
-		condition: CMP
+		columns: list[TableColumn]
+			List of columns to select, default All.
+		
+		distinct: bool = False
+			Whether selection should include `DISTINCT`	
+		
+		where: CMP
 			Comparison object used to build the statement.
 
 		join_all: bool
@@ -679,51 +904,60 @@ class Table():
 		>>> 	order_by = [Table1.value1, Table1.value2.ascending])
 		"""
 
-		if (join_all): join_on.extend(self._joins)
-		tables_involved: list[type[TableRow]] = [
-			self.row_model, *( v.joining_table_row_model for v in join_on )]
+		if (join_all): join_on.extend(self.row.get_joins())
+
+		tables_involved: list[Table[Any]] = [
+			self, *( v.joining_table for v in join_on )]
+
+		all_columns: list[TableColumn[Any]] = columns
+		if (not columns):
+			all_columns = []
+			
+			for v in tables_involved:
+				r: TableRow = v.row
+				cols: list[TableColumn[Any]] = [getattr(r, col) for col in r.get_column_names()]
+
+				all_columns.extend(cols)
 		
-		print([id(v) for v in tables_involved])
-		
-
-
-		all_columns = flatten( v.list_column_objs() for v in tables_involved )
-		what_to_select = ", ".join( f"{v} AS \'{v}\'" for v in all_columns )
-
-		sql: str = f"SELECT {what_to_select} FROM {self.name}"
-
-
-		for join in join_on: sql += " " + str(join)
-
-		if (condition): sql += " WHERE " + str(condition)
-
 		order_by_strs: list[str] = [ str(v) for v in order_by]
-		if (len(order_by_strs) > 0):
-			sql += " ORDER BY " + ", ".join(order_by_strs)
+		
 
-		if (limit): sql += " LIMIT " + str(limit)
+		# BUILD str STATEMENT:
+		what_to_select = ", ".join( f"{v} AS \'{v}\'" for v in all_columns )
+		distinct_statement = " DISTINCT" if distinct else ""
+
+		sql: str = f"SELECT{distinct_statement} {what_to_select} FROM {self}" # BASE
+
+		for join in join_on: sql += f" {join}" # ADD JOINS
+
+		if (where): sql += f" WHERE {where}" # ADD CONDITION
+
+		if (order_by_strs):
+			order_by_statement = ", ".join(order_by_strs)
+
+			sql += f" ORDER BY {order_by_statement}" # ADD ORDER BY
+
+		if (limit): sql += f" LIMIT {limit}" # ADD LIMIT
 
 		return {
 			"query": sql + ";",
 			"expect_response": "fetchall",
 			"objectify_from_table": self.name,
-			#"joins_info": 
 			"debug": ("select", "from " + self.name)
 		}
 
 
 	def insert(self, *rows: TableRow) -> DSA:
 		""" ### Build `INSERT` STATEMENT. ### """
-
-		autoincrement_keys = self.row_model.get_autoincrement_keys()
-		keys_str: str = ", ".join(k for k in self.db_keys if (not k in autoincrement_keys))
+		ai_fields = self.row.get_autoincrement_keys()
+		fields = ", ".join(f for f in self.row.get_fields() if (not f in ai_fields))
 
 		# "%s" FOR EVERY KEY, THEN [: -2] TO REMOVE TRAILING ", "
-		n_values = len(self.db_keys) - len(autoincrement_keys)
+		n_values = len(self.row.get_fields()) - len(ai_fields)
 		placeholder_str: str = ("%s, " * n_values)[: -2]
-		values: list[QP] = [ v.to_storable_tuple(self.db_keys) for v in rows ]
+		values = [ v.to_storable() for v in rows ]
 
-		sql: str = f"INSERT INTO {self.name} ({keys_str}) VALUES ({placeholder_str});"
+		sql: str = f"INSERT INTO {self.name} ({fields}) VALUES ({placeholder_str});"
 
 		payload: DSA = {
 			"query": sql,
@@ -741,32 +975,34 @@ class Table():
 
 
 	def update(self, *rows: TableRow) -> DSA:
-		""" ### Build `UPDATE` STATEMENT. ### """
+		"""
+		### Build `UPDATE` STATEMENT. ###
+		Only used for updating specific rows based on PKs.
+		Blanket UPDATE statements should be created otherwise.
+		# """
 
 		sqls: list[str] = []
-		valueses: list[QP] = []
+		valueses: list[QueryParams] = []
 
 		for row in rows:
 			changes = row.get_changes()
 
 			py_fields = changes.keys()
-			db_keys_changed = [
-				k for k,v in row.get_db_fields().items() if v in py_fields ]
+			db_fields_changed = list(row.get_column(v).field for v in py_fields) # type: ignore[reportOptionalMemberAccess]
 
-			set_str = ", ".join( f"{k} = %s" for k in db_keys_changed )
+			set_str = ", ".join( f"{k} = %s" for k in db_fields_changed )
 			values = tuple(changes.values())
 
 			where_str = ""
 
-			db_fields = self.row_model.get_db_fields()
+			db_fields = row.get_fields()
 
 			pk: str
-			for pk in row.pkeys:
-				py_field = db_fields.get(pk)
-				assert py_field and hasattr(row, py_field), Errors.PKNoPy
+			for pk in row.get_primarykey_fields():
+				col = row.get_column(row.get_col_from_field(pk))
+				if (not col): continue
 
-				where_str += f" {row.table_name}.{pk}={getattr(row, py_field)}"
-				# TODO: joined tables
+				where_str += f" {col}={col.value}"
 
 			sqls.append(f"UPDATE {self.name} SET {set_str} WHERE{where_str};")
 			valueses.append(values)
@@ -777,6 +1013,60 @@ class Table():
 			"paramses": valueses,
 			"debug": ("update", [ type(v).__name__ for v in rows ])
 		}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	# NAMING FUNCTIONS
+
+	def as_alias(self, alias: str):
+		"""
+		Create new instance of Table with alias.
+
+		Happens automatically when a TableRow self-references, but may also
+		be useful manually.
+		"""
+
+		if (self._alias):
+			raise AttributeError("This table has already been aliased.")
+		
+		cloned = self.__class__.__new__(self.__class__)
+		cloned.__init__(self._db_name, self._row_model, alias)
+		
+		return cloned
+
+	
+	def __str__(self):
+		""" Always returns `str` db_name. """
+		return self._db_name
+	
+	def id_statement(self):
+		"""
+		Statement for a FROM or JOIN to identify a table.
+		
+		Either: "TableName" OR "TableName AS Alias"
+		"""
+		return f"{self._db_name} AS {self._alias}" if self._alias else str(self)
+	
+	@property
+	def identifier(self) -> str:
+		"""
+		`str` identifier of the table. alias if exists, else name.
+		"""
+		return self._alias if self._alias else str(self)
+
+
+
 
 
 
@@ -817,7 +1107,7 @@ class Database():
 		self._logger: Logger
 		self._time_idle: int
 		self._is_connected: bool
-		self._table_row_models: dict[str, type[TableRow]]
+		self._tables: dict[str, Table[Any]]
 
 		# CONFIG = SETUP OF ACTIVE DB / CONNECTION
 		# SET ONCE HERE, NEVER CHANGE.
@@ -838,7 +1128,7 @@ class Database():
 		self._logger = logger
 		self._time_idle = 0
 		self._is_connected = False
-		self._table_row_models = {}
+		self._tables = {}
 
 		# DON'T HAVE SETTERS FOR _active_cursor BECAUSE I WANT ITS CREATION
 		# TO BE EXPLICIT WITH ._init_cursor(), PLUS WANT THIS CURSOR TO ONLY
@@ -869,12 +1159,9 @@ class Database():
 
 	def reset_time_idle(self): self._time_idle = 0
 
-	def declare_table_row_model(self, table_row: type[TableRow]):
-		self._table_row_models[table_row.table_name] = table_row
-
-	def declare_table_row_models(self, *rows: type[TableRow]):
-		for row in rows:
-			self.declare_table_row_model(row)
+	def declare_tables(self, *tables: Table[Any]):
+		for table in tables:
+			self._tables[table.name] = table
 
 
 
@@ -961,8 +1248,8 @@ class Database():
 
 
 	def _execute_one(
-			self, query: str, params: QP = (),
-			many_params: list[QP] = []):
+			self, query: str, params: QueryParams = (),
+			many_params: list[QueryParams] = []):
 		"""
 		Execute a single SQL Statement.
 
@@ -979,9 +1266,10 @@ class Database():
 
 	@db_error_catcher_rethrows
 	def execute(
-			self, query: str, params: QP  = (), many_params: list[QP] = [],
-			expect_response: str = "", buffered: bool = True,
-			objectify_from_table: str = "", **kwargs: Any):
+			self, query: str, params: QueryParams = (), 
+			many_params: list[QueryParams] = [], expect_response: str = "",
+			buffered: bool = True, objectify_from_table: str = "",
+			**kwargs: Any):
 		"""
 		Execute SQL Statement
 
@@ -1051,7 +1339,8 @@ class Database():
 
 	@db_error_catcher_rethrows
 	def execute_multiple(
-			self, queries: list[str], paramses: list[QP | list[QP]] = [],
+			self, queries: list[str],
+			paramses: list[QueryParams | list[QueryParams]] = [],
 			expect_response: bool = False, buffered: bool = True,
 			objectify_from_table: str = "", **kwargs: Any):
 		"""
@@ -1079,7 +1368,7 @@ class Database():
 		i: int
 		for i in range(len(queries)):
 			query: str = queries[i]
-			these_params: QP | list[QP] = paramses[i]
+			these_params = paramses[i]
 
 			if (type(these_params) == tuple):
 				self._execute_one(query, these_params)
@@ -1124,9 +1413,9 @@ class Database():
 			self, ms_result: MySQLRowType, table_name: str,
 			fetched_column_names: list[str]) -> TableRow:
 		""" ### Convert one dictionary result to the object of its table. """
-		model: type[TableRow] | None = self._table_row_models.get(table_name)
+		table: Optional[Table[Any]] = self._tables.get(table_name)
 
-		assert model, f"objectify: no model for table_name {table_name}"
+		assert table, f"objectify: no model for table_name {table_name}"
 		assert len(ms_result) == len(fetched_column_names), \
 			f"length of results not equal to amount of column names"
 
@@ -1134,10 +1423,7 @@ class Database():
 			(fetched_column_names[i], ms_result[i])
 			for i in range(len(fetched_column_names)) )
 
-		print(fetched_column_names)
-		print(result)
-
-		return model.from_dict(result)
+		return table.row.from_dict(result, True)
 
 
 
@@ -1146,33 +1432,21 @@ class Database():
 			table_name: str, column_names: list[str]) -> list[TableRow]:
 		""" ### Objectify a list of results easily. """
 
-		print(results)
-
 		return [
 			self.objectify_result(v, table_name, column_names)
 			for v in results ]
 
-
-
 	@classmethod
 	def from_env(
-			cls, logger: Logger, init_command: str = "",
+			cls, env: DSA, logger: Logger, init_command: str = "",
 			autocommit: bool = False, time_zone_description: str = ""):
-		host: str | None = getenv(ENVStrucutre.host)
-		prt_: str | None = getenv(ENVStrucutre.port)
-		user: str | None = getenv(ENVStrucutre.user)
-		pswd: str | None = getenv(ENVStrucutre.pswd)
-		schm: str | None = getenv(ENVStrucutre.schm) # TODO: dotenv_values
+		host: str = env["DB_HOST"]
+		port: int = env["DB_PORT"]
+		user: str = env["DB_USER"]
+		pswd: str = env["DB_PASS"]
+		schm: str = env["DB_SCHM"]
 
-		to_assert: list[str | None] = [host, prt_, user, pswd, schm]
-
-		assert (host and prt_ and user and pswd and schm), (
-			"Load from env missing params: "
-			",".join(str(v) for v in to_assert if not v))
-
-
-		port: int = -1
-		try: port = int(prt_)
+		try: port = int(port)
 		except: ValueError("Port must be convertable to int.")
 
 		return cls(

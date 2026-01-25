@@ -1,4 +1,4 @@
-from dbmanager2.engine import *
+from dbmanager.engine import *
 from copy import deepcopy
 
 
@@ -23,6 +23,8 @@ class Brand(TableRow):
 
 Brands = Table("Brands", Brand)
 Products = Table("Products", Product)
+
+Brands.row.new
 
 #Brand.best_product.references = Products.row.db_id
 #Brands.row.best_product.references = Products.row.db_id both do it

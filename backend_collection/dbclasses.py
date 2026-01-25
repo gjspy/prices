@@ -6,42 +6,30 @@ from datetime import datetime
 
 
 class Product(TableRow):
-	table_name = "Products"
-
-	db_id = TableColumn("PID", "INT", int, autoincrement = True)
+	db_id = TableColumn("PID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
 	name = TableColumn("PName", "TINYTEXT", str, True)
-	brand = TableColumn("BrandID", "INT", int, True)
-	preferred_thumb = TableColumn("PreferredThumbID", "INT", int)
-	packsize_count = TableColumn("PS_Count", "SMALLINT", int)
-	packsize_sizeeach = TableColumn("PS_SizeEach", "FLOAT", float)
-	packsize_unit = TableColumn("PS_Unit", "VARCHAR(2)", str)
-
-	pkeys = ["PID"]
+	brand = TableColumn("BrandID", "INT UNSIGNED", int, True)
+	preferred_thumb = TableColumn("PreferredThumbID", "INT UNSIGNED", int)
+	packsize_count = TableColumn("PS_Count", "SMALLINT UNSIGNED", int)
+	packsize_sizeeach = TableColumn("PS_SizeEach", "FLOAT UNSIGNED", float)
+	packsize_unit = TableColumn("PS_Unit", ("VARCHAR", 2), str)
 
 
 class ProductLink(TableRow):
-	table_name = "ProductLinks"
-
-	db_id = TableColumn("ID", "INT", int, autoincrement = True)
-	product = TableColumn("PID", "INT", int, True)
-	upc = TableColumn("UPC", "BIGINT", int)
-	cin = TableColumn("CIN", "BIGINT", int, True)
-	store = TableColumn("StoreID", "TINYINT", int, True)
-
-	pkeys = ["ID"]
+	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
+	product = TableColumn("PID", "INT UNSIGNED", int, True)
+	upc = TableColumn("UPC", "BIGINT UNSIGNED", int)
+	cin = TableColumn("CIN", "BIGINT UNSIGNED", int, True)
+	store = TableColumn("StoreID", "TINYINT UNSIGNED", int, True)
 
 
 class PriceEntry(TableRow):
-	table_name = "Prices"
-
-	db_id = TableColumn("ID", "INT", int, autoincrement = True)
-	product = TableColumn("PID", "INT", int, True)
-	store = TableColumn("StoreID", "TINYINT", int, True)
-	fetched_at = TableColumn("FetchedAt", "TIMESTAMP", datetime) # REQUIRED BUT HAS DEFAULT
-	price_pence = TableColumn("PricePence", "SMALLINT", int, True)
+	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
+	product = TableColumn("PID", "INT UNSIGNED", int, True)
+	store = TableColumn("StoreID", "TINYINT UNSIGNED", int, True)
+	fetched_at = TableColumn("FetchedAt", "TIMESTAMP", datetime) # REQUIRED BUT HAS DEFAULT TODO decide db does it or not?
+	price_pence = TableColumn("PricePence", "SMALLINT UNSIGNED", int, True)
 	available = TableColumn("Available", "BOOL", bool)
-
-	pkeys = ["EntryID"]
 
 """
 class Offer(TableRow):
@@ -57,6 +45,11 @@ class Offer(TableRow):
 	for_price = TableColumn("AnyFor_Price", int)
 	was_price = TableColumn("WasPrice", int)
 
+	# needs OfferHolder, many[offer] -> many[product]
+	# always store offer data in JSON? is fast
+	# have field OfferTypeRecognised in SQL, so all offers stored together (error of offer gathered)
+	# NO, just have OfferType = 0 (unknown)
+
 	pkeys = ["ID"]
 
 	class OfferHolder
@@ -64,54 +57,28 @@ class Offer(TableRow):
 """
 
 class Rating(TableRow):
-	table_name = "Ratings"
-
-	db_id = TableColumn("ID", "INT", int, autoincrement = True)
-	product = TableColumn("PID", "INT", int, True)
-	store = TableColumn("StoreID", "TINYINT", int, True)
-	avg = TableColumn("Average", "FLOAT", float, True)
-	count = TableColumn("NVotes", "SMALLINT", int, True)
-
-	pkeys = ["ID"]
+	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
+	product = TableColumn("PID", "INT UNSIGNED", int, True)
+	store = TableColumn("StoreID", "TINYINT UNSIGNED", int, True)
+	avg = TableColumn("Average", "FLOAT UNSIGNED", float, True)
+	count = TableColumn("NVotes", "SMALLINT UNSIGNED", int, True)
 
 
 class Image(TableRow):
-	table_name = "Images"
-
-	db_id = TableColumn("ID", "INT", int, autoincrement = True)
-	product = TableColumn("PID", "INT", int, True)
-	store = TableColumn("StoreID", "TINYINT", int, True)
+	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
+	product = TableColumn("PID", "INT UNSIGNED", int, True)
+	store = TableColumn("StoreID", "TINYINT UNSIGNED", int, True)
 	src = TableColumn("SourceURL", "TEXT", str, True)
-
-	pkeys = ["ID"]
 
 
 class Brand(TableRow):
-	table_name = "Brands"
-
-	db_id = TableColumn("ID", "INT", int, autoincrement = True)
-	name = TableColumn("BName", "TINYTEXT", str)
-	parent = TableColumn("ParentID", "INT", int)
-
-	pkeys = ["ID"]
-
-class NestedBrand(Brand):
-	table_name = "2"
+	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
+	name = TableColumn("BName", "TINYTEXT", str, True)
+	parent = TableColumn("ParentID", "INT UNSIGNED", int)
 
 class Store(TableRow):
-	table_name = "Stores"
-
-	db_id = TableColumn("ID", "INT", int, autoincrement = True)
-	name = TableColumn("SName", "TINYTEXT", str)
-
-	pkeys = ["ID"]
-
-
-ProductLink.product.joins = Product.db_id
-PriceEntry.product.joins = Product.db_id
-Rating.product.joins = Product.db_id
-Image.product.joins = Product.db_id
-Brand.parent.joins = Brand.db_id
+	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
+	name = TableColumn("SName", "TINYTEXT", str, True)
 
 Products = Table("Products", Product)
 ProductLinks = Table("ProductLinks", ProductLink)
@@ -122,7 +89,23 @@ Images = Table("Images", Image)
 Brands = Table("Brands", Brand)
 Stores = Table("Stores", Store)
 
+Products.row.brand.references = Brands.row.db_id
+Products.row.preferred_thumb.references = Images.row.db_id
 
+Brands.row.parent.references = Brands.row.db_id
+
+# CIRCULAR ProductID
+Images.row.store.references = Stores.row.db_id
+
+ProductLinks.row.product.references = Products.row.db_id
+ProductLinks.row.store.references = Stores.row.db_id
+
+PriceEntries.row.product.references = Products.row.db_id
+PriceEntries.row.store.references = Stores.row.db_id
+
+# OFFERS
+
+Ratings.row.store.references = Stores.row.db_id
 
 
 
@@ -130,37 +113,16 @@ Stores = Table("Stores", Store)
 
 class Queries:
 
-	@staticmethod
-	def get_link_by_upc(upc: int):
-		return ProductLinks.select( ProductLink.upc == upc )
-	
-	@staticmethod
-	def get_link_by_cin(cin: int, store: str):
-		return ProductLinks.select(
-			(ProductLink.cin == cin) & (ProductLink.store == store))
-	
-	@staticmethod
-	def get_link_by_some_id(data: DSA):
-		upc: int | None = data.get("upc")
-
-		if (upc): return Queries.get_link_by_upc(upc)
-
-		cin: int | None = data.get("cin")
-		store: str | None = data.get("store")
-		if (cin and store): return Queries.get_link_by_cin(cin, store)
-
-		# TODO: log
-		return
 
 	@staticmethod
 	def get_link_by_ids(upcs: list[int], cin: int, store: int):
 		cin_query = (ProductLink.cin == cin) & (ProductLink.store == store)
 
 		if (len(upcs) > 0): return ProductLinks.select(
-			(ProductLink.upc.in_(upcs)) | cin_query
+			where = (ProductLink.upc.in_(upcs)) | cin_query
 		)
 
-		return ProductLinks.select(cin_query)
+		return ProductLinks.select(where = cin_query)
 			
 
 

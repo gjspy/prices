@@ -82,15 +82,16 @@ CREATE TABLE Offers (
 	StartDate DATETIME,
 	EndDate DATETIME,
 
+	RequiresMembership BOOL,
+	OnlineExclusive BOOL,
+
 	AF_AnyCount TINYINT UNSIGNED,
 	AF_ForPrice SMALLINT UNSIGNED,
 	AF_ForCount TINYINT UNSIGNED,
 
 	RR_NewPrice SMALLINT UNSIGNED,
+
 	SavePerc TINYINT UNSIGNED,
-	
-	RequiresMembership BOOL,
-	OnlineExclusive BOOL,
 	
 	PRIMARY KEY (ID),
 	FOREIGN KEY (StoreID) REFERENCES Stores(ID),

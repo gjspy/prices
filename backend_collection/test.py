@@ -40,7 +40,7 @@ console = logging.StreamHandler()
 logger.addHandler(console)
 
 
-# TODO: categories
+# TODO: categories !!!!!!!
 # TODO: logging and error catching
 # TODO: check todos
 # TODO: look at more product cases, see how code responds, different offer types
@@ -48,7 +48,12 @@ logger.addHandler(console)
 # TODO: PARTIAL DB OBJECTS
 # TODO: typechecking errors around Product().name = "hi", how does this work btw?
 # TODO fix joins
-
+# TODO add print statements useful for debugging and leave them in (TESTING)
+# TODO: update CFW
+# TODO: add logger to collectors.
+# TODO: another addmin action: "return id_ if (id_ is not None) else self._store_data[StoreNames.unknown]" Price STORE is UNKNOWn?
+# TODO: igs to interrogate, where price is old. to define old: last price was over 1 week ago? dont try again?
+# -> for website user search, use available on latest price. tell user last time price was grabbed.
 """
 class Product(TableRow):
 	product_id = tablecol..
@@ -98,7 +103,6 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 
 	for r in storables:
 		print(r)
-
 
 
 

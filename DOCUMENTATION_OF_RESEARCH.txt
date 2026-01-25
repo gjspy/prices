@@ -35,7 +35,9 @@ wanted to have a proxy
 researched and found cloudflare workers
 set up, discovered akamai blocks. built workaround.
 
+writing storer, its the most procedural thing ever, just use obj to contain it all.
 
+WROTE MY OWN SQLALCHEMY because I didnt like how it worked, and **NEEDED DB_THREAD. SO WAS HALFWAY THERE.
 
 
 
