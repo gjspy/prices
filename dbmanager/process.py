@@ -133,7 +133,7 @@ class DBThread(Thread):
 		active: bool = self._active
 
 		if ((ql != 0 and not active) or (ql == 0 and active)):
-			self._logger.info(f"db queue {ql}, worked last cycle = {active}")
+			self._logger.info(f"DBThread Q {ql}, worked last cycle {active}")
 
 		next_item: DSA | None = self._staged_queue.get_next()
 		if (not next_item):
@@ -142,7 +142,7 @@ class DBThread(Thread):
 		data: DSA | None = next_item.get("data")
 		if (not data):
 			self._logger.warning(
-				f"db queue ignoring task {next_item.get("id")}, no data.")
+				f"DBThread Q ignoring task {next_item.get("id")}, no data.")
 			self._staged_queue.remove_first()
 
 			return True # ACTIVE
@@ -207,7 +207,7 @@ class DBThread(Thread):
 		future = self.create_future()
 
 		self.stage(query, future)
-		response = await future
+		response: list[Any] = await future
 
 		return response
 	

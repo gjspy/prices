@@ -8,7 +8,9 @@ import time
 from backend_collection.collectors import algolia, graphql, clusters, akamai, aldi
 from backend_collection.constants import regex
 from backend_collection.storer import Writer
-import backend_collection.dbclasses as objs
+from backend_collection.dbclasses import (
+	Products, ProductLinks, PriceEntries, Ratings, Images,
+	Brands, Stores, Store)
 from dbmanager.engine import Database
 from dbmanager.process import DBThread
 
@@ -22,11 +24,7 @@ RESULTS_PER_SEARCH = 100
 import sshtunnel
 import logging
 
-logger = logging.getLogger("main-logger") # GETS OR CREATES
-logger.setLevel(logging.DEBUG)
-
-console = logging.StreamHandler()
-logger.addHandler(console)
+from backend_collection.log_handler import logger
 
 SSH_USER = env["SSH_USER"]
 SSH_HOST = env["SSH_HOST"]
@@ -40,37 +38,58 @@ DB_SCHM = env["DB_SCHM"]
 
 from dbmanager import misc
 
-"""# TESTING uid FOR DUPLICATES
-a = [misc.uid() for i in range(100_000)]
 
-print(len(set(a)) == len(a))
-print(len(set(a)))"""
-print(objs.Brand.table_name)
-print(objs.NestedBrand.db_id.table_row_model)
 
-Writer._query_brand_with_name(None, "test")
-raise
+#print(Brands.row.parent._references)
+#print(Brands.row.new().parent._references)
+#print(Brands.row.parent._references)
 
+#print(id(Brands.row.parent), id(Brands.row.new().parent))
 
 
 async def main(tunnel: sshtunnel.SSHTunnelForwarder):
-	db = Database(
-		DB_HOST, tunnel.local_bind_port, DB_SCHM, DB_USER, DB_PASS, logger # type: ignore
-	)
-
-	db.declare_table_row_models(
-		objs.Product, objs.ProductLink, objs.PriceEntry,# objs.Offer,
-		objs.Rating, objs.Image
-	)
-
+	env["DB_PORT"] = tunnel.local_bind_port # type: ignore
+	
+	db = Database.from_env(env, logger)
+	db.declare_tables(
+		Products, ProductLinks, PriceEntries, Ratings, Images, Brands, Stores)
+	
 	succ = db.connect()
 	print(succ, "connected:", db.is_connected)
 
 	DB_PROCESS = DBThread(logger, db, asyncio.get_event_loop())
 	DB_PROCESS.start()
 
-	manager = Writer(DB_PROCESS)
-	# TODO: WRAP ALL WITH TRY/CATCH
+	#s = Stores.row.new()
+	#s.name.value = "tesco"
+	#store_id = await DB_PROCESS.query(Stores.insert(s))
+	#print(store_id[0])
+
+
+
+	"""b = Brands.row.new()
+	b.name.value = "CAT"
+	b.parent.value = 1
+	q = Brands.insert(b)
+	brand_id = await DB_PROCESS.query(q)
+	print(brand_id)"""
+
+	b = Brands.row.new()
+	b.parent.value = Stores.row.new()
+
+	q = Brands.select(where = Brands.row.db_id == 2) # (2 CAT 1) b.parent.value.is_partial() = True
+	#q = Brands.select(where = Brands.row.db_id == 2, join_all=True) # (2 CAT 1)
+	print(q)
+	b = (await DB_PROCESS.query(q))[0]
+	print(b.to_storable(False), b.parent.value.db_id.value, b.parent.value.is_partial())
+
+# MAKE IT SO ALWAYS USE TableRow.TableCOlumn.value.TableColumn.value, and the 2nd tablecolumn may be "partial" if not laoded form db.
+	#p = Products.row.new()
+	#p.name.value = "mature cheese"
+
+
+
+	return
 
 	await manager.write_storable_group([
     {

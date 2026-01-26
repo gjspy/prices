@@ -14,6 +14,8 @@ class Product(TableRow):
 	packsize_sizeeach = TableColumn("PS_SizeEach", "FLOAT UNSIGNED", float)
 	packsize_unit = TableColumn("PS_Unit", ("VARCHAR", 2), str)
 
+	entry_created = TableColumn("EntryCreatedDate", "TIMESTAMP", datetime) # required false as db default
+	verified = TableColumn("DetailsVerified", "BOOL", bool, default_value = False)
 
 class ProductLink(TableRow):
 	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)

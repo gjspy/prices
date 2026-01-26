@@ -39,7 +39,9 @@ writing storer, its the most procedural thing ever, just use obj to contain it a
 
 WROTE MY OWN SQLALCHEMY because I didnt like how it worked, and **NEEDED DB_THREAD. SO WAS HALFWAY THERE.
 
+talk about data sizes in db fields (SMALLINT for price, save data as max price £100 rlly)
 
+confirmed id(Store.db_id) == id(Store(Stores).db_id) True so we need our stuff. 
 
 # TESTING uid FOR DUPLICATES
 a = [misc.uid() for i in range(100_000)]

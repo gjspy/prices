@@ -1,5 +1,5 @@
 # TODO: MAKE ALL TYPES COME FROM types
-from backend_collection.types import DSA, DSS, Any, Optional
+from backend_collection.types import DSA, DSI, Any, Optional
 from backend_collection.constants import StoreNames
 
 from dbmanager.process import DBThread # ONLY FOR TYPE. DO NOT CREATE A THREAD HERE. ONLY ONE MAY EXIST.
@@ -32,7 +32,7 @@ class Writer():
 	def __init__(self, db_thread: DBThread):
 		self._db_thread = db_thread
 		self._this_batch: dict[int, tuple[int, list[int]]] = {}
-		self._store_data: DSS = {}
+		self._store_data: DSI = {}
 
 	
 	async def init_store_data(self):
@@ -40,7 +40,9 @@ class Writer():
 
 		v: Store
 		for v in data:
-			self._store_data[v.name.value] = v.db_id.value # type: TODO
+			store_name: str = v.name.value # type: ignore[reportAssignmentType]
+			store_id: int = v.db_id.value #  type: ignore[reportAssignmentType]
+			self._store_data[store_name] = store_id
 
 
 
@@ -80,7 +82,7 @@ class Writer():
 		return (upc, cin, store)
 	
 	def get_store_id(self, store_name: str):
-		id_ = self._store_data.get(store_name)
+		id_: Optional[int] = self._store_data.get(store_name)
 
 		return id_ if (id_ is not None) else self._store_data[StoreNames.unknown]
 
@@ -143,7 +145,7 @@ class Writer():
 		self._db_thread.stage(ProductLinks.insert(db_row)) # DON'T WANT RESPONSE SO STAGE, NOT QUERY
 
 
-	async def create_price_entry(self, product_id: int, store_id: int, )
+	async def create_price_entry(self, product_id: int, store_id: int, ):...
 
 
 	async def get_product_id(self, product: DSA, links: list[DSA]) -> int:

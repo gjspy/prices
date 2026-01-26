@@ -4,22 +4,22 @@ Python Package to connect to a MySQL database with ORM.
 
 ### Example Usage ###
 >>> from dbmanager import engine
->>> 
+>>>
 >>> class Book(engine.TableRow):
 >>> 	db_id = engine.TableColumn("ID", "INT UNSIGNED", int, primary_key = True)
 >>> 	name = engine.TableColumn("BookName", "MEDIUMTEXT", str, required = True)
 >>> 	author = engine.TableColumn("AuthorID", "INT UNSIGNED", int, required = True)
 >>> 	category = engine.TableColumn("Category", "MEDIUMTEXT", str)
->>> 
+>>>
 >>> class Author(engine.TableRow):
 >>> 	db_id = engine.TableColumn("ID", "INT UNSIGNED", int, primary_key = True)
 >>> 	name = engine.TableColumn("AuthorName", "MEDIUMTEXT", str, required = True)
->>> 
+>>>
 >>> Books = engine.Table("Books", Book)
 >>> Authors = engine.Table("Authors", Author)
->>> 
+>>>
 >>> Books.row.author.references = Authors.row.db_id
->>> 
+>>>
 >>> Books.select(
 >>> 	where = Books.row.category == "Fiction",
 >>> 	join_all = True,
@@ -46,9 +46,8 @@ from dbmanager.types import (
 from dbmanager.misc import (
 	Errors, ExecutionException, ASCENDING_SQL, DESCENDING_SQL, uid)
 
-TableRowType = TypeVar("TableRowType", bound = "TableRow")
+TableRowType = TypeVar("TableRowType", bound = "TableRow") # USE TypeVar TO GIVE NICE TYPING FOR SUBCLASSES.
 EH = TypeVar("EH", bound = Callable[..., Any])
-
 
 
 
@@ -64,7 +63,7 @@ def error_handling(
 	"""
 	HANDLES ERRORS FOR DB METHODS
 	PREVENTS WRITING TRY/EXCEPT AROUND EVERY EXECUTION
-	
+
 	AUTOMATICALLY CLOSES CURSORS AND ROLLS BACK CONNECTIONS.
 	"""
 	is_fatal: bool = type(e) == MySQLError and e.errno in FATAL_ERROR_CODES
@@ -140,14 +139,14 @@ class Validator():
 		if (type(db_type) == str):
 			self.db_type = db_type.replace(" UNSIGNED", "")
 			self.size = 0
-			
+
 		elif (type(db_type) == tuple):
 			self.db_type = db_type[0]
 			self.size = db_type[1]
 
 		self.value = value
 		self.unsigned = "UNSIGNED" in db_type
-	
+
 
 	def CHAR(self): return type(self.value) == str and len(self.value) == self.size
 	def VARCHAR(self, size: int = 0):
@@ -163,7 +162,7 @@ class Validator():
 
 		if (self.unsigned): return self.value < (signed_max_exc * 2)
 		else: return self.value >= -signed_max_exc and self.value < signed_max_exc
-	
+
 	def TINYINT(self): return self._NUMBER(128) # 2 ** 7
 	def SMALLINT(self): return self._NUMBER(32_768) # 2 ** 15
 	def MEDIUMINT(self): return self._NUMBER(8_388_608) # 2 ** 24
@@ -181,17 +180,17 @@ class Validator():
 		"MEDIUMINT", "MEDIUMINT UNSIGNED", "INT", "INT UNSIGNED",
 		"BIGINT", "BIGINT UNSIGNED", "FLOAT", "FLOAT UNSIGNED", "BOOL",
 		"TIMESTAMP"]
-	
+
 	def is_valid(self):
 		try: return getattr(self, self.db_type)()
 		except:
 			print("DB TYPE", self.db_type, "NOT RECOGNISED")
 			return None
-	
+
 	def make_valid(self, py_type: type[Any]):
 		if (py_type == datetime):
 			return datetime.strftime(self.value, SQL_DATETIME_FMT)
-		
+
 		try: return py_type(self.value)
 		except: return None
 
@@ -211,25 +210,25 @@ class CMP():
 		self.a = a
 		self.b = b
 		self.symbol = symbol
-	
+
 	def _convert_to_str(self, v: Union[Any, "TableColumn[Any]"]) -> str:
 		if (isinstance(v, datetime)):
 			v = f"{v.strftime(SQL_DATETIME_FMT)}"
-		
+
 		if (not isinstance(v, TableColumn) and not isinstance(v, CMP)):
 			v = f"\'{v}\'" # MUST RUN FOR DATETIME TOO.
-		
+
 		if (not isinstance(v, str)): # int, str, float, TableColumn
 			v = str(v) # type: ignore
-		
+
 		return v
-	
+
 
 	def __str__(self):
 		a = self._convert_to_str(self.a)
 		b = self._convert_to_str(self.b)
 
-		
+
 		return f"({a}{self.symbol}{b})"
 
 
@@ -240,7 +239,7 @@ class CMP():
 
 	def __or__(self, value: object):
 		return CMP(self, value, " OR ")
-	
+
 	def __invert__(self):
 		return NOT(self)
 
@@ -249,7 +248,7 @@ class METHOD(CMP):
 
 	def __init__(self, value: Any):
 		self.a = value
-	
+
 	def __str__(self):
 		a = self._convert_to_str(self.a)
 
@@ -257,7 +256,7 @@ class METHOD(CMP):
 
 	def __eq__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
 		return CMP(self, value, "=")
-	
+
 	def __ne__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
 		return CMP(self, value, "<>")
 
@@ -271,7 +270,7 @@ class LOWER(METHOD): method = "LOWER"
 class Join():
 	"""
 	Use this class to define a JOIN statement.
-	
+
 	This may be created manually, but also happens automatically when
 	`join_all` is true in `Table.select()`
 	"""
@@ -346,8 +345,8 @@ class TableColumn(Generic[T]):
 		- Do not apply references as these would not be given to other
 		Table.row.new() instances
 		- Apply values, as these will be individual.
-	
-		
+
+
 	You may not subclass this, as that will break its logic. (.duplicate())
 	"""
 
@@ -373,30 +372,30 @@ class TableColumn(Generic[T]):
 		----
 		db_field: str
 			Name of field in Database.
-		
+
 		db_type: Literal[...]
 			MySQL string definition for the datatype of the field.
 
 		py_type: type[Any]
 			Python `type` object for the datatype of the field.
-		
+
 		required: bool = False
 			Whether field is `NOT NULL`
-		
+
 		default_value: Optional[Any]
 			Any value to automatically apply to TableColumn.value,
 			where its type must match `py_type`.
-		
+
 		primary_key: bool = False
 			Whether field is involved in the `PRIMARY KEY` of the TableRow.
-		
+
 		reference: Optional[TableColumn]
 			Which TableColumn a field is the foreign key of.
 
 			Usually more convenient to define using
 			Table.row.TableColumn.references = X later.
 		"""
-		
+
 		self._db_type = db_type
 		self._db_field = db_field
 		self._py_type = py_type
@@ -414,10 +413,9 @@ class TableColumn(Generic[T]):
 		self._table = _table
 		self._references = reference
 		self._attr_name = _attr_name
-	
 
-	def _set_value(self, v: T, set_changed: bool = True):
-		# TODO: VALIDATION
+
+	def _set_value(self, v: T | "TableRow", set_changed: bool = True):
 		self._value = v
 		if (set_changed): self._value_changed = True
 
@@ -428,17 +426,29 @@ class TableColumn(Generic[T]):
 			raise AttributeError(
 				"TableColumn templates do not have values, "
 				"only value holder instances do")
-		
+
 		return self._value
-	
+
 	@value.setter
-	def value(self, v: T):
+	def value(self, v: T | "TableRow"):
 		# DO NOT APPLY TO CHILDREN OF UNINSTANTIATED TableRow, OR TEMPLATES.
 		if ((not self._row_instantiated) or self._row_template):
 			raise AttributeError(
 				"Cannot set the value of TableColumn templates, "
 				"must be value holder instance")
 		
+		ref = self.references
+
+		if (ref):
+			if (isinstance(v, TableRow)): self._set_value(v)
+			else:
+				this = f"{self.table.name}.{self.name}"
+				raise TypeError(
+				f"{self} references {ref}, so you cannot set {this}.value, "
+				f"you must use {this}.value.{ref.name}.value even if partial")
+
+			return
+
 		validator = Validator(self.db_type, v)
 
 		if (validator.is_valid() == False):
@@ -448,13 +458,13 @@ class TableColumn(Generic[T]):
 				raise TypeError(f"TableColumn {self} has type {self.db_type} "
 					f"{self._py_type}, which does not match "
 					f"type {type(v)} of {v}")
-		
+
 		self._set_value(v)
-	
+
 
 	@property
 	def references(self): return self._references
-	
+
 	@references.setter
 	def references(self, other: "TableColumn[Any]"):
 		"""
@@ -473,7 +483,7 @@ class TableColumn(Generic[T]):
 				"type[TableRow].TableColumn, but you must use your "
 				"Table.row.TableColumn"
 			)
-		
+
 		# ONLY APPLY REFERENCES TO TEMPLATES, REJECT IF IS VALUE HOLDER
 		if (not (self.is_template and other.is_template)):
 			raise AttributeError(
@@ -481,9 +491,15 @@ class TableColumn(Generic[T]):
 				"of TableColumn. You are running your Table.row.new().TableColumn, "
 				"but you may only define Table.row.TableColumn.references"
 			)
+		
+		#if (id(self._table) == id(other)):
+		if (self._table.name == other.table.name):
+			other_table = other.table.as_alias(uid())
+			other = other_table.row.get_column(other.name)
+		
 
 		self._references = other
-	
+
 
 	# READ-ONLY FOR THE USER
 	@property
@@ -511,7 +527,7 @@ class TableColumn(Generic[T]):
 	def field(self):
 		""" DB field name """
 		return self._db_field
-	
+
 	@property
 	def name(self):
 		""" py attr name """
@@ -529,11 +545,28 @@ class TableColumn(Generic[T]):
 		"""
 
 		return self.__class__(
-			self._db_field, self._db_type, self._py_type, self._required, # type: ignore
+			self._db_field, self._db_type, self._py_type, self._required,
 			self._default_value, self._is_pk,
-			self._references, self._is_pk, True, True, table, attr # KEEPS OLD TC REFERENCE HERE, TODO: BAD?
+			self._references, self._autoincrement, True, True, table, attr # KEEPS OLD TC REFERENCE HERE, TODO: BAD?
 		)
-	
+
+	def create_value_holder(self, table: "Table[Any]", attr: str):
+		"""
+		Creates new instance of TableColumn with all the same properties
+		Does not preserve `self.value`.
+
+		This method used to create a new TableColumn instance which can
+		hold a value. Only used internally, you should only ever use
+		`Table.row.new()` to access TableColumns.
+		"""
+
+		return self.__class__(
+			self._db_field, self._db_type, self._py_type, self._required, 
+			self._default_value, self._is_pk,
+			self._references, self._autoincrement, True, False, table, attr # KEEPS OLD TC REFERENCE HERE, TODO: BAD?
+		)
+
+
 	def commit(self):
 		"""
 		Set `self._value_changed` to False.
@@ -548,7 +581,7 @@ class TableColumn(Generic[T]):
 
 	def in_(self, objects: list[Any]) -> CMP:
 		return CMP(self, objects, "IN")
-	
+
 	def like_(self, objects: list[Any]) -> CMP:
 		return CMP(self, objects, "LIKE")
 
@@ -569,7 +602,7 @@ class TableColumn(Generic[T]):
 
 	def __ge__(self, value: object) -> CMP:
 		return CMP(self, value, ">=")
-	
+
 	@property
 	def ascending(self) -> str:
 		""" Returns ORDER_BY query for this column, ascending. """
@@ -599,7 +632,9 @@ class TableRow():
 	you can assign new values to columns.
 	"""
 
-	def __init__(self, table: "Table[Any]"):
+	def __init__(
+			self, table: "Table[Any]", _is_template: bool = True,
+			_old_cols: Optional[list[TableColumn[Any]]] = None):
 		self._table = table
 		self._columns: list[str] = []
 		self._db_fields: list[str] = []
@@ -607,23 +642,44 @@ class TableRow():
 		self._ai: list[str] = []
 		self._db_field_to_col: DSS = {}
 
-		self._is_template: bool = True
+		self._is_template: bool = _is_template # False FROM Table.row.new()
+		self._partial: bool = False
 
-		for k in dir(self):
-			v = self.get_column(k)
+		# old_cols PRESENT IN Table.row.new(), TO PRESERVE REFERENCES.
+		if (_old_cols):
+			for v in _old_cols:
+				k = v.name
+				self.__init_one_tc(k, v, _is_template)
 
-			if (not isinstance(v, TableColumn)): continue
-			vv = v.duplicate(table, k)
+		else:
+			for k in dir(self):
+				v = self.get_column(k)
 
-			setattr(self, k, vv)
+				if (not isinstance(v, TableColumn)): continue
+				self.__init_one_tc(k, v, _is_template)
+			
+	
 
-			self._columns.append(k)
-			self._db_fields.append(vv.field)
-			if (vv.is_primary_key): self._pkeys.append(vv.field)
-			if (vv.is_autoincrement): self._ai.append(vv.field)
+	def __init_one_tc(self, attr: str, v: TableColumn[Any], _is_template: bool):
+		vv = (
+			v.duplicate(self._table, attr) if _is_template 
+			else v.create_value_holder(self._table, attr))
+		
+		if (vv.references and not _is_template):
+			vv.value = vv.references.table.row.new()
+		
+		setattr(self, attr, vv)
 
-			self._db_field_to_col[vv.field] = k
+		self._columns.append(attr)
+		self._db_fields.append(vv.field)
+		if (vv.is_primary_key): self._pkeys.append(vv.field)
+		if (vv.is_autoincrement): self._ai.append(vv.field)
 
+		self._db_field_to_col[vv.field] = attr
+	
+
+	def is_partial(self): return self._partial
+	def set_partial(self, v: bool): self._partial = v
 
 	# READ-ONLY FOR THE USER
 	# USE METHODS, NOT SETTERS, TO DISTINGUISH FROM TableColumn ATTRS.
@@ -634,13 +690,13 @@ class TableRow():
 
 		if (not isinstance(v, TableColumn)): return None
 		return v
-	
+
 	def get_columns(self):
 		return list(filter(
 			None, # RETURN ALL WHERE BOOL(v) is True
 			(self.get_column(k) for k in self.get_column_names())
 		))
-	
+
 	def get_fields(self): return self._db_fields
 
 
@@ -657,12 +713,12 @@ class TableRow():
 			other_table = ref.table
 			if (not other_table): continue # CONCERNING IF THIS HAPPENS
 
-			if (id(self._table) == id(other_table)):
+			"""if (id(self._table) == id(other_table)): # TODO
 				other_table = other_table.as_alias(uid())
-				ref = other_table.row.get_column(ref.name)
-			
+				ref = other_table.row.get_column(ref.name)"""
+
 			joins.append(Join(other_table, v == ref))
-		
+
 		return joins
 
 
@@ -676,8 +732,9 @@ class TableRow():
 		----
 		include_defaults: bool = False
 			If the result of this method will be used for a table INSERT,
-			use include_defaults = True to add default values, adding
-			protection for required fields being omitted.
+			use include_defaults = True to add default values, **and
+			any other existing values, which haven't changed**.
+			Provides protection for required fields being omitted.
 		"""
 		changes: DSA = {}
 
@@ -692,27 +749,43 @@ class TableRow():
 				continue
 
 			changes[attr] = column.value
-		
+
 		return changes
-	
-	def to_storable(self) -> QueryParams:
+
+	def to_storable(self, for_insert: bool = True) -> QueryParams:
+		"""
+		Returns tuple of VALUES representing the TableRow.
+
+		Args
+		--------
+		for_insert: bool = True
+		If True, excludes autoincrement fields but includes defaults and
+		unchanged values.
+		If False, includes all fields.
+		"""
 		changes = self.get_changes(True)
 		ai = self.get_autoincrement_keys()
 		storable: list[Any] = []
 
 		for field in self._db_fields:
-			if (field in ai): continue
+			if (field in ai and for_insert): continue
 
 			col_name = self.get_col_from_field(field)
-			storable.append(changes[col_name])
-		
+			this_col = self.get_column(col_name)
+			value = changes.get(col_name)
+
+			if (this_col and isinstance(value, TableRow)):
+				value = value.get_column(this_col.references.name).value # type: ignore
+
+			storable.append(value) # TODO error if field required and no change
+
 		return tuple(storable)
 
 
 
 
 
-	
+
 	def commit(self):
 		"""
 		Commit all changes of TableRows.
@@ -723,7 +796,7 @@ class TableRow():
 			col: TableColumn[Any] = getattr(self, attr)
 
 			col.commit()
-	
+
 
 	def get_autoincrement_keys(self):
 		"""
@@ -731,19 +804,27 @@ class TableRow():
 		its `TableColumn.is_autoincrement` is True.
 		"""
 		return self._ai
-	
+
 	def get_primarykey_fields(self):
 		"""
 		Returns list of `db_field` where
 		its `TableColumn.is_primary_key` is True
 		"""
 		return self._pkeys
-	
+
 	def get_col_from_field(self, field: str):
 		""" Returns column name from db_field. """
 		return self._db_field_to_col[field]
-		
 
+	def get_primarykey_value(self):
+		v = list(
+			self.get_column(self.get_col_from_field(v))
+			for v in self.get_primarykey_fields())
+		l = len(v)
+
+		if   (l == 0): return None
+		elif (l == 1 and v[0]): return v[0].value
+		else: return v
 
 
 	# INSTANCE CREATORS
@@ -757,7 +838,7 @@ class TableRow():
 		--------
 		data: dict[str, Any]
 			Data to apply to `TableRow`
-		
+
 		from_db: bool = False
 			Declare where `data` originated.
 			True = from `mysql-connector`, `data` keys are db columns.
@@ -769,31 +850,38 @@ class TableRow():
 		new: Self = self.new()
 		column_types_applied_to: list[bool] = []
 
+		print(data)
+
 		for attr in new._columns:
 			col = new.get_column(attr)
 			if (not col): continue
 
 			ref = col.references
+			print(col, ref)
+
+			key = str(col) if from_db else col.name
 
 			if (ref):
 				other_row: Self = ref.table.row
 				created = other_row.from_dict(data, from_db)
-				
+
+				if (created.get_primarykey_value() is None):
+					other_col = created.get_column(ref.name)
+					other_col.value = data[key] # type: ignore
+					created.set_partial(True)
+
 				col.value = created
+				del data[key] # PREVENT INF RECURSION
 				continue
 
-			key = col.field if from_db else col.name
+			
 			value = data.get(key)
 			if (not value): continue
 
 			col.value = value
-			del data[key] # PREVENT CIRCULAR RECURSION
+			del data[key] # PREVENT INF RECURSION
 			column_types_applied_to.append(col.is_primary_key)
-		
-		# column_types.. = list[is primary key? t/f]
-		#if (all(column_types_applied_to)): # ALL PKS
-			# TODO: set partial if needed.
-		
+
 		new.commit() # SAVE CHANGES
 
 		return new
@@ -811,15 +899,8 @@ class TableRow():
 		with shared references in Python.
 		"""
 
-		new = self.__class__(self._table)
-		new._is_template = False
+		new = self.__class__(self._table, False, self.get_columns())
 
-		for attr in new._columns:
-			column: TableColumn[Any] = getattr(new, attr)
-
-			new_column = column._create_value_holder(self._table) # type: ignore
-			setattr(new, attr, new_column)
-		
 		return new
 
 
@@ -844,7 +925,7 @@ class Table(Generic[TableRowType]):
 
 		self._row_model = row_model
 		self._row = row_model(self)
-	
+
 
 	# READ-ONLY FOR THE USER
 	@property
@@ -874,10 +955,10 @@ class Table(Generic[TableRowType]):
 		--------
 		columns: list[TableColumn]
 			List of columns to select, default All.
-		
+
 		distinct: bool = False
-			Whether selection should include `DISTINCT`	
-		
+			Whether selection should include `DISTINCT`
+
 		where: CMP
 			Comparison object used to build the statement.
 
@@ -912,15 +993,15 @@ class Table(Generic[TableRowType]):
 		all_columns: list[TableColumn[Any]] = columns
 		if (not columns):
 			all_columns = []
-			
+
 			for v in tables_involved:
 				r: TableRow = v.row
 				cols: list[TableColumn[Any]] = [getattr(r, col) for col in r.get_column_names()]
 
 				all_columns.extend(cols)
-		
+
 		order_by_strs: list[str] = [ str(v) for v in order_by]
-		
+
 
 		# BUILD str STATEMENT:
 		what_to_select = ", ".join( f"{v} AS \'{v}\'" for v in all_columns )
@@ -1039,25 +1120,25 @@ class Table(Generic[TableRowType]):
 
 		if (self._alias):
 			raise AttributeError("This table has already been aliased.")
-		
+
 		cloned = self.__class__.__new__(self.__class__)
 		cloned.__init__(self._db_name, self._row_model, alias)
-		
+
 		return cloned
 
-	
+
 	def __str__(self):
 		""" Always returns `str` db_name. """
 		return self._db_name
-	
+
 	def id_statement(self):
 		"""
 		Statement for a FROM or JOIN to identify a table.
-		
+
 		Either: "TableName" OR "TableName AS Alias"
 		"""
 		return f"{self._db_name} AS {self._alias}" if self._alias else str(self)
-	
+
 	@property
 	def identifier(self) -> str:
 		"""
@@ -1242,7 +1323,10 @@ class Database():
 	def close_cursor(self):
 		if (not self._active_cursor): return
 
-		self._active_cursor.close()
+		try: self._active_cursor.close()
+		except ReferenceError:
+			pass # SOMETIMES "weakly-referenced object no longer exists",
+			# ALREADY CLOSED BY PACKAGE.
 		self._active_cursor = None
 
 
@@ -1266,7 +1350,7 @@ class Database():
 
 	@db_error_catcher_rethrows
 	def execute(
-			self, query: str, params: QueryParams = (), 
+			self, query: str, params: QueryParams = (),
 			many_params: list[QueryParams] = [], expect_response: str = "",
 			buffered: bool = True, objectify_from_table: str = "",
 			**kwargs: Any):
@@ -1414,6 +1498,8 @@ class Database():
 			fetched_column_names: list[str]) -> TableRow:
 		""" ### Convert one dictionary result to the object of its table. """
 		table: Optional[Table[Any]] = self._tables.get(table_name)
+
+		print(ms_result)
 
 		assert table, f"objectify: no model for table_name {table_name}"
 		assert len(ms_result) == len(fetched_column_names), \
