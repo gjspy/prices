@@ -10,7 +10,7 @@ from backend_collection.constants import regex
 from backend_collection.storer import Writer
 from backend_collection.dbclasses import (
 	Products, ProductLinks, PriceEntries, Ratings, Images,
-	Brands, Stores, Store)
+	Brands, Stores, Store, Brand)
 from dbmanager.engine import Database
 from dbmanager.process import DBThread
 
@@ -80,8 +80,8 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	q = Brands.select(where = Brands.row.db_id == 2) # (2 CAT 1) b.parent.value.is_partial() = True
 	#q = Brands.select(where = Brands.row.db_id == 2, join_all=True) # (2 CAT 1)
 	print(q)
-	b = (await DB_PROCESS.query(q))[0]
-	print(b.to_storable(False), b.parent.value.db_id.value, b.parent.value.is_partial())
+	b: Brand = (await DB_PROCESS.query(q))[0]
+	print(b.to_storable(False), b.parent.ref_value.db_id.value, b.parent.value.is_partial())
 
 # MAKE IT SO ALWAYS USE TableRow.TableCOlumn.value.TableColumn.value, and the 2nd tablecolumn may be "partial" if not laoded form db.
 	#p = Products.row.new()

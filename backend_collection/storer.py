@@ -10,24 +10,16 @@ from backend_collection.dbclasses import (
 	Brands, Stores,
 
 	# TableRows ONLY IMPROTED FOR TYPEHINTS.
-	ProductLink, Brand, Store
+	ProductLink, Brand, Store, Product
 )
 from backend_collection.dbclasses import Queries
 
 
-
+import typing
 
 
 class Writer():
 	# TODO: ON INIT, READING .state ETC, CREATE STORE DATA (CACHE STORE IDS)
-	"""_store_data = {
-		"UNKNOWN": 0,
-		"TESCO": 1,
-		"ASDA": 2,
-		"MORRISONS": 3,
-		"SAINSBURYS": 4,
-		"ALDI": 5
-	}"""
 
 	def __init__(self, db_thread: DBThread):
 		self._db_thread = db_thread
@@ -36,12 +28,18 @@ class Writer():
 
 	
 	async def init_store_data(self):
-		data = await self._db_thread.query(Stores.select())
+		q = Stores.select()
+		data = await self._db_thread.query(q)
 
 		v: Store
 		for v in data:
-			store_name: str = v.name.value # type: ignore[reportAssignmentType]
-			store_id: int = v.db_id.value #  type: ignore[reportAssignmentType]
+			store_name = v.name.plain_value
+			store_id = v.db_id.plain_value
+
+			if (not (store_name and store_id)): raise Exception(
+				f"FATAL: could not get store_name {store_name} {store_id}"
+				f"{q}")
+			
 			self._store_data[store_name] = store_id
 
 
@@ -92,7 +90,7 @@ class Writer():
 		query = Brands.select(
 			where = LOWER(Brands.name) == brand_name.lower(),
 			join_all = True)
-		print(query)
+
 		existing: list[Brand] = await self._db_thread.query(query)
 
 		if (existing):
@@ -113,7 +111,7 @@ class Writer():
 		return await self._db_thread.query(query)
 	
 
-	async def create_brand(self, brand_name: str) -> int:
+	async def create_brand(self, brand_name: str) -> list[int]:
 		db_row = Brands.row.new()
 		db_row.name.value = brand_name
 
@@ -124,12 +122,10 @@ class Writer():
 	async def create_product(self, product: DSA):
 		db_row = Products.row.from_dict(product)
 
-		# TODO: ADD BRAND ID
-		# db_row.brand.db_id OR db_row.brand = ..
 		brand_id = await self.get_brand_id(product["brand_name"])
-		db_row.brand.value = brand_id
-		
-		new_id: int = await self._db_thread.query(Products.insert(db_row))
+		db_row.brand.ref_value(Brand).db_id.value = brand_id
+
+		new_id = await self._db_thread.query(Products.insert(db_row))
 
 		return new_id
 	
@@ -157,9 +153,11 @@ class Writer():
 		product_id = None
 		print(existing_links)
 
-		#for link in existing_links:
-		#	if (not link.product.id): continue # type?
-		#	product_id = link.product.?
+		# GET PID FROM LINKS
+		for link in existing_links:
+			pid = link.product.ref_value(Product).db_id
+			if (not ): continue
+			product_id = link.product.?
 
 		if (not product_id):
 			product_id = await self.create_product(product)

@@ -428,6 +428,44 @@ class TableColumn(Generic[T]):
 				"only value holder instances do")
 
 		return self._value
+	
+
+	@property
+	def plain_value(self) -> T | None:
+		"""
+		This attribute returns self.value as usual. Only exists to help with
+		typing when you're certain the `TableColumn` has no reference.
+		"""
+
+		v = self.value
+		
+		if (isinstance(v, TableRow)):
+			raise TypeError(
+				f"Use {self.table.name}.{self.name}.ref_value to get a "
+				"reference, not .plain_value")
+
+		return v
+	
+	def ref_value(self, as_: type[TableRowType]) -> TableRowType:
+		"""
+		This attribute returns self.value as usual. Only exists to help with
+		typing when you're certain the `TableColumn` has a reference.
+
+		Args
+		-------
+		as_: type[TableRow]
+		Type of TableRow to be returned. I'd love pylance to be able to
+		infer this but manually works I guess...
+		"""
+
+		v = self.value
+		
+		if (not isinstance(v, as_)):
+			raise TypeError(
+				f"Use {self.table.name}.{self.name}.plain_value to get a "
+				"value, not .ref_value")
+
+		return v
 
 	@value.setter
 	def value(self, v: T | "TableRow"):
@@ -446,7 +484,7 @@ class TableColumn(Generic[T]):
 				raise TypeError(
 				f"{self} references {ref}, so you cannot set {this}.value, "
 				f"you must use {this}.value.{ref.name}.value even if partial")
-
+			
 			return
 
 		validator = Validator(self.db_type, v)
