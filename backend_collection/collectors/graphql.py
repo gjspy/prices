@@ -28,6 +28,8 @@ class TSCPromoProcessor(PromoProcessor):
 	membership_price_promo_keyword = "clubcard price"
 	multibuy_cheapest_free_keyword = "cheapest product free"
 
+	datetime_fmt = "%Y-%m-%dT%H:%M:%SZ"
+
 	def __init__(self, result: DSA, specific_promo: DSA):
 		super().__init__(result, specific_promo)
 
@@ -172,14 +174,14 @@ class GQLCollector(BaseCollector):
 		if (name_data[0] != 0): return name_data
 
 		# CRUMBS TO FIND INFO
-		size_each = -1
+		size_each = 0
 
 		try: size_each = round(int(result["price"]) / int(result["unitPrice"]))
 		except: pass
 
 		unit = result.get("unitOfMeasure") or ""
 
-		if (size_each == -1): return (-1, 0, "")
+		if (size_each == 0): return (0, 0, "")
 		size_each, unit = standardise_packsize(size_each, unit)
 
 		return (1, size_each, unit)
@@ -193,6 +195,9 @@ class GQLCollector(BaseCollector):
 			result, self._path_price_from_result, {})
 		price_data: DSA | None = sale_data.get("price")
 		if (not price_data): return []
+
+		price = price_data.get("price")
+		if (not price): return []
 
 		rating_data: DSA = safe_deepget(
 			result, self._path_reviews_from_result, {})
@@ -216,7 +221,7 @@ class GQLCollector(BaseCollector):
 			thumb = result.get("defaultImageUrl"), # HAS ICONS :( # TODO: STANDARDISE IMAGE SIZE. TESCO HAVE ?h=x&w=x, ASDA?
 			upcs = [upc] if upc else None,
 			cin = int_safe(result.get("tpnc")), # TSC PROD NUM C, A AND B EXIST, B GIVEN, C = WEBSITE PAGE ID.
-			price_pence = round(float(price_data.get("price") or -1) * 100),
+			price_pence = round(float(price) * 100),
 			is_available = sale_data.get("isForSale") == True, # NOT STOCK LEVELS. THEY'RE PER STORE.
 			rating_avg = rating_data.get("overallRating"),
 			rating_count = rating_data.get("noOfReviews"),

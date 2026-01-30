@@ -27,6 +27,8 @@ Python Package to connect to a MySQL database with ORM.
 """
 import mysql.connector
 from mysql.connector import Error as MySQLError
+import mysql.connector.errorcode as errorcodes
+import mysql.connector.errors as errors
 
 from mysql.connector.abstracts import (
 	MySQLConnectionAbstract, MySQLCursorAbstract)
@@ -36,22 +38,21 @@ from mysql.connector.pooling import PooledMySQLConnection
 from datetime import datetime
 from functools import wraps
 from logging import Logger
-from os import getenv
+from copy import deepcopy
 
 
 from dbmanager.types import (
-	Generic, Type, T, Any, Optional, Literal, Union, overload, TypeVar, Self,
-	Callable,
-	DSS, DSA, QueryParams)
-from dbmanager.misc import (
-	Errors, ExecutionException, ASCENDING_SQL, DESCENDING_SQL, uid)
+	Generic, Any, Optional, Literal, Union, TypeVar, Self, Callable,
 
-TableRowType = TypeVar("TableRowType", bound = "TableRow") # USE TypeVar TO GIVE NICE TYPING FOR SUBCLASSES.
+	DSS, DSA, QueryParams )
+
+from dbmanager.misc import ASCENDING_SQL, DESCENDING_SQL, uid
+
+# USE TypeVar TO GIVE NICE TYPING FOR SUBCLASSES.
+TableRowType = TypeVar("TableRowType", bound = "TableRow") 
+T = TypeVar("T")
 EH = TypeVar("EH", bound = Callable[..., Any])
 
-
-
-FATAL_ERROR_CODES: list[int] = [2006, 2013, 2055]
 MAX_IDLE_TIME: int = 30 # TICKS
 SQL_DATETIME_FMT = "%Y-%m-%d %H:%M:%S"
 
@@ -66,29 +67,35 @@ def error_handling(
 
 	AUTOMATICALLY CLOSES CURSORS AND ROLLS BACK CONNECTIONS.
 	"""
-	is_fatal: bool = type(e) == MySQLError and e.errno in FATAL_ERROR_CODES
-	fatal_str: str = "[FATAL] " if is_fatal else ""
+	is_msql = isinstance(e, MySQLError)
+	is_fatal = is_msql and 2000 <= e.errno < 3000
 
-	connection: MySQLConnectionAbstract | None = None
+	fatal_str: str = (
+		"[FATAL] EXCEPTION WITH DB WHILE TRANSACTING" if is_fatal 
+		else "EXCEPTION WITH DB" )
+
+	connection: Optional[MySQLConnectionAbstract] = None
 
 	try: connection = getattr(self, "connection")
 	except: pass
 
+	if (is_msql):
+		msg = f"{fatal_str} - {e}"
+
+		if (is_fatal): self.logger.critical(msg)
+		else: self.logger.error(msg)
+
 	if (connection and connection.in_transaction):
-		self.logger.exception(
-			f"{fatal_str}EXCEPTION WITH DB WHILE TRANSACTING")
 		connection.rollback()
 		self.close_cursor()
-
-	else: self.logger.exception(f"{fatal_str}EXCEPTION WITH DB")
 
 	#if (is_fatal):
 	#	self.disconnect()
 
-	if (rethrow): raise ExecutionException(e, is_fatal)
+	if (rethrow): raise e
 
 
-def db_error_safe_catcher(func: EH) -> EH:
+def db_error_safe_catcher(func: EH) -> Callable[[Any], EH]:
 	"""
 	Wrapper to catch exceptions raised by various DB methods.
 
@@ -106,10 +113,10 @@ def db_error_safe_catcher(func: EH) -> EH:
 		except Exception as e: # CATCH ERROR CAUSED BY func, HANDLE IT NOW.
 			error_handling(self, e)
 
-	return wrapper # type: ignore[reportReturnType]
+	return wrapper
 
 
-def db_error_catcher_rethrows(func: EH) -> EH:
+def db_error_catcher_rethrows(func: EH) -> Callable[[Any], EH]:
 	"""
 	Wrapper to catch exceptions raised by various DB methods.
 
@@ -127,7 +134,7 @@ def db_error_catcher_rethrows(func: EH) -> EH:
 		except Exception as e: # CATCH ERROR CAUSED BY func, HANDLE IT NOW.
 			error_handling(self, e, True)
 
-	return wrapper # type: ignore[reportReturnType]
+	return wrapper
 
 
 
@@ -173,13 +180,15 @@ class Validator():
 	def BOOL(self): return type(self.value) == bool
 
 	def TIMESTAMP(self): return type(self.value) == str # TODO: make match fmt
+	def DATE(self): return type(self.value) == str # TODO: make match fmt
+	def DATETIME(self): return type(self.value) == str # TODO: make match fmt
 
 	TYPES_CHECKING = Literal[
 		"CHAR", "VARCHAR", "TINYTEXT", "MEDIUMTEXT", "TEXT", "LONGTEXT",
 		"TINYINT", "TINYINT UNSIGNED", "SMALLINT", "SMALLINT UNSIGNED",
 		"MEDIUMINT", "MEDIUMINT UNSIGNED", "INT", "INT UNSIGNED",
 		"BIGINT", "BIGINT UNSIGNED", "FLOAT", "FLOAT UNSIGNED", "BOOL",
-		"TIMESTAMP"]
+		"TIMESTAMP", "DATE", "DATETIME"]
 
 	def is_valid(self):
 		try: return getattr(self, self.db_type)()
@@ -211,12 +220,13 @@ class CMP():
 		self.b = b
 		self.symbol = symbol
 
-	def _convert_to_str(self, v: Union[Any, "TableColumn[Any]"]) -> str:
+	def _convert_to_str(self, v: Any, only_str: bool = True) -> str:
+		
 		if (isinstance(v, datetime)):
 			v = f"{v.strftime(SQL_DATETIME_FMT)}"
 
 		if (not isinstance(v, TableColumn) and not isinstance(v, CMP)):
-			v = f"\'{v}\'" # MUST RUN FOR DATETIME TOO.
+			v = f"'{v}" if only_str else f"%s" # MUST RUN FOR DATETIME TOO.
 
 		if (not isinstance(v, str)): # int, str, float, TableColumn
 			v = str(v) # type: ignore
@@ -225,11 +235,21 @@ class CMP():
 
 
 	def __str__(self):
-		a = self._convert_to_str(self.a)
-		b = self._convert_to_str(self.b)
+		a = self._convert_to_str(self.a, True)
+		b = self._convert_to_str(self.b, True)
 
 
 		return f"({a}{self.symbol}{b})"
+	
+	def get(self):
+		a = self._convert_to_str(self.a, False)
+		b = self._convert_to_str(self.b, False)
+
+		vs: list[Any] = []
+		if (a == "%s"): vs.append(self.a)
+		if (b == "%s"): vs.append(self.b)
+
+		return (f"({a}{self.symbol}{b})", tuple(vs))
 
 
 	# BITWISE OPERATIONS BEING OVERWRITTEN!
@@ -263,6 +283,8 @@ class METHOD(CMP):
 class NOT(METHOD): method = "NOT"
 class UPPER(METHOD): method = "UPPER"
 class LOWER(METHOD): method = "LOWER"
+class MAX(METHOD): method = "MAX"
+class MIN(METHOD): method = "MIN"
 
 
 
@@ -415,7 +437,7 @@ class TableColumn(Generic[T]):
 		self._attr_name = _attr_name
 
 
-	def _set_value(self, v: T | "TableRow", set_changed: bool = True):
+	def _set_value(self, v: Optional[T | "TableRow"], set_changed: bool = True):
 		self._value = v
 		if (set_changed): self._value_changed = True
 
@@ -431,7 +453,7 @@ class TableColumn(Generic[T]):
 	
 
 	@property
-	def plain_value(self) -> T | None:
+	def plain_value(self) -> Optional[T]:
 		"""
 		This attribute returns self.value as usual. Only exists to help with
 		typing when you're certain the `TableColumn` has no reference.
@@ -451,11 +473,13 @@ class TableColumn(Generic[T]):
 		This attribute returns self.value as usual. Only exists to help with
 		typing when you're certain the `TableColumn` has a reference.
 
+		(HATE having this. I don't know what else to do.)
+
 		Args
-		-------
+		--------
 		as_: type[TableRow]
-		Type of TableRow to be returned. I'd love pylance to be able to
-		infer this but manually works I guess...
+			Type of TableRow to be returned. I'd love pylance to be able to
+			infer this but manually works I guess...
 		"""
 
 		v = self.value
@@ -468,7 +492,7 @@ class TableColumn(Generic[T]):
 		return v
 
 	@value.setter
-	def value(self, v: T | "TableRow"):
+	def value(self, v: Optional[T | "TableRow"]):
 		# DO NOT APPLY TO CHILDREN OF UNINSTANTIATED TableRow, OR TEMPLATES.
 		if ((not self._row_instantiated) or self._row_template):
 			raise AttributeError(
@@ -485,6 +509,15 @@ class TableColumn(Generic[T]):
 				f"{self} references {ref}, so you cannot set {this}.value, "
 				f"you must use {this}.value.{ref.name}.value even if partial")
 			
+			return
+		
+		if (v is None):
+			v = self.default
+
+			if (v is None and self._required): raise TypeError(
+				f"TableColumn {self} is required.")
+			
+			self._set_value(v)
 			return
 
 		validator = Validator(self.db_type, v)
@@ -537,6 +570,13 @@ class TableColumn(Generic[T]):
 		
 
 		self._references = other
+	
+	@property
+	def join(self):
+		ref = self.references
+		if (not ref): raise TypeError("No reference.")
+
+		return Join(ref.table, self == ref)
 
 
 	# READ-ONLY FOR THE USER
@@ -583,9 +623,9 @@ class TableColumn(Generic[T]):
 		"""
 
 		return self.__class__(
-			self._db_field, self._db_type, self._py_type, self._required,
+			self._db_field, self._db_type, self._py_type, self._required, # type: ignore[reportArgumentType]
 			self._default_value, self._is_pk,
-			self._references, self._autoincrement, True, True, table, attr # KEEPS OLD TC REFERENCE HERE, TODO: BAD?
+			self._references, self._autoincrement, True, True, table, attr
 		)
 
 	def create_value_holder(self, table: "Table[Any]", attr: str):
@@ -599,9 +639,9 @@ class TableColumn(Generic[T]):
 		"""
 
 		return self.__class__(
-			self._db_field, self._db_type, self._py_type, self._required, 
+			self._db_field, self._db_type, self._py_type, self._required, # type: ignore[reportArgumentType]
 			self._default_value, self._is_pk,
-			self._references, self._autoincrement, True, False, table, attr # KEEPS OLD TC REFERENCE HERE, TODO: BAD?
+			self._references, self._autoincrement, True, False, table, attr
 		)
 
 
@@ -749,15 +789,23 @@ class TableRow():
 			if (not ref): continue
 
 			other_table = ref.table
-			if (not other_table): continue # CONCERNING IF THIS HAPPENS
-
-			"""if (id(self._table) == id(other_table)): # TODO
-				other_table = other_table.as_alias(uid())
-				ref = other_table.row.get_column(ref.name)"""
+			if (not other_table): continue
 
 			joins.append(Join(other_table, v == ref))
 
 		return joins
+	
+	def get_pkey_where_statement(self) -> CMP:
+		where_str: CMP = None # type: ignore
+
+		for pk in self.get_primarykey_fields():
+			col = self.get_column(self.get_col_from_field(pk))
+			if (not col): continue
+
+			if (where_str): where_str = where_str & (col == col.value)
+			else: where_str = (col == col.value)
+		
+		return where_str
 
 
 
@@ -886,8 +934,7 @@ class TableRow():
 		"""
 
 		new: Self = self.new()
-		column_types_applied_to: list[bool] = []
-
+		data = deepcopy(data)
 		print(data)
 
 		for attr in new._columns:
@@ -895,9 +942,9 @@ class TableRow():
 			if (not col): continue
 
 			ref = col.references
-			print(col, ref)
-
 			key = str(col) if from_db else col.name
+			value = data.get(key)
+			print(key, value)
 
 			if (ref):
 				other_row: Self = ref.table.row
@@ -905,23 +952,19 @@ class TableRow():
 
 				if (created.get_primarykey_value() is None):
 					other_col = created.get_column(ref.name)
-					other_col.value = data[key] # type: ignore
+					other_col.value = value # type: ignore
 					created.set_partial(True)
 
 				col.value = created
-				del data[key] # PREVENT INF RECURSION
+				if (value): del data[key] # PREVENT INF RECURSION
 				continue
 
-			
-			value = data.get(key)
 			if (not value): continue
 
 			col.value = value
 			del data[key] # PREVENT INF RECURSION
-			column_types_applied_to.append(col.is_primary_key)
 
 		new.commit() # SAVE CHANGES
-
 		return new
 
 
@@ -938,6 +981,7 @@ class TableRow():
 		"""
 
 		new = self.__class__(self._table, False, self.get_columns())
+		new.commit()
 
 		return new
 
@@ -979,13 +1023,14 @@ class Table(Generic[TableRowType]):
 
 	def select(
 			self,
-			columns: list[TableColumn[Any]] = [],
+			columns: Optional[list[TableColumn[Any] | METHOD]] = None,
 			distinct: bool = False,
-			where: CMP | None = None,
+			where: Optional[CMP] = None,
 			join_all: bool = False,
-			join_on: list[Join] = [],
+			join_on: Optional[list[Join]] = None,
 			limit: int = 1000,
-			order_by: list[TableColumn[Any] | str] = []) -> DSA:
+			order_by: Optional[list[TableColumn[Any] | str]] = None,
+			objectify_results: bool = True) -> DSA:
 		"""
 		### Build `SELECT` STATEMENT. ###
 
@@ -1023,26 +1068,26 @@ class Table(Generic[TableRowType]):
 		>>> 	order_by = [Table1.value1, Table1.value2.ascending])
 		"""
 
+		# SETTING DEFAULT VALUES TO PARAMS AS [] OR {} MAINTAINS REF,
+		# SO NEXT Table.select() WOULD INCLUDE OLD DATA. (ONLY EVALS ONCE)
+		if (not columns): columns = []
+		if (not join_on): join_on = []
+		if (not order_by): order_by = []
+
 		if (join_all): join_on.extend(self.row.get_joins())
 
-		tables_involved: list[Table[Any]] = [
-			self, *( v.joining_table for v in join_on )]
-
-		all_columns: list[TableColumn[Any]] = columns
 		if (not columns):
-			all_columns = []
+			tables_involved: list[Table[Any]] = [
+				self, *( v.joining_table for v in join_on )]
 
 			for v in tables_involved:
-				r: TableRow = v.row
-				cols: list[TableColumn[Any]] = [getattr(r, col) for col in r.get_column_names()]
-
-				all_columns.extend(cols)
+				columns.extend(v.row.get_columns())
 
 		order_by_strs: list[str] = [ str(v) for v in order_by]
 
 
 		# BUILD str STATEMENT:
-		what_to_select = ", ".join( f"{v} AS \'{v}\'" for v in all_columns )
+		what_to_select = ", ".join( f"{v} AS \'{v}\'" for v in columns )
 		distinct_statement = " DISTINCT" if distinct else ""
 
 		sql: str = f"SELECT{distinct_statement} {what_to_select} FROM {self}" # BASE
@@ -1058,15 +1103,21 @@ class Table(Generic[TableRowType]):
 
 		if (limit): sql += f" LIMIT {limit}" # ADD LIMIT
 
-		return {
+		query = {
 			"query": sql + ";",
 			"expect_response": "fetchall",
-			"objectify_from_table": self.name,
-			"debug": ("select", "from " + self.name)
+			"debug": ("SELECT", "from " + self.name)
 		}
 
+		if (objectify_results): query["objectify_from_table"] = self.name
+		return query
 
-	def insert(self, *rows: TableRow) -> DSA:
+
+	def insert(
+			self, *rows: TableRow,
+			on_duplicate_key_query: Optional[DSA] = None,
+			on_duplicate_key_update: Optional[bool] = False) -> DSA:
+
 		""" ### Build `INSERT` STATEMENT. ### """
 		ai_fields = self.row.get_autoincrement_keys()
 		fields = ", ".join(f for f in self.row.get_fields() if (not f in ai_fields))
@@ -1076,12 +1127,32 @@ class Table(Generic[TableRowType]):
 		placeholder_str: str = ("%s, " * n_values)[: -2]
 		values = [ v.to_storable() for v in rows ]
 
-		sql: str = f"INSERT INTO {self.name} ({fields}) VALUES ({placeholder_str});"
+		if ((not on_duplicate_key_query) and on_duplicate_key_update):
+			on_duplicate_key_query = self.update(*rows, for_odk = True)
+
+		if (on_duplicate_key_query):
+			# ADD VALUES TO SUB INTO ODK STATEMENT
+			# TO EVERY STORABLE tuple, INCASE OF many_params
+
+			odk_params = on_duplicate_key_query.get("params")
+			if (odk_params): values = [ (*v, *odk_params) for v in values ]
+			else:
+				values = [
+					(*v, *on_duplicate_key_query["paramses"][i])
+					for i,v in enumerate(values) ]
+				on_duplicate_key_query["query"] = on_duplicate_key_query["queries"][0]
+
+		odk = (
+			f" ON DUPLICATE KEY {on_duplicate_key_query["query"]}"
+			if on_duplicate_key_query else "" )
+
+		sql: str = (f"INSERT INTO {self.name} ({fields}) "
+		f"VALUES ({placeholder_str}){odk};")
 
 		payload: DSA = {
 			"query": sql,
 			"expect_response": "lastrowid",
-			"debug": ("insert", [ type(v).__name__ for v in rows ])
+			"debug": ("INSERT", [ type(v).__name__ for v in rows ])
 		}
 
 		if (len(values) == 1): payload["params"] = values[0]
@@ -1091,9 +1162,82 @@ class Table(Generic[TableRowType]):
 			row.commit() # CLEAR changes.
 
 		return payload
+	
+
+	def update_blanket(
+			self, set_values: list[tuple[TableColumn[T], T]],
+			where: Optional[CMP] = None, for_odk: bool = False):
+		"""
+		### Build `UPDATE` STATEMENT. ###
+		Use this to update MULTIPLE rows based on a `WHERE` statement.
+
+		Args
+		--------
+		where: CMP
+			Statement to select which rows to update.
+		
+		set_values: list[tuple[TableColumn[T], T]]
+			List of k,v tuple pairs to apply to db rows,
+			where k is the TableColumn and v is the value to set.
+		
+		for_odk: bool = False
+			Whether statement will be used with `ON DUPLICATE KEY` in an
+			INSERT query.
+		"""
+
+		set_str = ", ".join( f"{k[0]} = %s" for k in set_values )
+
+		q = (
+			f"UPDATE {set_str}"	if for_odk
+			else f"UPDATE {self.name} SET {set_str};" )
+		
+		if (where and not for_odk): q += f" WHERE {where}"
+
+		return {
+			"query": q,
+			"params": list( k[1] for k in set_values ),
+			"debug": ("UPDATE", [ self.name ])
+		}
+	
+	def delete(
+			self, rows: Optional[list[TableRow]] = None, 
+			where: Optional[CMP] = None, allow_del_all: bool = False):
+		"""
+		### Build `DELETE` STATEMENT. ###
+		Use this to update MULTIPLE rows based on a `WHERE` statement.
+
+		Args
+		--------
+		rows: TableRow
+			Rows to delete (using PKey)
+
+		where: CMP
+			Statement to select which rows to update.
+		
+		allow_del_all: bool = False
+			Whether to allow DELETE without WHERE clause.
+		"""
+
+		if (rows):
+			for row in rows:
+				this_where = row.get_pkey_where_statement()
+
+				if (where): where = where & this_where
+				else: where = this_where
+		
+		where_stmt = str(where)
+		if (not (where_stmt or allow_del_all)): raise ValueError(
+			"No valid WHERE statement for DELETE")
+		
+		if (where_stmt): where_stmt = " WHERE " + where_stmt
+
+		return {
+			"query": f"DELETE FROM {self.name}{where_stmt}",
+			"debug": ("DELETE", [ self.name ])
+		}
 
 
-	def update(self, *rows: TableRow) -> DSA:
+	def update(self, *rows: TableRow, for_odk: bool = False) -> DSA:
 		"""
 		### Build `UPDATE` STATEMENT. ###
 		Only used for updating specific rows based on PKs.
@@ -1112,25 +1256,18 @@ class Table(Generic[TableRowType]):
 			set_str = ", ".join( f"{k} = %s" for k in db_fields_changed )
 			values = tuple(changes.values())
 
-			where_str = ""
+			where = row.get_pkey_where_statement()
 
-			db_fields = row.get_fields()
-
-			pk: str
-			for pk in row.get_primarykey_fields():
-				col = row.get_column(row.get_col_from_field(pk))
-				if (not col): continue
-
-				where_str += f" {col}={col.value}"
-
-			sqls.append(f"UPDATE {self.name} SET {set_str} WHERE{where_str};")
+			sqls.append(
+				f"UPDATE {set_str}" if for_odk else
+				f"UPDATE {self.name} SET {set_str} WHERE {where};")
 			valueses.append(values)
 			row.commit() # CLEAR changes.
 
 		return {
 			"queries": sqls,
 			"paramses": valueses,
-			"debug": ("update", [ type(v).__name__ for v in rows ])
+			"debug": ("UPDATE", [ type(v).__name__ for v in rows ])
 		}
 
 
@@ -1221,8 +1358,8 @@ class Database():
 		"""
 
 		self._config: dict[str, str | int | bool]
-		self._connection: MySQLConnectionAbstract | PooledMySQLConnection | None
-		self._active_cursor: MySQLCursorAbstract | None
+		self._connection: Optional[MySQLConnectionAbstract | PooledMySQLConnection]
+		self._active_cursor: Optional[MySQLCursorAbstract]
 		self._logger: Logger
 		self._time_idle: int
 		self._is_connected: bool
@@ -1286,6 +1423,7 @@ class Database():
 
 	def test_connection(self):
 		assert self._connection, "Connection must be initialised first."
+		self._logger.info("TESTING CONNECTION")
 
 		is_connected: bool = self._connection.is_connected() # PINGS DB
 
@@ -1370,16 +1508,19 @@ class Database():
 
 
 	def _execute_one(
-			self, query: str, params: QueryParams = (),
-			many_params: list[QueryParams] = []):
+			self, query: str, params: Optional[QueryParams] = None,
+			many_params: Optional[list[QueryParams]] = None):
 		"""
 		Execute a single SQL Statement.
 
 		MANY = ONE QUERY, USED FOR MULTIPLE VALUES.
 		NOT MULTIPLE STATEMENTS.
 		"""
+		if (not params): params = ()
+		if (not many_params): many_params = []
 
 		assert self._active_cursor, "There is no active cursor"
+		self.logger.debug(f"{query} < {params} < {many_params}")
 
 		if (many_params): self._active_cursor.executemany(query, many_params)
 		else: self._active_cursor.execute(query, params)
@@ -1388,10 +1529,10 @@ class Database():
 
 	@db_error_catcher_rethrows
 	def execute(
-			self, query: str, params: QueryParams = (),
-			many_params: list[QueryParams] = [], expect_response: str = "",
-			buffered: bool = True, objectify_from_table: str = "",
-			**kwargs: Any):
+			self, query: str, params: Optional[QueryParams] = None,
+			many_params: Optional[list[QueryParams]] = None,
+			expect_response: str = "", buffered: bool = True,
+			objectify_from_table: str = "", **kwargs: Any):
 		"""
 		Execute SQL Statement
 
@@ -1406,7 +1547,7 @@ class Database():
 		query: str or list[str]
 			SQL statement(s) to run.
 
-		params: tuple | None
+		params: Optional[tuple]
 			Parameters to insert into SQL statement
 
 		expect_response: str
@@ -1423,6 +1564,9 @@ class Database():
 			the response as objects [True], or just return the `dict` as
 			provided from cursor.fetchall()
 		"""
+		if (not params): params = ()
+		if (not many_params): many_params = []
+
 
 		assert self.connection, "The database is not connected"
 		if (kwargs):
@@ -1462,7 +1606,7 @@ class Database():
 	@db_error_catcher_rethrows
 	def execute_multiple(
 			self, queries: list[str],
-			paramses: list[QueryParams | list[QueryParams]] = [],
+			paramses: Optional[list[QueryParams | list[QueryParams]]] = None,
 			expect_response: bool = False, buffered: bool = True,
 			objectify_from_table: str = "", **kwargs: Any):
 		"""
@@ -1475,6 +1619,7 @@ class Database():
 		`**kwargs` is included, so this function will ignore extra
 		params in your payload.
 		"""
+		if (not paramses): paramses = []
 
 		assert len(queries) == len(paramses)
 		assert self.connection, "The database is not connected"
@@ -1536,8 +1681,6 @@ class Database():
 			fetched_column_names: list[str]) -> TableRow:
 		""" ### Convert one dictionary result to the object of its table. """
 		table: Optional[Table[Any]] = self._tables.get(table_name)
-
-		print(ms_result)
 
 		assert table, f"objectify: no model for table_name {table_name}"
 		assert len(ms_result) == len(fetched_column_names), \

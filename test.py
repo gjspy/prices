@@ -6,14 +6,16 @@ import copy
 import time
 
 from backend_collection.collectors import algolia, graphql, clusters, akamai, aldi
-from backend_collection.constants import regex
+from backend_collection.constants import regex, StoreNames
 from backend_collection.storer import Writer
+from backend_collection.state import State
 from backend_collection.dbclasses import (
 	Products, ProductLinks, PriceEntries, Ratings, Images,
-	Brands, Stores, Store, Brand)
-from dbmanager.engine import Database
+	Brands, Stores, Store, Brand, Product)
+from dbmanager.engine import Database, LOWER
 from dbmanager.process import DBThread
 
+from backend_collection.types import DSA
 import os
 print(os.getcwd())
 
@@ -22,7 +24,6 @@ env = dotenv_values(".env")
 RESULTS_PER_SEARCH = 100
 
 import sshtunnel
-import logging
 
 from backend_collection.log_handler import logger
 
@@ -38,14 +39,39 @@ DB_SCHM = env["DB_SCHM"]
 
 from dbmanager import misc
 
+tesco = graphql.GQLCollector(env, config, RESULTS_PER_SEARCH) # good cfw
 
+
+
+
+
+raise
+"""
+async def main():
+	result = await tesco.search("cheese", True)
+
+
+	with open(f"TestResult_{int(time.time())}.json", "w") as f:
+		json.dump(result, f, indent = 2)
+
+asyncio.run(main())
+
+raise"""
 
 #print(Brands.row.parent._references)
 #print(Brands.row.new().parent._references)
 #print(Brands.row.parent._references)
 
 #print(id(Brands.row.parent), id(Brands.row.new().parent))
+"""v = Ratings.row.new()
+v.avg.value = 1
+v.count.value = 10
 
+q=Ratings.insert(v, on_duplicate_key_update=True)
+
+print(q)
+"""
+raise
 
 async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	env["DB_PORT"] = tunnel.local_bind_port # type: ignore
@@ -60,10 +86,69 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	DB_PROCESS = DBThread(logger, db, asyncio.get_event_loop())
 	DB_PROCESS.start()
 
+	s = State()
+	s.store_names = {
+		StoreNames.unknown: 0,
+		StoreNames.tesco: 1,
+		StoreNames.asda: 2,
+		StoreNames.morrisons: 3,
+		StoreNames.sainsburys: 4,
+		StoreNames.aldi: 5
+	}
+
+	w = Writer(env, logger, DB_PROCESS, s)
+
+	d = json.load(open("TESCODebugResponse_1769611222j.json","r"))
+	result: list[list[DSA]] = tesco.parse_data(d)
+
+	t = time.time()
+	last = t
+	for i, v in enumerate(result):
+		print(i, v)
+
+		await w.write_storable_group(v)
+
+		this = time.time()
+		print(i, "this took", this - last)
+		last = this
+	
+	print("done omg, all", len(result), "in", time.time() - t)
+
+	try: time.sleep(100)
+	except: pass
+
+	db.disconnect()
+	print("disconnect")
+	#r = await w.get_image_data("")
+	#print(r)
+	#with open("test.png", "wb") as f:
+	#	f.write(r.content)
+	"""q = Brands.select([LOWER(Brands.row.name)], objectify_results=False)
+	print(q)
+	a = await DB_PROCESS.query(q)
+	print(a)
+"""
+
+	return
 	#s = Stores.row.new()
 	#s.name.value = "tesco"
 	#store_id = await DB_PROCESS.query(Stores.insert(s))
 	#print(store_id[0])
+
+	# TODO: test if error thrown by stage does it crash anything?
+	# check how UniqueConstraitn errors are.
+	# write nice error catching for clean logging.
+
+	db_row = Images.row.new()
+	db_row.product_id.plain_value = 1
+	db_row.store.ref_value(Store).db_id.value = 2
+
+	db_row.src.value = "url"
+
+	resp = await DB_PROCESS.query(Images.insert(db_row))
+	print("RESP", resp)
+
+
 
 
 
@@ -74,8 +159,11 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	brand_id = await DB_PROCESS.query(q)
 	print(brand_id)"""
 
-	b = Brands.row.new()
-	b.parent.value = Stores.row.new()
+	#b = Brands.row.new()
+	#b.parent.value = Stores.row.new()
+
+
+	return
 
 	q = Brands.select(where = Brands.row.db_id == 2) # (2 CAT 1) b.parent.value.is_partial() = True
 	#q = Brands.select(where = Brands.row.db_id == 2, join_all=True) # (2 CAT 1)
@@ -155,7 +243,7 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 
 
 
-
+logger.critical("MUST ADD CATEGORIES")
 
 
 with sshtunnel.SSHTunnelForwarder(
@@ -167,6 +255,7 @@ with sshtunnel.SSHTunnelForwarder(
 
 	asyncio.run(main(tunnel))
 
+logger.critical("MUST ADD CATEGORIES")
 
 
 
@@ -175,10 +264,9 @@ with sshtunnel.SSHTunnelForwarder(
 
 
 
-raise
+"""
 
-
-
+# TODO: MEAL DEAL MULTIBUY, STORE "main", "side", "snack", "dessert", "drink"
 
 
 asda = algolia.AlgoliaCollector(env, config, RESULTS_PER_SEARCH) # good cfw
@@ -197,10 +285,11 @@ async def main():
 	with open(f"TestResult_{int(time.time())}.json", "w") as f:
 		json.dump(result, f, indent = 2)
 ##
-asyncio.run(main())
+#asyncio.run(main())
 
 #ata = json.load(open("test.json","r"))
-#print(data, data.get("url"))
+#print(data, data.get("url"))"""
+# TODO: DATETIMES FOR STORING OFFERS.
 
 # TODO: IN STORAGE WRITER, DEAL WITH "NOT NULL". ALDI: RATINGS_COUNT AND AVG DO NOT EXIST, BUT STILL CREATE STORABLE.
 

@@ -1,4 +1,5 @@
 from typing import Any, Callable, Optional
+from datetime import datetime
 import re
 import traceback
 
@@ -28,6 +29,7 @@ class PromoProcessor:
 
 	# USED IN BASE CLASS
 	multibuy_cheapest_free_keyword: str | None = None
+	datetime_fmt: Optional[str] = None
 
 	# ONLY USED IN SUBCLASS
 	membership_price_promo_keyword: str
@@ -55,17 +57,23 @@ class PromoProcessor:
 	
 	@property
 	def promo_start_date(self):
-		return ( 
-			None if (not self.keys.start_date)
-			else self.promo_data.get(self.keys.start_date)
-		)
+		if (not (self.keys.start_date and self.datetime_fmt)): return None
+		
+		v = self.promo_data.get(self.keys.start_date)
+		if (not v): return None
+
+		try: return datetime.strptime(v, self.datetime_fmt)
+		except: pass # TODO: LOG DATETIME FMT IS WRONG
 	
 	@property
 	def promo_end_date(self):
-		return (
-			None if (not self.keys.end_date)
-			else self.promo_data.get(self.keys.end_date)
-		)
+		if (not (self.keys.end_date and self.datetime_fmt)): return None
+		
+		v = self.promo_data.get(self.keys.end_date)
+		if (not v): return None
+
+		return datetime.strptime(v, self.datetime_fmt)
+		#except: pass # TODO: LOG DATETIME FMT IS WRONG
 	
 	@property
 	def promo_requires_membership(self):
@@ -182,7 +190,7 @@ class PromoProcessor:
 		# PROCESSING BY TYPE DID NOT WORK, USE STRAPLINE/DESCRIPTION:
 		if (self.strapline):
 			from_strapline = self._run_strapline_checks()
-			if (from_strapline): return from_strapline
+			if (from_strapline): return {**initial_data, **from_strapline}
 		
 		print(self.strapline)	
 

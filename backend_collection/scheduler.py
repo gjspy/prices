@@ -1,10 +1,11 @@
 from datetime import datetime
 import asyncio
+import json
 
 from dotenv import dotenv_values
 
 
-from dbmanager.engine import Database
+from dbmanager.engine import Database, MAX
 from dbmanager.process import DBThread
 
 
@@ -13,10 +14,15 @@ from backend_collection.collectors import (
 
 from backend_collection.dbclasses import (
 	Products, ProductLinks, PriceEntries, Ratings, Images,
-	Brands, Stores)
+	Brands, Stores,
+	
+	Store)
 
 from backend_collection.log_handler import logger
 from backend_collection.storer import Writer
+from backend_collection.state import State
+
+from backend_collection.constants import utcnow
 
 
 RESULTS_PER_SEARCH = 100
@@ -31,25 +37,40 @@ sns = akamai.AKMCollector(env, config, RESULTS_PER_SEARCH) # bad cfw
 ald = aldi.ALDCollector(env, config, 60) # "Page limit must be equal to some of there values: [12,16,24,30,32,48,60]"
 
 
-class State(): # give same instance to writer and scheduler
-	keywords_done = []
-	time_to_next_batch = 0
-	data_today: dict[int, tuple[int, list[int]]] = {}
-	ids_to_interrogate = []
 
-	def new_batch(self):
-		data_today = {}
-		# set time
 
-	def load(self):
-		' load from json '
 
 
 
 
 class Scheduler():
-	def __init__(self, thread: DBThread):
-		...
+	def __init__(self, thread: DBThread, state: State):
+		self._db_thread = thread
+		self.state = state
+	
+
+	async def init_store_data(self):
+		q = Stores.select()
+		data = await self._db_thread.query(q)
+
+		v: Store
+		for v in data:
+			store_name = v.name.plain_value
+			store_id = v.db_id.plain_value
+
+			if (not (store_name and store_id)): raise Exception(
+				f"FATAL: could not get store_name {store_name} {store_id}"
+				f"{q}")
+			
+			self.state.store_names[store_name] = store_id
+	
+	"""async def init_batch_n(self):
+		q = PriceEntries.select(
+			[MAX(PriceEntries.row.batch)],
+			objectify_results = False)
+		
+		data = await self._db_thread.query(q)
+		self.state.batch = data[0][0]""" # WORKS
 	
 
 

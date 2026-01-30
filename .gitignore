@@ -1,4 +1,5 @@
 *_private.*
+storage/*
 
 .config
 #*DebugResponse_*.json

@@ -1,0 +1,1 @@
+INSERT INTO Stores (SName) VALUES ("UNKNOWN"), ("TESCO"), ("ASDA"), ("MORRISONS"), ("SAINSBURYS"), ("ALDI")

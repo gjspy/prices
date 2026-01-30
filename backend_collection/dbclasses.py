@@ -17,6 +17,7 @@ class Product(TableRow):
 	entry_created = TableColumn("EntryCreatedDate", "TIMESTAMP", datetime) # required false as db default
 	verified = TableColumn("DetailsVerified", "BOOL", bool, default_value = False)
 
+
 class ProductLink(TableRow):
 	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
 	product = TableColumn("PID", "INT UNSIGNED", int, True)
@@ -29,34 +30,43 @@ class PriceEntry(TableRow):
 	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
 	product = TableColumn("PID", "INT UNSIGNED", int, True)
 	store = TableColumn("StoreID", "TINYINT UNSIGNED", int, True)
-	fetched_at = TableColumn("FetchedAt", "TIMESTAMP", datetime) # REQUIRED BUT HAS DEFAULT TODO decide db does it or not?
+	
+	fetched_time = TableColumn("FetchedAt", "TIMESTAMP", datetime) # DB handles default CURRENT_TIMESTAMP
+	fetched_date = TableColumn("FetchedDate", "DATE", datetime) # DB handles default CURRENT_DATE
+
 	price_pence = TableColumn("PricePence", "SMALLINT UNSIGNED", int, True)
-	available = TableColumn("Available", "BOOL", bool)
+	available = TableColumn("Available", "BOOL", bool) # DB handles default True
 
-"""
+
 class Offer(TableRow):
-	table_name = "Offers"
+	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
+	store_given_id = TableColumn("StoreGivenID", "INT UNSIGNED", int, True)
+	store = TableColumn("StoreID", "TINYINT UNSIGNED", int, True)
+	offer_type = TableColumn("OfferType", "TINYINT UNSIGNED", int, default_value = 0) # QUERY "error: true" BY type = 0
+	start_date = TableColumn("StartDate", "DATETIME", datetime)
+	end_date = TableColumn("EndDate", "DATETIME", datetime)
+	
+	requires_membership = TableColumn("RequiresMembership", "BOOL", bool)
+	online_exclusive = TableColumn("OnlineExclusive", "BOOL", bool)
 
-	db_id = TableColumn("ID", int, autoincrement = True)
-	store_given_id = TableColumn("StoreGivenID", int)
-	store = TableColumn("Store", str, True)
-	offer_type = TableColumn("OfferType", str)
-	start_date = TableColumn("StartDate", datetime)
-	end_date = TableColumn("EndDate", datetime)
-	any_count = TableColumn("AnyFor_Count", int)
-	for_price = TableColumn("AnyFor_Price", int)
-	was_price = TableColumn("WasPrice", int)
 
-	# needs OfferHolder, many[offer] -> many[product]
-	# always store offer data in JSON? is fast
-	# have field OfferTypeRecognised in SQL, so all offers stored together (error of offer gathered)
-	# NO, just have OfferType = 0 (unknown)
+class OfferHolder(TableRow):
+	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
+	offer = TableColumn("OfferID", "INT UNSIGNED", int, True)
+	product = TableColumn("PID", "INT UNSIGNED", int, True)
 
-	pkeys = ["ID"]
 
-	class OfferHolder
-	class Label
-"""
+class Label(TableRow):
+	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
+	product = TableColumn("PID", "INT UNSIGNED", int, True)
+	store = TableColumn("StoreID", "TINYINT UNSIGNED", int, True)
+
+	entry_created = TableColumn("CreatedDate", "TIMESTAMP", datetime)
+	entry_verified = TableColumn("VerifiedDate", "TIMESTAMP", datetime)
+
+	label_type = TableColumn("LabelType", "TINYINT UNSIGNED", int, True, 0)
+	param1 = TableColumn("Param1", "TEXT", str, True)
+
 
 class Rating(TableRow):
 	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
@@ -68,24 +78,28 @@ class Rating(TableRow):
 
 class Image(TableRow):
 	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
-	product = TableColumn("PID", "INT UNSIGNED", int, True)
+	product_id = TableColumn("PID", "INT UNSIGNED", int, True) # NO .reference AS CREATES CIRCULAR REF.
 	store = TableColumn("StoreID", "TINYINT UNSIGNED", int, True)
 	src = TableColumn("SourceURL", "TEXT", str, True)
 
 
 class Brand(TableRow):
 	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
-	name = TableColumn("BName", "TINYTEXT", str, True)
+	brand_name = TableColumn("BName", "TINYTEXT", str, True)
+	store = TableColumn("StoreID", "TINYINT UNSIGNED", int, True)
 	parent = TableColumn("ParentID", "INT UNSIGNED", int)
 
 class Store(TableRow):
 	db_id = TableColumn("ID", "INT UNSIGNED", int, primary_key = True, autoincrement = True)
 	name = TableColumn("SName", "TINYTEXT", str, True)
 
+
 Products = Table("Products", Product)
 ProductLinks = Table("ProductLinks", ProductLink)
-PriceEntries = Table("PriceEntries", PriceEntry)
-#Offers = Table("Offers", Offer)
+PriceEntries = Table("Prices", PriceEntry)
+Offers = Table("Offers", Offer)
+OfferHolders = Table("OfferHolders", OfferHolder)
+Labels = Table("Labels", Label)
 Ratings = Table("Ratings", Rating)
 Images = Table("Images", Image)
 Brands = Table("Brands", Brand)
@@ -94,9 +108,9 @@ Stores = Table("Stores", Store)
 Products.row.brand.references = Brands.row.db_id
 Products.row.preferred_thumb.references = Images.row.db_id
 
+Brands.row.store.references = Stores.row.db_id
 Brands.row.parent.references = Brands.row.db_id
 
-# CIRCULAR ProductID
 Images.row.store.references = Stores.row.db_id
 
 ProductLinks.row.product.references = Products.row.db_id
@@ -105,8 +119,15 @@ ProductLinks.row.store.references = Stores.row.db_id
 PriceEntries.row.product.references = Products.row.db_id
 PriceEntries.row.store.references = Stores.row.db_id
 
-# OFFERS
+Offers.row.store.references = Stores.row.db_id
 
+OfferHolders.row.offer.references = Offers.row.db_id
+OfferHolders.row.product.references = Products.row.db_id
+
+Labels.row.product.references = Products.row.db_id
+Labels.row.store.references = Stores.row.db_id
+
+Ratings.row.product.references = Products.row.db_id
 Ratings.row.store.references = Stores.row.db_id
 
 
@@ -118,13 +139,21 @@ class Queries:
 
 	@staticmethod
 	def get_link_by_ids(upcs: list[int], cin: int, store: int):
-		cin_query = (ProductLink.cin == cin) & (ProductLink.store == store)
+		cin_query = (ProductLinks.row.cin == cin) & (ProductLinks.row.store == store)
 
 		if (len(upcs) > 0): return ProductLinks.select(
-			where = (ProductLink.upc.in_(upcs)) | cin_query
+			where = (ProductLinks.row.upc.in_(upcs)) | cin_query
 		)
 
 		return ProductLinks.select(where = cin_query)
+	
+	@staticmethod
+	def get_offer_by_store_data(store_id: int, store_given_id: int):
+		return Offers.select(
+			where = (
+				(Offers.row.store == store_id) &
+				(Offers.row.store_given_id == store_given_id))
+		)
 			
 
 

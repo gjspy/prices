@@ -1,6 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor as TPE
 #from urllib import parse as urlparse
-from asyncio import get_running_loop
 from functools import partial
 from typing import Any, Optional
 from requests import Response
@@ -13,18 +12,8 @@ import re
 from backend_collection.types import Number, DSA
 from backend_collection.constants import (
 	safe_deepget, regex, split_packsize_str, standardise_packsize,
-	stringify_query)
+	stringify_query, async_executor)
 from backend_collection.promo_processor import PromoProcessor
-
-
-# WE HAVE EXECUTOR AS requests IS NOT NATIVELY ASYNCHRONOUS.
-async def async_executor(func: partial[Any]):
-	loop = get_running_loop()
-
-	with TPE() as pool:
-		result = await loop.run_in_executor(pool, func)
-
-	return result
 
 
 class BaseCollector:
@@ -172,10 +161,10 @@ class BaseCollector:
 			- size_each: size of each item formatted to standard unit
 			- standard unit used
 
-			**Invalid inputs do not error, they return (0, -1, "")**
+			**Invalid inputs do not error, they return (0, 0, "")**
 		"""
 
-		if (not packsize): return (0, -1, "")
+		if (not packsize): return (0, 0, "")
 		packsize = packsize.lower() # STANDARD: LOWERCASE
 
 		multi = re.search(regex.PACKSIZE_MULTIPLE, packsize)
@@ -194,9 +183,9 @@ class BaseCollector:
 
 
 		size, unit = split_packsize_str(packsize)
-		if (size != -1): return (1, size, unit)
+		if (size != 0): return (1, size, unit)
 
-		return (0, -1, "")
+		return (0, 0, "")
 
 
 	def parse_data(self, data: DSA) -> list[list[DSA]]:
@@ -223,11 +212,13 @@ class BaseCollector:
 			data, self._path_promos_from_result)
 
 		for promo in (promotions or []):
-			processor = self.PromoProcessor(data, promo)
+				processor = self.PromoProcessor(data, promo)
 
-			try: promo = processor.process_promo()
-			except: pass
-			else: gathered_promos.append(promo)
+			#try:
+				promo = processor.process_promo()
+			#except: pass # TODO log
+			#else: 
+				gathered_promos.append(promo)
 		
 		# RUN ENTIRE
 		#processor = self.PromoProcessor(data, {})
@@ -257,6 +248,7 @@ class BaseCollector:
 			promos: Optional[list[DSA]], 
 			labels: Optional[list[DSA]]) -> list[DSA]:
 		""" Creates `dict` objects ready for databse storage. """
+		print(product_name, promos)
 		
 		product = {
 			"type": "product",
@@ -279,11 +271,8 @@ class BaseCollector:
 			"data": { "upc": upc, "store_name": self.store, "cin": cin }
 		} for upc in upcs] if (upcs) else [{
 			"type": "link",
-			"data": {
-				"store_name": self.store,
-				"cin": cin
-				}
-			}]
+			"data": { "store_name": self.store, "cin": cin }
+		}]
 
 		price = {
 			"type": "price",

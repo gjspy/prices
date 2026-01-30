@@ -9,13 +9,6 @@ DESCENDING_SQL = "DESC"
 CHARS_URLSAFE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890"
 NUMS = "1234567890"
 
-class Errors():
-	PKMissing = "You must define the primary key structure."
-	PKNoPy = "PK is missing a python property."
-	TBNMissing = "You must define the table name."
-	InvalidSortOrder = "sort_order must be {ASCENDING_SQL} or {DESCENDING_SQL} only."
-	NotAI = "Must be an autoincrement value."
-
 class Queue():
 	def __init__(self):
 		self._queue: list[Any]
@@ -50,34 +43,10 @@ class Queue():
 		except: return None
 
 
-class ExecutionException(Exception):
-	def __init__(self, original: Exception, is_fatal: bool):
-		self.original = original
-		self.is_fatal = is_fatal
 
 
-def get_placeholder(field_type: type) -> Any:
-	"""
-	## Gets placeholder value of type. ##
-
-	First attempts running field_type().\n
-	Works for str -> ""\n
-	Works for int -> 0
-
-	If datetime, returns .fromtimestamp(0)
-	"""
-	try: return field_type()
-	except: pass
-
-	if (field_type == datetime):
-		return datetime.fromtimestamp(0)
-	
-	raise TypeError(f"get_placeholder: What is this? {field_type}")
 
 
-def get_k_from_v(d: DSA, value: Any):
-	for k,v in d.items():
-		if (v == value): return k
 
 
 def flatten(ls: Iterable[list[Any]]) -> list[Any]:

@@ -18,7 +18,13 @@ tesco = graphql.GQLCollector(env, config, RESULTS_PER_SEARCH) # good cfw
 #mor = clusters.ClusterCollector(env, config, MORRISONS_ENDPOINT, StoreNames.morrisons, RESULTS_PER_SEARCH) # good cfw
 #sains = akamai.AKMCollector(env, config, SAINSBURYS_ENDPOINT, StoreNames.sainsburys, RESULTS_PER_SEARCH) # bad cfw
 
-async def main():
+
+import re
+
+print(re.sub("", " ", " Italian Mozzarella Cheese"))
+
+raise
+"""async def main():
 	#result = await tesco.search("cheese", True)
 	
 	d = json.load(open("TESCODebugResponse_1765497922j.json","r"))
@@ -27,7 +33,36 @@ async def main():
 	with open(f"TestDSA_{int(time.time())}.json", "w") as f:
 		json.dump(result, f, indent = 2)
 
-asyncio.run(main())
+asyncio.run(main())"""
+
+import requests
+import time
+
+KEYWORD = "crisps"
+N_ITEMS = 60
+
+response = requests.post(
+	"https://xapi.tesco.com",
+	#data = { "operationName": "Search", "query": KEYWORD, "count": N_ITEMS, ... },
+	headers={
+		"Accept": "application/json",
+		"user-agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+		"AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36")
+	}
+)
+
+response = requests.get(
+	(f"https://www.sainsburys.co.uk/groceries-api/gol-services/product/v1/"
+	"product?filter[keyword]={KEYWORD}&page_number=1&page_size={N_ITEMS}"),
+	headers={
+		"Accept": "application/json",
+		"user-agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+		"AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36")
+	}
+)
+
+with open(f"{time.time()}","wb") as f:
+	f.write(response.content)
 
 # TODO: verify UPC, ensure is x digits, incase any change (ASDA IMAGE_ID stress)
 """from urllib import parse

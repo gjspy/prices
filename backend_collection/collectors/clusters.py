@@ -174,8 +174,8 @@ class ClusterCollector(BaseCollector):
 			cin = int_safe(result.get("retailerProductId")),
 			price_pence = price_pence,
 			is_available = result.get("available") == True, # NOT STOCK LEVELS. THEY'RE PER STORE.
-			rating_avg = float(rating_data.get("overallRating") or -1),
-			rating_count = int(rating_data.get("count") or -1),
+			rating_avg = float(rating_data.get("overallRating") or 0),
+			rating_count = int(rating_data.get("count") or 0),
 			category = category,
 			dept = dept,
 			promos = promos_data,

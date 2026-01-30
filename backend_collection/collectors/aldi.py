@@ -32,8 +32,6 @@ class ALDCollector(BaseCollector):
 			"Accept": "application/json"
 		}
 		self._compute_cfw_e(env)
-		print("CFW OFF TEMP")
-		self._cfwt = False
 
 		self.results_per_search = results_per_search
 
@@ -44,8 +42,6 @@ class ALDCollector(BaseCollector):
 			"q": query,
 			"limit": self.results_per_search,
 		}
-	
-		#https://api.aldi.co.uk/v3/product-search?currency=GBP&serviceType=walk-in&q=cheese&limit=30&offset=0&sort=relevance&servicePoint=C092
 
 	def parse_packsize(self, result: DSA, product_name: str):
 		"""

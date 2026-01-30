@@ -1,5 +1,9 @@
-from datetime import time as dtime
+from datetime import datetime, time as dtime, timezone
+from concurrent.futures import ThreadPoolExecutor as TPE
+from functools import partial
 from threading import Thread
+from asyncio import get_running_loop
+import requests
 from typing import Any, Callable, Iterable
 import re
 
@@ -7,9 +11,10 @@ import logging
 import logging.handlers
 
 
-from backend_collection.types import Number, SDG_Key
+from backend_collection.types import Number, SDG_Key, DSA, Optional
 
 COLLECT_START_TIME = "02:00"
+DATE_FMT = "%Y%m%dT%H%M%S"
 
 class StoreNames:
 	unknown = "UNKNOWN"
@@ -42,52 +47,76 @@ class regex:
 	SAVE = rf"save {FRACTION_OR_PERC}"
 
 	# MATCHES DIGITS FOLLOWED BY CHAR UNITS.
-	PACKSIZE_ONE = r"([\d\.]+)([A-z]+)"
-	# MATCHES PACKSIZE_ONE, OR PACKSIZE_ONE WITH A SPACE
-	# (IF IS AT THE END OF STR), MAY HAVE CLOSING BRACKET BEFORE STR END.
-	PACKSIZE_SINGLE = rf"(?:{PACKSIZE_ONE})|(?:([\d\.]+) ?([A-z]+)\)?$)"
-	# SECOND HALF OF MULTI IS SAME AS SINGLE, BUT [A-z] IS OPTIONAL.
-	# SOME WILL GIVE 4x330 BUT NO UNIT. STILL WANT MATCH.
-	PACKSIZE_MULTIPLE = rf"([\d\.]+) ?x ?([\d\.]+)([A-z]*)"
+	PACKSIZE_ONE = r"([\d\.]+) ?([A-z]*)\)?$"
+
+	# "{a} x {b} {unit}", "{a} x {b}", "{a} pack {b} {unit}", "{a} pack {b}"
+	# WHERE EVERY SPACE IS OPTIONAL.
+	# ALLOWS FOR CLOSING BRACKET.
+	# MUST BE END OF STR.
+	PACKSIZE_MULTIPLE = rf"(\d+)(?:(?: ?x ?)|(?: ?pack ?)){PACKSIZE_ONE}"
+
+	ALL_NON_ASCII = r"[^\x00-\x7F]"
+
+print(regex.PACKSIZE_MULTIPLE)
 
 class OFFER_TYPES:
 	unknown = 0
 	any_for = 1
 	simple_reduction = 2
 
+class LABEL_TYPES:
+	unknown = 0
+	price_match = 1
 
-
-LOG_FORMAT = "%(asctime)s - %(levelname)-8s IN %(threadName)-20s :  %(message)s"
-LOG_DATE_FORMAT = "%d-%m-%y %H:%M:%S"
-
-LOG_FORMATTER = logging.Formatter(
-	fmt = LOG_FORMAT,
-	datefmt = LOG_DATE_FORMAT)
-
-class CustomLogFH(logging.handlers.TimedRotatingFileHandler):
-	def __init__(self):
-		super().__init__(
-			filename = "collection.log", # FILENAME
-			when = "midnight", # SWITCH ACTION, HAVE TO SAY THIS AS WELL.
-			utc = True, # TIMEZONE
-			atTime = dtime(23, 55), # TIME TO SWITCH.
-			backupCount = 14 # N OF LOG FILES TO KEEP BEFORE DELETING
-		)
-
-		self.setFormatter(LOG_FORMATTER)
-
-
-	def namer(self, default_name: str) -> str: # type: ignore
-		# EG DEFAULT_NAME: 'collection.log.2025-07-31'
-
-		fn: str; ext: str; date: str
-		fn, ext, date = default_name.split(".")
-
-		return f"{fn}-{date}.{ext}"
+	param_structures: list[tuple[Optional[str]]] = [
+		(None, ), ("matching_store", ) ]
 	
+	n_types = len(param_structures)
 
-class CustomLogSH(logging.StreamHandler):
-	formatter = LOG_FORMATTER
+	@classmethod
+	def get_type(cls, label: DSA):
+		for id_ in range(1, cls.n_types):
+			structure = cls.param_structures[id_]
+			okay = True
+
+			for k in structure:
+				if (k is None): continue
+				if (label.get(k) is not None): continue
+
+				okay = False
+				break
+			
+			if (okay): return id_
+		
+		return 0
+	
+	@classmethod
+	def return_params(cls, label_type: int, label: DSA):
+		structure = cls.param_structures[label_type]
+
+		data: list[Any] = []
+
+		for k in structure:
+			if (k is None):
+				data.append(None)
+				continue
+
+			data.append(label.get(k))
+		
+		return data
+
+
+
+
+# TODO: use this for each keyword!
+# WE HAVE EXECUTOR AS requests IS NOT NATIVELY ASYNCHRONOUS.
+async def async_executor(func: partial[Any]):
+	loop = get_running_loop()
+
+	with TPE() as pool:
+		result = await loop.run_in_executor(pool, func)
+
+	return result
 
 def sdg_dict_filter(filter_key: dict[Any, Any], data: list[Any]):
 	def filterer(v: Any):
@@ -102,7 +131,6 @@ def sdg_dict_filter(filter_key: dict[Any, Any], data: list[Any]):
 		return True
 	
 	return list(filter(filterer, data))[0]
-
 
 
 def safe_deepget(
@@ -143,6 +171,8 @@ def int_safe(value: Any) -> int | None:
 	try: return int(value)
 	except: return None
 
+def utcnow(): return datetime.now(timezone.utc)
+
 
 def pad_list(l: list[Any], value: Any, length: int):
 	"""
@@ -155,19 +185,19 @@ def pad_list(l: list[Any], value: Any, length: int):
 	return l + [value] * (length - len(l)) if (curr_l < length) else l
 
 
-def convert_str_to_pence(value: str | None) -> int:
-	if (value is None): return -1
+def convert_str_to_pence(value: str | None) -> Optional[int]:
+	if (value is None): return None
 
 	if type(value) == int or type(value) == float: # type: ignore [JUST IN CASE]
 		print(f"assuming int value is £ {value}")
 		return value * 100 # pence
 	
-	if (value.startswith(".")): return int_safe(value.replace(".", "")) or -1
-	if ("£" in value): return int_safe(float(value.replace("£", "")) * 100) or -1
-	if ("p" in value): return int_safe(value.replace("p", "")) or -1
+	if (value.startswith(".")): return int_safe(value.replace(".", ""))
+	if ("£" in value): return int_safe(float(value.replace("£", "")) * 100)
+	if ("p" in value): return int_safe(value.replace("p", ""))
 	
 	print(f"assuming int value is £ {value}")
-	return int_safe(float(value) * 100) or -1 # pence
+	return int_safe(float(value) * 100) # pence
 
 def convert_fracorperc_to_perc(value: str):
 	if type(value) == int or type(value) == float: # type: ignore [JUST IN CASE]
@@ -194,7 +224,7 @@ def standardise_packsize(size: str | Number, unit: str):
 		# TODO ASDA: "L" LITRE CAN BE "LT" (MANUAL INPUT OF DATA SOMEWHERE)
 		if ("l" in unit): return (float(size.replace("l","")) * 1000, "ml") 
 	
-	return (-1, "")
+	return (0, "")
 
 
 def split_packsize_str(value: str) -> tuple[float, str]:
@@ -206,8 +236,8 @@ def split_packsize_str(value: str) -> tuple[float, str]:
 	"""
 	value = value.lower()
 
-	match = re.search(regex.PACKSIZE_SINGLE, value)
-	if (not match): return (-1, "")
+	match = re.search(regex.PACKSIZE_ONE, value)
+	if (not match): return (0, "")
 
 	# TWO VERSIONS POSSIBLE TO MATCH, SO 4 GROUPS UNFORTUNATELY.
 	
@@ -217,7 +247,7 @@ def split_packsize_str(value: str) -> tuple[float, str]:
 	size = size or size_
 	unit = unit or unit_
 
-	if (not size or not unit): return (-1, "")
+	if (not size or not unit): return (0, "")
 	
 	standardised = standardise_packsize(size, unit)
 	return standardised
@@ -238,9 +268,13 @@ def clean_product_name(name: str, brand_name: str | None = None):
 
 	DO NOT .lower() the string here. Would lose original case.
 	regexes use `re.IGNORECASE`
+
+	Also uses an expression to remove any non-ascii characters.
+	Helps combat weird formatting.
 	"""
 	name = re.sub(regex.PACKSIZE_MULTIPLE, "", name, flags = re.IGNORECASE)
-	name = re.sub(regex.PACKSIZE_SINGLE, "", name, flags = re.IGNORECASE)
+	name = re.sub(regex.PACKSIZE_ONE, "", name, flags = re.IGNORECASE)
+	name = re.sub(regex.ALL_NON_ASCII, " ", name)
 
 	if (brand_name):
 		# USE re.sub NOT str.replace SO WE CAN re.IGNORECASE!
