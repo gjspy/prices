@@ -220,13 +220,12 @@ class CMP():
 		self.b = b
 		self.symbol = symbol
 
-	def _convert_to_str(self, v: Any, only_str: bool = True) -> str:
-		
+	def _convert_to_str(self, v: Any) -> str:
 		if (isinstance(v, datetime)):
 			v = f"{v.strftime(SQL_DATETIME_FMT)}"
 
 		if (not isinstance(v, TableColumn) and not isinstance(v, CMP)):
-			v = f"'{v}" if only_str else f"%s" # MUST RUN FOR DATETIME TOO.
+			v = f"'{v}" # MUST RUN FOR DATETIME TOO.
 
 		if (not isinstance(v, str)): # int, str, float, TableColumn
 			v = str(v) # type: ignore
@@ -235,21 +234,11 @@ class CMP():
 
 
 	def __str__(self):
-		a = self._convert_to_str(self.a, True)
-		b = self._convert_to_str(self.b, True)
+		a = self._convert_to_str(self.a)
+		b = self._convert_to_str(self.b)
 
 
 		return f"({a}{self.symbol}{b})"
-	
-	def get(self):
-		a = self._convert_to_str(self.a, False)
-		b = self._convert_to_str(self.b, False)
-
-		vs: list[Any] = []
-		if (a == "%s"): vs.append(self.a)
-		if (b == "%s"): vs.append(self.b)
-
-		return (f"({a}{self.symbol}{b})", tuple(vs))
 
 
 	# BITWISE OPERATIONS BEING OVERWRITTEN!
