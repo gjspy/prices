@@ -48,3 +48,5 @@ a = [misc.uid() for i in range(100_000)]
 
 print(len(set(a)) == len(a))
 print(len(set(a)))
+
+creating logo: used google fonts, inkscape to convert font to svg, svgviewer and svgpatheditor
