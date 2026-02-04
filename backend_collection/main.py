@@ -48,8 +48,8 @@ DEBUG = False
 
 # LIST MUST BE IN ORDER
 RUNTIMES = [
-	dtime( 9,00),
-	dtime(20, 2),
+	#dtime( 9,00),
+	dtime(15, 0),
 	#dtime(21,00)
 ]
 
@@ -134,7 +134,9 @@ class Scheduler():
 		for i in range(len(keywords)):
 			kw = keywords[i]
 
-			"""for store in COLLECTORS:
+			self._logger.progress(f"Starting fetch for keyword {kw}")
+
+			for store in COLLECTORS:
 				fetchid = f"{store.store}-{kw}"
 
 				result = await store.search(kw, DEBUG)
@@ -143,7 +145,7 @@ class Scheduler():
 					f"Writing {len(result)} results for Fetch#{fetchid}" )
 
 				asyncio.create_task(
-					self._writer.write_from_search_results(result, fetchid))"""
+					self._writer.write_from_search_results(result, fetchid))
 
 			self._state.now = utcnow()
 			self._state.keywords_todo = keywords[i:] # i IS INCLUSIVE.
