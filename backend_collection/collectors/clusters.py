@@ -1,5 +1,6 @@
 from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.types import DSA, Result, SDG_Key
+from backend_collection.log_handler import CustomLogger
+from backend_collection.types import DSA
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence, clean_product_name,
 	StoreNames, regex, OFFER_TYPES, convert_fracorperc_to_perc)
@@ -81,16 +82,17 @@ class ClusterCollector(BaseCollector):
 
 	_path_best_img_res = ["imageConfig", "availableResolutions",-1]
 	_path_img_format = ["imageConfig", "availableFormats", 0]
-	_path_clean_img = ["imagePaths", -1]
+	_path_clean_img = ["imagePaths", 0]
 	_path_img_url_fmt = "{path}/{resolution}.{fmt}"
 
-	def __init__(self, env: DSA, config: DSA, results_per_search: int):
+	def __init__(
+			self, logger: CustomLogger, env: DSA,
+			config: DSA, results_per_search: int):
+		super().__init__(logger, env, config, results_per_search)
+
 		self._HEADERS = {
 			"Accept": "application/json"
 		}
-		self._compute_cfw_e(env)
-
-		self.results_per_search = results_per_search
 
 		
 	def get_gettable_search_params(self, query: str):
@@ -196,11 +198,10 @@ class ClusterCollector(BaseCollector):
 
 			product: DSA
 			for product in products:
-				#try TODO
-				results.append(self.get_storables_from_result(product))
-				#except Exception as err:
-				#... # TODO LOG, FIGURE LOGGING OUT
-			#	print(err,"err")
+				try:
+					results.append(self.get_storables_from_result(product))
+				except:
+					self._logger.exception(f"COULD NOT GATHER PRODUCT DATA. {self.store}.")
 
 		return results
 

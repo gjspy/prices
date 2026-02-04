@@ -1,10 +1,10 @@
-from typing import Any, Callable, Optional
-from datetime import datetime
-import re
 import traceback
+import re
 
-from backend_collection.constants import regex, convert_str_to_pence, OFFER_TYPES, safe_deepget
-from backend_collection.types import DSA
+from backend_collection.types import  Any, Callable, Optional, DSA
+from backend_collection.constants import (
+	regex, convert_str_to_pence, OFFER_TYPES, get_dt)
+
 
 class InterfacePromoKeys:
 	"""
@@ -28,7 +28,7 @@ class PromoProcessor:
 	keys: InterfacePromoKeys = NotImplemented
 
 	# USED IN BASE CLASS
-	multibuy_cheapest_free_keyword: str | None = None
+	multibuy_cheapest_free_keyword: Optional[str] = None
 	datetime_fmt: Optional[str] = None
 
 	# ONLY USED IN SUBCLASS
@@ -48,32 +48,30 @@ class PromoProcessor:
 			specific_promo.get(self.keys.promo_type) if (self.keys.promo_type)
 			else "") or ""
 
-		self._strapline_checks: list[Callable[[], DSA | None]] = [
+		self._strapline_checks: list[Callable[[], Optional[DSA]]] = [
 			self.check_reduction,
 			self.check_multibuy]
 		
-		self._entire_checks: list[Callable[[], DSA | None]] = []
+		self._entire_checks: list[Callable[[], Optional[DSA]]] = []	
 
-	
+
 	@property
 	def promo_start_date(self):
-		if (not (self.keys.start_date and self.datetime_fmt)): return None
-		
-		v = self.promo_data.get(self.keys.start_date)
-		if (not v): return None
+		if (not self.keys.start_date): return None
 
-		try: return datetime.strptime(v, self.datetime_fmt)
-		except: pass # TODO: LOG DATETIME FMT IS WRONG
+		v = self.promo_data.get(self.keys.start_date)
+		if (not v): return
+		return get_dt(v, self.datetime_fmt or "")
+
+
 	
 	@property
 	def promo_end_date(self):
-		if (not (self.keys.end_date and self.datetime_fmt)): return None
-		
-		v = self.promo_data.get(self.keys.end_date)
-		if (not v): return None
+		if (not self.keys.end_date): return None
 
-		return datetime.strptime(v, self.datetime_fmt)
-		#except: pass # TODO: LOG DATETIME FMT IS WRONG
+		v = self.promo_data.get(self.keys.end_date)
+		if (not v): return
+		return get_dt(v, self.datetime_fmt or "")
 	
 	@property
 	def promo_requires_membership(self):
@@ -100,7 +98,8 @@ class PromoProcessor:
 		}
 	
 
-	def _query_regex(self, expression: str, string: str) -> tuple[Any, ...] | None:
+	def _query_regex(
+			self, expression: str, string: str) -> Optional[tuple[Any, ...]]:
 		""" 
 		Uses `re` to query `string` with `expression`.
 		Automatically converts `string` to all lowercase as standard.
@@ -191,8 +190,6 @@ class PromoProcessor:
 		if (self.strapline):
 			from_strapline = self._run_strapline_checks()
 			if (from_strapline): return {**initial_data, **from_strapline}
-		
-		print(self.strapline)	
 
 		return {
 			**initial_data,
@@ -211,12 +208,3 @@ class PromoProcessor:
 			if (result): gathered.append(result)
 		
 		return gathered
-
-		
-
-		# TODO: ALDI PRICE MATCH
-		# VERIFY IF IS ACTUALLY A PRICE MATCH!! COOL IDEA!!
-		# MORRISONS ALSO HAS PRICE MATCHES.s
-		# CHECK WHEN SETTING PRODUCT PRICE THAT IT IS NON-DISCOUNTED PRICE.
-		# IN PROMO, STORE WAS_PRICE AND NEW_PRICE? IDK WHAT?
-		# TODO: ONLINE EXCLUSIVE

@@ -1,10 +1,10 @@
-from typing import Any, Callable
 from copy import deepcopy
 from uuid import uuid4
-
+import re
 
 from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.types import DSA, Result, SDG_Key
+from backend_collection.log_handler import CustomLogger
+from backend_collection.types import DSA, Optional
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence, 
 	clean_product_name, standardise_packsize, regex, OFFER_TYPES, StoreNames)
@@ -69,6 +69,10 @@ class GQLCollector(BaseCollector):
 	store = StoreNames.tesco
 	endpoint = "https://xapi.tesco.com"
 	http_method = "POST"
+
+	image_size = 1250
+	_image_pattern = r"h=\d+&w=\d+"
+	_image_sub = f"h={image_size}&w={image_size}"
 	
 	_path_results_from_resp = [0, "data", "search", "results"]
 	_path_promos_from_result = ["sellers", "results", 0, "promotions"]
@@ -80,14 +84,16 @@ class GQLCollector(BaseCollector):
 		{"__typename": "CompetitorsInfo"}, "competitors"]
 	
 
-	def __init__(self, env: DSA, config: DSA, results_per_search: int):
+	def __init__(
+			self, logger: CustomLogger, env: DSA,
+			config: DSA, results_per_search: int):
+		super().__init__(logger, env, config, results_per_search)
+		
 		self._HEADERS = {
 			"Accept": "application/json",
 			"x-apikey": config["TESCO_XAPI_KEY"]
 		}
-		self._compute_cfw_e(env)
 
-		self.results_per_search = results_per_search
 		self._base_search_request: list[DSA] = [
 			{
 				"operationName": "Search",
@@ -190,10 +196,10 @@ class GQLCollector(BaseCollector):
 		if (not result.get("node")): return []
 		result = result["node"]
 
-		# TODO: filter list for marketplace?
+		# WARNING ABOUT MARKETPLACE ITEMS. QPs FILTER OUT.
 		sale_data: DSA = safe_deepget(
 			result, self._path_price_from_result, {})
-		price_data: DSA | None = sale_data.get("price")
+		price_data: Optional[DSA] = sale_data.get("price")
 		if (not price_data): return []
 
 		price = price_data.get("price")
@@ -212,13 +218,16 @@ class GQLCollector(BaseCollector):
 
 		upc = int_safe(result.get("gtin"))
 
+		img = result.get("defaultImageUrl") or ""
+		img = re.sub(self._image_pattern, self._image_sub, img)
+
 		return self._build_storables(
 			product_name = clean_product_name(name, brand_name),
 			brand_name = brand_name, # NOT PERFECT BUT ITS SOMETHING
 			ps_count = count, # ONLY IN TITLE.
 			ps_sizeeach = size_each,
 			ps_unit = unit,
-			thumb = result.get("defaultImageUrl"), # HAS ICONS :( # TODO: STANDARDISE IMAGE SIZE. TESCO HAVE ?h=x&w=x, ASDA?
+			thumb = img, # HAS ICONS :(
 			upcs = [upc] if upc else None,
 			cin = int_safe(result.get("tpnc")), # TSC PROD NUM C, A AND B EXIST, B GIVEN, C = WEBSITE PAGE ID.
 			price_pence = round(float(price) * 100),

@@ -1,20 +1,17 @@
-from datetime import datetime, time as dtime, timezone
 from concurrent.futures import ThreadPoolExecutor as TPE
+from datetime import datetime, timezone
+from asyncio import get_running_loop
 from functools import partial
 from threading import Thread
-from asyncio import get_running_loop
-import requests
-from typing import Any, Callable, Iterable
+
 import re
 
-import logging
-import logging.handlers
+from backend_collection.types import (
+	Number, SDG_Key, DSA,
 
+	Any, Callable, Iterable, Optional)
 
-from backend_collection.types import Number, SDG_Key, DSA, Optional
-
-COLLECT_START_TIME = "02:00"
-DATE_FMT = "%Y%m%dT%H%M%S"
+DATE_FMT = "%y%m%dT%H%M%S"
 
 class StoreNames:
 	unknown = "UNKNOWN"
@@ -27,7 +24,8 @@ class StoreNames:
 class regex:
 	"""ALL MATCHES SHOULD USE .lower() FOR THE SEARCH STRING."""
 
-	CLEAN_STR = r"(?: {2,})|(?:^ +)|(?: +$)|(?:\( *\))|(?:\[ *\])|(?:\{ *\})"
+	CLEAN_STR = r"(?:\( *\))|(?:\[ *\])|(?:\{ *\})|(?:^ +)|(?: *,.* *$)"
+	MULTI_SPACES = r" {2,}"
 
 	# MATCHES £4.29, £4, 29p
 	__PRICE = r"(?:£\d+\.\d+)|(?:£\d+)|(?:\d+p)" # DEFINITION, NO CAPTURE
@@ -47,17 +45,21 @@ class regex:
 	SAVE = rf"save {FRACTION_OR_PERC}"
 
 	# MATCHES DIGITS FOLLOWED BY CHAR UNITS.
-	PACKSIZE_ONE = r"([\d\.]+) ?([A-z]*)\)?$"
+	_EOS = r"\)? *$"
+	_CH = r"[,\(\) ]*" # MISC CHARACTERS TO IGNORE
+	_PS_ONE = r"([\d\.]+) ?([A-z]*)" # 
+	PACKSIZE_SINGLE = rf"{_PS_ONE}{_EOS}"
 
 	# "{a} x {b} {unit}", "{a} x {b}", "{a} pack {b} {unit}", "{a} pack {b}"
 	# WHERE EVERY SPACE IS OPTIONAL.
 	# ALLOWS FOR CLOSING BRACKET.
 	# MUST BE END OF STR.
-	PACKSIZE_MULTIPLE = rf"(\d+)(?:(?: ?x ?)|(?: ?pack ?)){PACKSIZE_ONE}"
+	_PS_MULTI = rf"(\d+) *(?:x|pack|pk) *{_PS_ONE}"
+	PACKSIZE_MULTI = rf"(?:(?:{_PS_MULTI}{_CH}{_PS_ONE})|(?:{_PS_MULTI})|(?:{_PS_ONE}{_CH}{_PS_MULTI})){_EOS}"
+	PACKSIZE_MULTI_GROUPS = ["c", "s", "u", "_", "_", "c", "s", "u", "_", "_", "c", "s", "u"]
 
 	ALL_NON_ASCII = r"[^\x00-\x7F]"
 
-print(regex.PACKSIZE_MULTIPLE)
 
 class OFFER_TYPES:
 	unknown = 0
@@ -167,7 +169,7 @@ def choose_child(data: list[Any], check: Callable[[Any], bool]):
 			if (check(child)): return child
 		except: pass
 
-def int_safe(value: Any) -> int | None:
+def int_safe(value: Any) -> Optional[int]:
 	try: return int(value)
 	except: return None
 
@@ -185,18 +187,16 @@ def pad_list(l: list[Any], value: Any, length: int):
 	return l + [value] * (length - len(l)) if (curr_l < length) else l
 
 
-def convert_str_to_pence(value: str | None) -> Optional[int]:
+def convert_str_to_pence(value: Optional[str]) -> Optional[int]:
 	if (value is None): return None
 
 	if type(value) == int or type(value) == float: # type: ignore [JUST IN CASE]
-		print(f"assuming int value is £ {value}")
 		return value * 100 # pence
 	
 	if (value.startswith(".")): return int_safe(value.replace(".", ""))
 	if ("£" in value): return int_safe(float(value.replace("£", "")) * 100)
 	if ("p" in value): return int_safe(value.replace("p", ""))
 	
-	print(f"assuming int value is £ {value}")
 	return int_safe(float(value) * 100) # pence
 
 def convert_fracorperc_to_perc(value: str):
@@ -221,36 +221,10 @@ def standardise_packsize(size: str | Number, unit: str):
 		if ("ml" in unit): return (float(size.replace("ml", "")), "ml")
 
 		if ("g" in unit): return (float(size.replace("g", "")), "g")
-		# TODO ASDA: "L" LITRE CAN BE "LT" (MANUAL INPUT OF DATA SOMEWHERE)
 		if ("l" in unit): return (float(size.replace("l","")) * 1000, "ml") 
 	
 	return (0, "")
 
-
-def split_packsize_str(value: str) -> tuple[float, str]:
-	"""
-	Splits packsize into size and unit.
-	Does not handle multipacks.
-
-	Then uses standardise_packsize to convert to standard units.
-	"""
-	value = value.lower()
-
-	match = re.search(regex.PACKSIZE_ONE, value)
-	if (not match): return (0, "")
-
-	# TWO VERSIONS POSSIBLE TO MATCH, SO 4 GROUPS UNFORTUNATELY.
-	
-	size, unit, size_, unit_ = match.groups()
-
-	# ALWAYS INDEPENDENT OF EACH OTHER. NO WORRY ABOUT CROSSOVER.
-	size = size or size_
-	unit = unit or unit_
-
-	if (not size or not unit): return (0, "")
-	
-	standardised = standardise_packsize(size, unit)
-	return standardised
 
 
 def clean_string(value: str):
@@ -258,11 +232,13 @@ def clean_string(value: str):
 	- Removes preceding, trailing, and double spaces.
 	- Removes empty pairs of (), [], {}
 	"""
+	value = re.sub(regex.CLEAN_STR, "", value)
+	value =  re.sub(regex.MULTI_SPACES, " ", value)
 
-	return re.sub(regex.CLEAN_STR, "", value)
+	return value
 
 
-def clean_product_name(name: str, brand_name: str | None = None):
+def clean_product_name(name: str, brand_name: Optional[str] = None):
 	"""
 	Remove packsize/brand name, and clean string.
 
@@ -272,13 +248,14 @@ def clean_product_name(name: str, brand_name: str | None = None):
 	Also uses an expression to remove any non-ascii characters.
 	Helps combat weird formatting.
 	"""
-	name = re.sub(regex.PACKSIZE_MULTIPLE, "", name, flags = re.IGNORECASE)
-	name = re.sub(regex.PACKSIZE_ONE, "", name, flags = re.IGNORECASE)
+	name = name.replace(",", "")
+	name = re.sub(regex.PACKSIZE_MULTI, " ", name, flags = re.IGNORECASE)
+	name = re.sub(regex.PACKSIZE_SINGLE, " ", name, flags = re.IGNORECASE)
 	name = re.sub(regex.ALL_NON_ASCII, " ", name)
 
 	if (brand_name):
 		# USE re.sub NOT str.replace SO WE CAN re.IGNORECASE!
-		name = re.sub(brand_name, "", name, flags = re.IGNORECASE)
+		name = re.sub(brand_name, " ", name, flags = re.IGNORECASE)
 	
 	name = clean_string(name)
 	return name
@@ -297,6 +274,21 @@ def stringify_query(query_params: dict[str, str | Any], remove_quotes: bool = Fa
 	v = "&".join(f"{k}={repr(v)}" for k,v in query_params.items())
 	return v.replace("'", "") if remove_quotes else v
 
+
+def get_dt(v: Any, dt_fmt: str = ""):
+	try:
+		if (isinstance(v, str)):
+			if (not dt_fmt): raise ValueError("No dt_fmt")
+
+			return datetime.strptime(v, dt_fmt)
+
+		return datetime.fromtimestamp(float(v), timezone.utc)
+
+	except: pass
+
+
+
+
 class TaskThread(Thread):
 	"""
 	Subclassed threading.Thread object, used for running a routine
@@ -314,7 +306,7 @@ class TaskThread(Thread):
 
 		self.value: Any = None
 		self.complete: bool = False
-		self.error: Exception | None = None
+		self.error: Optional[Exception] = None
 
 	
 	def run(self):
@@ -335,5 +327,3 @@ class TaskThread(Thread):
 			self.error = err
 		
 		self.complete = True
-	
-	

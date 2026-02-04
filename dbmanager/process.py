@@ -1,5 +1,5 @@
+from datetime import datetime, timedelta
 from threading import Thread
-from typing import Any
 from logging import Logger
 
 from asyncio import Future, AbstractEventLoop
@@ -10,17 +10,21 @@ import time
 import dbmanager.engine as engine
 import dbmanager.misc as misc
 
-from dbmanager.types import DSA, Optional
+from dbmanager.types import Any, DSA, Optional, DSI
 
 AVG_WORK_SPEED = 1 # SECONDS
 RECONNECTION_WAIT = 5
+
+DUMP_INTERVAL = 30 # SECONDS
+NOTICE_INTERVAL = 60 * 60 # SECONDS
+WAIT_BEFORE_FIRST_NOTICE = 5 * 60 # SECONDS
 
 class DBThread(Thread):
 	"""## Subclassed threading.Thread only for DB process. ##"""
 
 	def __init__(
 			self, logger: Logger, engine_: engine.Database,
-			event_loop: AbstractEventLoop):
+			event_loop: AbstractEventLoop, state_fp: str):
 		"""
 		Args
 		--------
@@ -43,9 +47,10 @@ class DBThread(Thread):
 		self._engine = engine_
 		self._active: bool = False
 		self._event_loop = event_loop
+		
+		self._state_fp = state_fp
 
 	
-
 	@property
 	def logger(self): return self._logger
 
@@ -57,6 +62,50 @@ class DBThread(Thread):
 	def set_logger(self, new: Logger): self._logger = new
 
 
+	def dump(self):
+		data = ""
+
+		for i in self._staged_queue.items():
+			p = i.get("payload")
+			ds = self.get_debug_str(p)
+
+			data += f"#{i.get("id")} {ds}\n"
+		
+		try:
+			with open(self._state_fp, "w") as f:
+				f.write(data)
+
+		except Exception as e:
+			self.logger.error(f"COULD NOT DUMP QUEUE STATE {e}")
+
+
+	def notice(self):
+		data: DSI = {}
+		tot = 0
+		max_id = 0
+
+		for i in self._staged_queue.items():
+			tot += 1
+
+			id_ = i.get("id") or 0
+			if (id_ > max_id): max_id = id_
+
+			s = self.get_debug_str(i.get("payload"))
+
+			if (not data.get(s)): data[s] = 0
+			data[s] += 1
+		
+		v = ",".join(f"{c}x {v}" for v,c in data.items())
+		
+		self.logger.notice( # type: ignore
+			f"{tot} TOTAL ITEMS IN QUEUE NOW, {max_id} MAX ID.\n" + v )
+		
+
+
+
+
+
+
 	@property
 	def event_loop(self): return self._event_loop
 
@@ -65,7 +114,7 @@ class DBThread(Thread):
 		self._event_loop = new
 
 
-	def _get_debug_str(self,  payload_done: DSA) -> str:		
+	def _get_debug_str(self, payload_done: DSA) -> str:		
 		debug_params = payload_done.get("debug")
 		if (not debug_params): return ""
 
@@ -93,6 +142,9 @@ class DBThread(Thread):
 		"select from Users"
 		"""
 
+		if (payload_done is None): # type: ignore
+			return "no payload"
+
 		try: return self._get_debug_str(payload_done)
 		except Exception as err: return f"couldn't get debug str {err}"
 
@@ -108,8 +160,8 @@ class DBThread(Thread):
 		except:
 			# HAS ALREADY BEEN CAUGHT, LOGGED & RETHROWN
 			# NO NEED TO LOG AGAIN.
-			return (False, "error occurred", []) # TODO: WANTED ERRORS? GIVE BACK HERE.
-		
+			return (False, "error occurred", [])
+
 		debug_str = self.get_debug_str(payload)
 		return (True, debug_str, result)
 		
@@ -141,12 +193,12 @@ class DBThread(Thread):
 
 			return True # ACTIVE
 		
-		future: Future[Any] | None = data.get("future")
+		future: Optional[Future[Any]] = data.get("future")
 
 		success, message, result = self.__execute_item(data)
 
 		success_str: str = ""
-		if (success): success_str = f" {len(result)} results returned."
+		if (success): success_str = f", {len(result)} results returned."
 
 		if (future): self._event_loop.call_soon_threadsafe(
 			future.set_result, result)
@@ -154,8 +206,8 @@ class DBThread(Thread):
 		self._staged_queue.remove_first()
 
 		self._logger.info(
-			f"Completed #{next_item.get("id")} ({message}).{self.log_newline}"
-			f"{ql - 1} left. Success: {success}{success_str}")
+			f"Completed #{next_item.get("id")} ({message}){success_str} "
+			f"Success: {success}")
 		
 		return True # ACTIVE
 
@@ -164,7 +216,7 @@ class DBThread(Thread):
 		return self.event_loop.create_future()
 		
 
-	def stage(self, payload: DSA, future: asyncio.Future[Any] | None = None):
+	def stage(self, payload: DSA, future: Optional[Future[Any]] = None):
 		"""
 		Add SQL payloads to queue. You may use this method.
 
@@ -211,7 +263,11 @@ class DBThread(Thread):
 		"""
 		assert self._engine
 
-		self._logger.debug("starting.")
+		self._logger.debug("DB Queue starting.")
+
+		last_dump = datetime.fromtimestamp(0)
+		last_notice = datetime.now() - timedelta(
+			seconds = NOTICE_INTERVAL - WAIT_BEFORE_FIRST_NOTICE)
 
 		while True:
 			if (not self._active): time.sleep(AVG_WORK_SPEED) # PREVENT RAPID-FIRE
@@ -219,6 +275,17 @@ class DBThread(Thread):
 			try:
 				if (not self._engine.is_connected): self._engine.connect()
 				self._active = self._main_process() # PROCESS NEXT QUEUE ITEM
+
+				n = datetime.now()
+
+				if ((n - last_dump).total_seconds() > DUMP_INTERVAL):
+					self.dump()
+					last_dump = n
+				
+				if ((n - last_notice).total_seconds() > NOTICE_INTERVAL):
+					self.notice()
+					last_notice = n
+
 			
 			except Exception as e:
 				self._logger.critical(f"MAIN PROCESS STOPPED, {e}")

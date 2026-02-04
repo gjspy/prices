@@ -34,15 +34,81 @@ meal deal page, comparing them all :)
 FOR STATIC FILES, ON CODE STARTUP GENERATE OPTIMISED VERS (REMOVED WHITESPACE)
 
 
+FRONTEND: SEARCH:
+1) with Keywords MATCH() AGAINST  [fulltext]
+2) with BrandName
+3) with ProductName
+in query, DO ALL and promise.gather(). do LIMIT 50 for each, then pick top X most important.
+SELECT PID, PName, MATCH(PName) AGAINST ('mature cheese') AS Score FROM Products WHERE MATCH(PName) AGAINST ('mature cheese');
+SELECT PID, PName, MATCH(PName) AGAINST ('plant based cheese') AS Score FROM Products WHERE MATCH(PName) AGAINST ('Mature Cheddar Cheese') ORDER BY Score DESC;
+SELECT PID, PName, MATCH(PName) AGAINST ('cheeses') AS Score FROM Products WHERE MATCH(PName) AGAINST ('Mature Cheddar Cheese') ORDER BY Score DESC;
 
+ALLOW USERS TO FLAG WRONG MATCHES (IF LOGGED IN)
 need some cleanup for unlinked products. if one of our productids doesnt have a link, itll never be found in data gathering.
 have in admin panel!
 
 tesco may be seriously different delivery vs instore
 
 
-
+"editor.gotoLocation.alternativeImplementationCommand": "editor.action.goToImplementation"
+"editor.gotoLocation.alternativeDefinitionCommand": "editor.action.goToReferences"CORRECT NOW?
 need some sort of "equivalents" field in link table
 when i start matching own-brand products, don't want to consider them completely identical
 
 ASK: how do upcs work for own-brand?
+
+# TODO: logging and error catching
+# TODO: look at more product cases, see how code responds, different offer types
+# TODO: another addmin action: "return id_ if (id_ is not None) else self._store_data[StoreNames.unknown]" Price STORE is UNKNOWn?
+# TODO: igs to interrogate, where price is old. to define old: last price was over 1 week ago? dont try again?
+# -> for website user search, use available on latest price. tell user last time price was grabbed.
+
+
+02-02-26 19:44:39 - ERROR    IN MainThread           :  Couldn't create offers for P#660 / 'store_given_id'
+TRYING TO FIX THIS, ASDA Rollback DO NOT HAVE STOREGIVENID. SOMETIMES START DATE IS NEGATIVE? WTF?
+NEED TO EXPIRE (SHOWING) OFFERS IF START_DATE IS LONGER THAN 2 WEEKS? BUT NO CUS START DATE IS A YR AGO FOR ASDA. HATE U
+
+
+
+
+
+
+
+
+
+
+
+"logFileHighlighter.customPatterns": [
+		{
+			"pattern": "CRITICAL",
+			"foreground": "#960000"
+		},
+		{
+			"pattern": "ERROR",
+			"foreground": "#964300"
+		},
+		{
+			"pattern": "WARNING",
+			"foreground": "#b9b900"
+		},
+		{
+			"pattern": "PROGRESS",
+			"foreground": "#006ac7"
+		},
+		{
+			"pattern": "NOTICE",
+			"foreground": "#009985"
+		},
+		{
+			"pattern": "INFO",
+			"foreground": "#00a400"
+		},
+		{
+			"pattern": "DEBUG",
+			"foreground": "#003000"
+		}
+		{
+			"pattern": "STATS",
+			"foreground": "#000000"
+		}
+	]

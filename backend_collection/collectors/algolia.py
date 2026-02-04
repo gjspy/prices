@@ -1,8 +1,9 @@
+from datetime import datetime, timedelta
 from copy import deepcopy
-import re
 
 from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.types import Number, DSA
+from backend_collection.log_handler import CustomLogger
+from backend_collection.types import DSA
 from backend_collection.constants import (
 	safe_deepget, int_safe, convert_str_to_pence,
 	clean_product_name, StoreNames, OFFER_TYPES)
@@ -20,6 +21,15 @@ class ASDPromoKeys(InterfacePromoKeys):
 
 class ASDPromoProcessor(PromoProcessor):
 	keys = ASDPromoKeys()
+
+	"""def __init__(self, result: DSA, specific_promo: DSA):
+		super().__init__(result, specific_promo)
+
+		self.promo_id = result["CIN"]""" # NO, only thing that needs this is reduction, and we do those in collecotr.
+
+	"""@property
+	def promo_end_date(self):
+		return super().promo_end_date or datetime.today() + timedelta(1)"""
 
 	# NOTHING EXTRA. WE PROCESS REDUCTION FOR ASD IN BaseCollector SUBCLASS NOW
 
@@ -42,15 +52,17 @@ class AlgoliaCollector(BaseCollector):
 	
 	_path_price_from_result = ["PRICES", "EN"]
 
-	def __init__(self, env: DSA, config: DSA, results_per_search: int):
+	def __init__(
+			self, logger: CustomLogger, env: DSA,
+			config: DSA, results_per_search: int):
+		super().__init__(logger, env, config, results_per_search)
+
 		self._HEADERS = {
 			"Accept": "*/*",
 			"x-algolia-api-key": config["ASDA_ALGOLIA_API_KEY"],
 			"x-algolia-application-id": config["ASDA_ALGOLIA_API_APP"]
 		}
-		self._compute_cfw_e(env)
 
-		self.results_per_search = results_per_search
 		self._base_search_request = {
 			"requests": [
 				{
@@ -139,7 +151,7 @@ class AlgoliaCollector(BaseCollector):
 			) else (pst_count, pst_size_each, pst_unit)
 		)
 	
-	def promo_check_reduction(self, sale_data: DSA):
+	def promo_check_reduction(self, sale_data: DSA, entire_data: DSA):
 		"""
 		Basic reductions ["Rollback", "Dropped"] are described
 		in price field, not as a promotion entry.
@@ -151,7 +163,9 @@ class AlgoliaCollector(BaseCollector):
 		return {
 			"offer_type": OFFER_TYPES.simple_reduction,
 			"was_price": convert_str_to_pence(sale_data.get("WASPRICE") or ""),
-			"reduced_price": convert_str_to_pence(sale_data["PRICE"])
+			"reduced_price": convert_str_to_pence(sale_data["PRICE"]),
+			"store_given_id": int(entire_data["CIN"]),
+			"end_date": datetime.today().date() + timedelta(days = 1)
 		}
 	
 
@@ -172,10 +186,10 @@ class AlgoliaCollector(BaseCollector):
 
 		promos_data = self.process_promos(result)
 
-		reduction = self.promo_check_reduction(sale_data)
+		reduction = self.promo_check_reduction(sale_data, result)
 		if (reduction): promos_data.append(reduction)
 
-		labels: list[DSA] = [] # NOTHIGN TO PUT HERE? NO PRICE MATCHES? (TODO CHECK)
+		labels: list[DSA] = []
 
 		upc = int_safe(image_id)
 

@@ -1,8 +1,7 @@
-from datetime import datetime
-from typing import Any, Iterable
+from copy import deepcopy
 import random
 
-from dbmanager.types import DSA
+from dbmanager.types import Any, Iterable
 
 ASCENDING_SQL = "ASC"
 DESCENDING_SQL = "DESC"
@@ -41,6 +40,14 @@ class Queue():
 	def remove_first(self) -> Any:
 		try: self._queue.pop(0)
 		except: return None
+	
+	def items(self):
+		"""
+		Returns a `deepcopy` of all queue items.
+		You can modify the results of this and it will not
+		change queue contents. Use `.pop()`, `.append`, etc.
+		"""
+		return deepcopy(self._queue)
 
 
 

@@ -6,31 +6,34 @@ import copy
 import time
 
 from backend_collection.collectors import algolia, graphql, clusters, akamai, aldi
-from backend_collection.constants import regex, StoreNames
+from backend_collection.constants import regex, StoreNames, clean_string
 from backend_collection.storer import Writer
 from backend_collection.state import State
 from backend_collection.dbclasses import (
 	Products, ProductLinks, PriceEntries, Ratings, Images,
-	Brands, Stores, Store, Brand, Product)
-from dbmanager.engine import Database, LOWER
+	Brands, Stores, Offers, OfferHolders, Keywords, Labels, Store, Brand, Product, ProductLink)
+from dbmanager.engine import Database, LOWER, NOT
 from dbmanager.process import DBThread
 
 from backend_collection.types import DSA
 import os
-print(os.getcwd())
+import re
 
 config = dotenv_values(".config")
 env = dotenv_values(".env")
 RESULTS_PER_SEARCH = 100
 
+print(os.getcwd())
+
 import sshtunnel
 
-from backend_collection.log_handler import logger
+from backend_collection.log_handler import get_logger
+logger = get_logger()
 
 SSH_USER = env["SSH_USER"]
 SSH_HOST = env["SSH_HOST"]
 SSH_PORT = env["SSH_PORT"]
-SSH_KEY = env["SSH_KEY"]
+SSH_KEY = env["SSH_KEYY"]
 DB_HOST = env["DB_HOST"]
 DB_PORT = env["DB_PORT"]
 DB_USER = env["DB_USER"]
@@ -39,13 +42,26 @@ DB_SCHM = env["DB_SCHM"]
 
 from dbmanager import misc
 
+"""
+asda = algolia.AlgoliaCollector(env, config, RESULTS_PER_SEARCH) # good cfw
 tesco = graphql.GQLCollector(env, config, RESULTS_PER_SEARCH) # good cfw
+mor = clusters.ClusterCollector(env, config, RESULTS_PER_SEARCH) # good cfw
+sains = akamai.AKMCollector(env, config, RESULTS_PER_SEARCH) # bad cfw
+ald = aldi.ALDCollector(env, config, 60) # "Page limit must be equal to some of there values: [12,16,24,30,32,48,60]"
+"""
+#c = (Products.row.brand == 12) | ((Products.row.db_id == 1) & (Products.row.name == "hello"))
+#print(c)
 
 
+#print(re.sub(r"h=\d+&w=\d+", "h=1250&w=1250", "https://digitalcontent.api.tesco.com/v2/media/ghs/020b73bb-fb75-45d6-aced-00bd39f357b1/7d8f014f-d9fa-4df0-92ab-922dea766b5e.jpeg?h=225&w=225"))
+"""TODO:::::::::::::::::::::::::::::::::::::::
+image sizing for asda, sains, ald
+QUERY BY UPC DOESNT WORK? DOESNT EVER PUT IN_?
+THEN RUN AGAIN.
+REMOVE IMG CFW FOR SAINS.
 
 
-
-raise
+"""
 """
 async def main():
 	result = await tesco.search("cheese", True)
@@ -57,6 +73,8 @@ async def main():
 asyncio.run(main())
 
 raise"""
+#print(bool(set([2,3]) - set([1,2,3])))
+#raise
 
 #print(Brands.row.parent._references)
 #print(Brands.row.new().parent._references)
@@ -71,20 +89,28 @@ q=Ratings.insert(v, on_duplicate_key_update=True)
 
 print(q)
 """
-raise
+#print("." + clean_string(" Mature Cheese( ), ") + ".")
+#raise
+
+#print(id(Brands.row.parent.references), id(Brand.parent.references),id(Brands.row.new().parent.references))
+#print(id(ProductLinks.row.store.references), id(ProductLink.store.references),id(ProductLinks.row.new().store.references))
 
 async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	env["DB_PORT"] = tunnel.local_bind_port # type: ignore
+	print(env["DB_PORT"])
 	
 	db = Database.from_env(env, logger)
 	db.declare_tables(
-		Products, ProductLinks, PriceEntries, Ratings, Images, Brands, Stores)
+		Products, ProductLinks, PriceEntries, Ratings, Images, Brands, Stores,
+		Offers, Keywords, OfferHolders, Labels)
 	
 	succ = db.connect()
 	print(succ, "connected:", db.is_connected)
 
-	DB_PROCESS = DBThread(logger, db, asyncio.get_event_loop())
+	DB_PROCESS = DBThread(logger, db, asyncio.get_event_loop(), "state/state.json")
 	DB_PROCESS.start()
+
+	raise
 
 	s = State()
 	s.store_names = {
@@ -98,23 +124,57 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 
 	w = Writer(env, logger, DB_PROCESS, s)
 
-	d = json.load(open("TESCODebugResponse_1769611222j.json","r"))
-	result: list[list[DSA]] = tesco.parse_data(d)
+	"""c = (ProductLinks.row.upc.in_([5057753934453, 5000436510826, 5057967013944])) | ((ProductLinks.row.cin == 1) & (ProductLinks.row.store == 2))
+	print(c)
+	print(c.safe())
+	
+	a = ProductLinks.select(where = c)
+	print(a)
+
+	r = await DB_PROCESS.query(a)
+	print(r)
+
+	time.sleep(10)
+
+	db.disconnect()"""
+
+	#d = json.load(open("TESCODebugResponse_1769611222j.json","r"))
+	#with open("ASDADebugResponse_1770057833j copy.json","r") as f:
+	#with open("TESCODebugResponse_1770120473j.json","r") as f:
+	#with open("ALDIDebugResponse_1770157574j.json","r") as f:
+	with open("SAINSBURYSDebugResponse_1770163260j.json","r") as f:
+		d = json.load(f)
+
+	#result = tesco.parse_data(d)
+	#result = asda.parse_data(d)
+	#result = ald.parse_data(d)
+	result = sains.parse_data(d)
+	#result = await mor.search("bread", True)
+	#result = await asda.search("cheese", True)
+	#result = await tesco.search("cheese", True)
+	#result = await ald.search("cheese", True)
+	#result = await mor.search("cheese", True)
+	#result = await sains.search("cheese", True)
+
 
 	t = time.time()
 	last = t
 	for i, v in enumerate(result):
-		print(i, v)
+		#print(i, v)
+		if (i <= 4): continue
 
-		await w.write_storable_group(v)
+		await w.write_storable_group(v, 1)#1770155790/60/60/24
 
 		this = time.time()
 		print(i, "this took", this - last)
 		last = this
+		break
 	
 	print("done omg, all", len(result), "in", time.time() - t)
 
-	try: time.sleep(100)
+	#try: time.sleep(100) # THIS IS BLOCKING db_thread. TODO ENSURE USING asyncio.sleep()
+	#except: pass
+	try: await asyncio.sleep(1000)
 	except: pass
 
 	db.disconnect()
@@ -135,9 +195,6 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	#store_id = await DB_PROCESS.query(Stores.insert(s))
 	#print(store_id[0])
 
-	# TODO: test if error thrown by stage does it crash anything?
-	# check how UniqueConstraitn errors are.
-	# write nice error catching for clean logging.
 
 	db_row = Images.row.new()
 	db_row.product_id.plain_value = 1
@@ -177,73 +234,9 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 
 
 
-	return
-
-	await manager.write_storable_group([
-    {
-      "type": "product",
-      "data": {
-        "name": "Mature Cheddar Cheese",
-        "brand_name": "CATHEDRAL CITY",
-        "packsize_count": 1,
-        "packsize_sizeeach": 350.0,
-        "packsize_unit": "g"
-      }
-    },
-    {
-      "type": "image",
-      "data": {
-        "url": "https://dm.emea.cms.aldi.cx/is/image/aldiprodeu/product/jpg/scaleWidth/1500/a3a42a2b-c96f-447c-8b7a-336fa01778b2/",
-        "store_name": "ALDI"
-      }
-    },
-    {
-      "type": "price",
-      "data": {
-        "price_pence": 339,
-        "available": True,
-        "store_name": "ALDI"
-      }
-    },
-    {
-      "type": "rating",
-      "data": {
-        "avg": None,
-        "count": None,
-        "store_name": "ALDI"
-      }
-    },
-    {
-      "category": "Chilled Food",
-      "department": "Cheese",
-      "store_name": "ALDI"
-    },
-    {
-      "type": "link",
-      "data": {
-        "store_name": "ALDI",
-        "cin": 482344002
-      }
-    }
-  ])
-	db.disconnect()
-
-	return
-
-	collector = AlgoliaCollector(CONFIG, "ASDA_PRODUCTS", "ASDA", 100)
-
-	storables = await this.search("cheese")
-	print("res",storables)
-
-	print("\n\n\n\n")
-
-	for r in storables:
-		print(r)
 
 
-
-
-logger.critical("MUST ADD CATEGORIES")
+logger.critical("MUST RECREATE TABLES BEFORE DEPLOY, FK DELETED IN Images, NO FKS IN Keywords")
 
 
 with sshtunnel.SSHTunnelForwarder(
@@ -289,11 +282,8 @@ async def main():
 
 #ata = json.load(open("test.json","r"))
 #print(data, data.get("url"))"""
-# TODO: DATETIMES FOR STORING OFFERS.
 
-# TODO: IN STORAGE WRITER, DEAL WITH "NOT NULL". ALDI: RATINGS_COUNT AND AVG DO NOT EXIST, BUT STILL CREATE STORABLE.
 
-# TODO: verify UPC, ensure is x digits, incase any change (ASDA IMAGE_ID stress)
 """from urllib import parse
 
 print(parse.unquote("https&#58;&#47;&#47;errors&#46;edgesuite&#46;net&#47;18&#46;cc61002&#46;1765401432&#46;82c9e435"))
@@ -323,8 +313,6 @@ ASDA and TESCO seem complete:
 	-need to inspect for more offer types
 	-does "Any x for x" correctly, rollbacks correctlys
 	-packsize works
-
-	check TODOS. theres quite a few :)
 
 	
 eventually want to have //TESCO, //ASDA, //MORRISONS, //SAINSBURYS, //ALDI.

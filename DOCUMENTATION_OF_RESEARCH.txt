@@ -50,3 +50,21 @@ print(len(set(a)) == len(a))
 print(len(set(a)))
 
 creating logo: used google fonts, inkscape to convert font to svg, svgviewer and svgpatheditor
+
+FUTURE THING is to interrogate old IDs, quit after X time (2 weeks?) and set as unavailable
+TODO: DESIGN, FSM OF PACKSIZE REGEX!! (MEALY?)
+IN ANALYSIS TALK ABOUT ITERATION OF PROCESSING DIFFERENT REGEXES.
+
+JOB FOR ADMIN: WHEN ps_unit is NULL, or some fields are null.
+JOB FOR ADMIN: linking Brand names. creating Parent. Every actual brand confirmed by admin should be a Parent. Need to confirm Dairylea-ASDA = Dairylea-TESCO. that will be a quick job of click click click.
+JOB FOR ADMIN: linking brand names, when created new Parent, UPDATE Products SET BrandID=ParentID WHERE BrandID=OldBrandID. Bcs if don't then querying by BrandID is bad.
+trying to find duplicate products = SELECT *, COUNT(*) AS C FROM Products GROUP BY PName, PS_Count, PS_SizeEach, BrandID ORDER BY C DESC;
+this does not work if BrandID is different.
+** FOR RESEARCH: REASON DO brands, eg "ESSENTIALS" = ASDA own brand, but aldi also have "ESSENTIALS"? so is dangerous. they are not the same. put StoreID in BRANd for UNIQUE key.
+
+keywords: got list from MOR, 8 thousand
+made algorithm manual, spent an hr doing around 1000, would get quicker but no
+so asked ai and got list.
+testing = 100 per query, each query around 1 minute.
+500 queries = 50000 items, which is 500 minutes, 8 1/3 hrs.
+do this at 9am and 9pm.

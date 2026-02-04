@@ -1,13 +1,8 @@
-from typing import Any, Callable
-from copy import deepcopy
-from uuid import uuid4
-
-
 from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.types import DSA, Result, SDG_Key
+from backend_collection.log_handler import CustomLogger
+from backend_collection.types import DSA, Optional
 from backend_collection.constants import (
-	safe_deepget, int_safe, convert_str_to_pence, 
-	clean_product_name, standardise_packsize, regex, OFFER_TYPES, StoreNames)
+	safe_deepget, int_safe, clean_product_name, StoreNames)
 
 
 # ALDI ARE THE OPPOSITE OF TRYHARDS
@@ -27,13 +22,14 @@ class ALDCollector(BaseCollector):
 	_path_dept_from_result = ["categories", 1, "name"]
 	
 
-	def __init__(self, env: DSA, config: DSA, results_per_search: int):
+	def __init__(
+			self, logger: CustomLogger, env: DSA,
+			config: DSA, results_per_search: int):
+		super().__init__(logger, env, config, results_per_search)
+
 		self._HEADERS = {
 			"Accept": "application/json"
 		}
-		self._compute_cfw_e(env)
-
-		self.results_per_search = results_per_search
 
 	def get_gettable_search_params(self, query: str):
 		return {
@@ -56,7 +52,7 @@ class ALDCollector(BaseCollector):
 		name = result.get("name") or ""
 
 		sale_data: DSA = result.get("price") or {}
-		price: int | None = sale_data.get("amount")
+		price: Optional[int] = sale_data.get("amount")
 		if (not price): return []
 
 		count, size_each, unit = self.parse_packsize(result, name)
@@ -78,7 +74,7 @@ class ALDCollector(BaseCollector):
 			ps_count = count, # ONLY IN TITLE.
 			ps_sizeeach = size_each,
 			ps_unit = unit,
-			thumb = img, # HAS ICONS :( # TODO: STANDARDISE IMAGE SIZE. TESCO HAVE ?h=x&w=x, ASDA?
+			thumb = img, # HAS ICONS :( # TODO: STANDARDISE IMAGE SIZE.
 			upcs = None,
 			cin = int_safe(result.get("sku")),
 			price_pence = price,

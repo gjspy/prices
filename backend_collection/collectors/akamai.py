@@ -1,7 +1,8 @@
 from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.types import DSA, Result, SDG_Key
+from backend_collection.log_handler import CustomLogger
+from backend_collection.types import DSA, Optional
 from backend_collection.constants import (
-	safe_deepget, int_safe, convert_str_to_pence, clean_product_name,
+	safe_deepget, convert_str_to_pence, clean_product_name,
 	regex, OFFER_TYPES, StoreNames, convert_fracorperc_to_perc, clean_string)
 from backend_collection.promo_processor import InterfacePromoKeys, PromoProcessor
 
@@ -19,6 +20,8 @@ class SAIPromoKeys(InterfacePromoKeys):
 
 class SAIPromoProcessor(PromoProcessor):
 	keys = SAIPromoKeys()
+
+	datetime_fmt = "%Y-%m-%dT%H:%M:%SZ"
 
 
 	def check_reduction(self):
@@ -56,7 +59,6 @@ class SAIPromoProcessor(PromoProcessor):
 		"""
 
 		data =  super().check_multibuy()
-		print(data, self.strapline)
 		if (not data): return
 		
 		was = self.promo_data.get("original_price")
@@ -98,15 +100,16 @@ class AKMCollector(BaseCollector):
 	pricematch_keyword = "price match"
 
 
-	def __init__(self, env: DSA, config: DSA, results_per_search: int):
+	def __init__(
+			self, logger: CustomLogger, env: DSA,
+			config: DSA, results_per_search: int):
+		super().__init__(logger, env, config, results_per_search)
+
 		self._HEADERS = {
 			"Accept": "application/json",
 			"User-Agent": "Chrome/143.0.0.0"
 		}
-		self._compute_cfw_e(env)
 		self._cfwt = False # akamai IS API SECURITY ORG. BLOCKS CF.
-
-		self.results_per_search = results_per_search
 
 
 	def get_gettable_search_params(self, query: str):
@@ -134,7 +137,7 @@ class AKMCollector(BaseCollector):
 		matches: list[DSA] = []
 
 		for l in labels:
-			uid: str | None = l.get("label_uid")
+			uid: Optional[str] = l.get("label_uid")
 			if (not uid): continue
 			if (not self.pricematch_keyword in uid.lower()): continue
 

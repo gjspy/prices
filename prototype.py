@@ -64,7 +64,6 @@ response = requests.get(
 with open(f"{time.time()}","wb") as f:
 	f.write(response.content)
 
-# TODO: verify UPC, ensure is x digits, incase any change (ASDA IMAGE_ID stress)
 """from urllib import parse
 
 print(parse.unquote("https&#58;&#47;&#47;errors&#46;edgesuite&#46;net&#47;18&#46;cc61002&#46;1765401432&#46;82c9e435"))

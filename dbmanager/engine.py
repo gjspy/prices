@@ -28,21 +28,21 @@ Python Package to connect to a MySQL database with ORM.
 import mysql.connector
 from mysql.connector import Error as MySQLError
 import mysql.connector.errorcode as errorcodes
-import mysql.connector.errors as errors
+#import mysql.connector.errors as errors
 
 from mysql.connector.abstracts import (
 	MySQLConnectionAbstract, MySQLCursorAbstract)
 from mysql.connector.types import RowType as MySQLRowType
 from mysql.connector.pooling import PooledMySQLConnection
 
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 from logging import Logger
 from copy import deepcopy
 
 
 from dbmanager.types import (
-	Generic, Any, Optional, Literal, Union, TypeVar, Self, Callable,
+	Generic, Any, Optional, Literal, TypeVar, Self, Callable,
 
 	DSS, DSA, QueryParams )
 
@@ -60,7 +60,8 @@ SQL_DATETIME_FMT = "%Y-%m-%d %H:%M:%S"
 # ERROR CATCHING FOR VARIOUS DB METHODS, TO SAVE REWRITING TRY/EXCEPT
 # EVERY TIME.
 def error_handling(
-		self: "Database", e: Exception | MySQLError, rethrow: bool = False):
+		self: "Database", e: Exception | MySQLError, rethrow: bool = False,
+		debug_config: Optional[DSA] = None):
 	"""
 	HANDLES ERRORS FOR DB METHODS
 	PREVENTS WRITING TRY/EXCEPT AROUND EVERY EXECUTION
@@ -68,24 +69,28 @@ def error_handling(
 	AUTOMATICALLY CLOSES CURSORS AND ROLLS BACK CONNECTIONS.
 	"""
 	is_msql = isinstance(e, MySQLError)
-	is_fatal = is_msql and 2000 <= e.errno < 3000
+	is_fatal = is_msql and (2000 <= e.errno < 3000)
+
+	quiet_codes: list[int] = []
+	if (debug_config): quiet_codes = debug_config.get("quiet_codes") or []
+	is_quiet = is_msql and (e.errno in quiet_codes)
 
 	fatal_str: str = (
 		"[FATAL] EXCEPTION WITH DB WHILE TRANSACTING" if is_fatal 
-		else "EXCEPTION WITH DB" )
+		else "QUIET DB EXCEPTION" if is_quiet else "EXCEPTION WITH DB" )
 
 	connection: Optional[MySQLConnectionAbstract] = None
 
 	try: connection = getattr(self, "connection")
 	except: pass
 
-	if (is_msql):
-		msg = f"{fatal_str} - {e}"
+	msg = f"{fatal_str} - {e}"
 
-		if (is_fatal): self.logger.critical(msg)
-		else: self.logger.error(msg)
+	if (is_fatal): self.logger.critical(msg)
+	elif (is_quiet): self.logger.info(msg)
+	else: self.logger.error(msg)
 
-	if (connection and connection.in_transaction):
+	if (is_msql and connection and connection.in_transaction):
 		connection.rollback()
 		self.close_cursor()
 
@@ -111,7 +116,7 @@ def db_error_safe_catcher(func: EH) -> Callable[[Any], EH]:
 			return func(self, *args, **kwargs)
 
 		except Exception as e: # CATCH ERROR CAUSED BY func, HANDLE IT NOW.
-			error_handling(self, e)
+			error_handling(self, e, False, kwargs.get("debug_config"))
 
 	return wrapper
 
@@ -132,7 +137,7 @@ def db_error_catcher_rethrows(func: EH) -> Callable[[Any], EH]:
 			return func(self, *args, **kwargs)
 
 		except Exception as e: # CATCH ERROR CAUSED BY func, HANDLE IT NOW.
-			error_handling(self, e, True)
+			error_handling(self, e, True, kwargs.get("debug_config"))
 
 	return wrapper
 
@@ -179,9 +184,9 @@ class Validator():
 	def FLOAT(self): return type(self.value) == float # I DON'T UNDERSTAND IT SO JUST SAY YES
 	def BOOL(self): return type(self.value) == bool
 
-	def TIMESTAMP(self): return type(self.value) == str # TODO: make match fmt
-	def DATE(self): return type(self.value) == str # TODO: make match fmt
-	def DATETIME(self): return type(self.value) == str # TODO: make match fmt
+	def TIMESTAMP(self): return type(self.value) == str
+	def DATE(self): return type(self.value) == str
+	def DATETIME(self): return type(self.value) == str
 
 	TYPES_CHECKING = Literal[
 		"CHAR", "VARCHAR", "TINYTEXT", "MEDIUMTEXT", "TEXT", "LONGTEXT",
@@ -198,7 +203,11 @@ class Validator():
 
 	def make_valid(self, py_type: type[Any]):
 		if (py_type == datetime):
-			return datetime.strftime(self.value, SQL_DATETIME_FMT)
+			if (isinstance(self.value, datetime)):
+				return datetime.strftime(self.value, SQL_DATETIME_FMT)
+			else:
+				return datetime.fromtimestamp(
+					float(self.value), timezone.utc).strftime(SQL_DATETIME_FMT)
 
 		try: return py_type(self.value)
 		except: return None
@@ -215,30 +224,48 @@ class CMP():
 	Internal, shouldn't usually be created manually outside of dbmanager
 	"""
 
+	_placeholder = "%s"
+
 	def __init__(self, a: Any, b: Any, symbol: str):
 		self.a = a
 		self.b = b
 		self.symbol = symbol
 
-	def _convert_to_str(self, v: Any) -> str:
-		if (isinstance(v, datetime)):
-			v = f"{v.strftime(SQL_DATETIME_FMT)}"
+	def _convert_to_str(
+			self, v: Any, only_str: bool = True) -> str | tuple[str, tuple[Any, ...]]:
 
-		if (not isinstance(v, TableColumn) and not isinstance(v, CMP)):
-			v = f"'{v}" # MUST RUN FOR DATETIME TOO.
+		# WANT TO 'QUOTE' IT, NO RETURN.
+		if (isinstance(v, datetime) and only_str):
+			v = v.strftime(SQL_DATETIME_FMT) 
 
-		if (not isinstance(v, str)): # int, str, float, TableColumn
-			v = str(v) # type: ignore
+		if (isinstance(v, TableColumn)): return str(v) if (only_str) else (f"{v}", tuple()) # type: ignore
+		if (isinstance(v, CMP)):
+			if (only_str): return str(v)
+			return v.safe()
 
-		return v
-
+		return f"'{v}'" if (only_str) else (self._placeholder, tuple())
 
 	def __str__(self):
 		a = self._convert_to_str(self.a)
 		b = self._convert_to_str(self.b)
 
-
 		return f"({a}{self.symbol}{b})"
+	
+	def safe(self) -> tuple[str, tuple[Any, ...]]:
+		a = self._convert_to_str(self.a, False)
+		b = self._convert_to_str(self.b, False)
+
+		values: list[Any] = []
+		values.extend(a[1])
+		if (a[0] == self._placeholder): values.append(self.a)
+		
+		values.extend(b[1])
+		if (b[0] == self._placeholder): values.append(self.b)
+
+		return (f"({a[0]}{self.symbol}{b[0]})", tuple(values))
+		
+
+
 
 
 	# BITWISE OPERATIONS BEING OVERWRITTEN!
@@ -262,6 +289,15 @@ class METHOD(CMP):
 		a = self._convert_to_str(self.a)
 
 		return f"{self.method}({a})"
+	
+	def safe(self):
+		a = self._convert_to_str(self.a, False)
+
+		values: list[Any] = []
+		values.extend(a[1])
+		if (a[0] == self._placeholder): values.append(self.a)
+
+		return (f"{self.method}({a[0]})", tuple(values))
 
 	def __eq__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
 		return CMP(self, value, "=")
@@ -274,6 +310,15 @@ class UPPER(METHOD): method = "UPPER"
 class LOWER(METHOD): method = "LOWER"
 class MAX(METHOD): method = "MAX"
 class MIN(METHOD): method = "MIN"
+
+
+class IN(CMP):
+	def safe(self):
+		assert isinstance(self.b, list), "IN params must be list"
+		self.b: list[Any]
+
+		ph = ((self._placeholder + ", ") * len(self.b))[:-2]
+		return (f"({self.a}{self.symbol}({ph}))", tuple(self.b))
 
 
 
@@ -318,6 +363,18 @@ class Join():
 		if (join_type): join_type += " "
 
 		return f"{join_type}JOIN {self.joining_table.id_statement()} ON {self.condition}"
+	
+	def safe(self):
+		if (isinstance(self.condition, str)): return (str(self), tuple())
+
+		join_type: str = self.join_type
+		if (join_type): join_type += " "
+
+		a = self.condition.safe()
+
+		return (
+			f"{join_type}JOIN {self.joining_table.id_statement()} ON {a[0]}",
+			a[1] )
 
 
 
@@ -369,8 +426,8 @@ class TableColumn(Generic[T]):
 			required: bool = False,
 			default_value: Optional[T] = None,
 			primary_key: bool = False,
-			reference: Optional["TableColumn[Any]"] = None,
 			autoincrement: bool = False,
+			_reference: Optional["TableColumn[Any]"] = None,
 			_row_instantiated: bool = False,
 			_row_template: bool = True,
 			_table: "Table[Any]" = None, # type: ignore[reportArgumentType]
@@ -422,7 +479,7 @@ class TableColumn(Generic[T]):
 		self._value_changed = False
 
 		self._table = _table
-		self._references = reference
+		self._references = _reference
 		self._attr_name = _attr_name
 
 
@@ -536,6 +593,7 @@ class TableColumn(Generic[T]):
 		"""
 
 		# ONLY APPLY REFERENCES TO TableColumn CHILDREN OF INSTANTIATED TableRow
+		# BECAUSE DATA LIKE TC.table IS ADDED AS ROW IS INSTANTIATED.
 		if (not (self.is_row_instantiated and other.is_row_instantiated)):
 			raise AttributeError(
 				"Reference (other) and self must be TableColumns from "
@@ -614,7 +672,7 @@ class TableColumn(Generic[T]):
 		return self.__class__(
 			self._db_field, self._db_type, self._py_type, self._required, # type: ignore[reportArgumentType]
 			self._default_value, self._is_pk,
-			self._references, self._autoincrement, True, True, table, attr
+			self._autoincrement, self._references, True, True, table, attr
 		)
 
 	def create_value_holder(self, table: "Table[Any]", attr: str):
@@ -630,7 +688,7 @@ class TableColumn(Generic[T]):
 		return self.__class__(
 			self._db_field, self._db_type, self._py_type, self._required, # type: ignore[reportArgumentType]
 			self._default_value, self._is_pk,
-			self._references, self._autoincrement, True, False, table, attr
+			self._autoincrement, self._references, True, False, table, attr
 		)
 
 
@@ -647,10 +705,10 @@ class TableColumn(Generic[T]):
 
 
 	def in_(self, objects: list[Any]) -> CMP:
-		return CMP(self, objects, "IN")
+		return IN(self, objects, " IN ")
 
 	def like_(self, objects: list[Any]) -> CMP:
-		return CMP(self, objects, "LIKE")
+		return CMP(self, objects, " LIKE ")
 
 	def __eq__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
 		return CMP(self, value, "=")
@@ -852,7 +910,7 @@ class TableRow():
 			if (this_col and isinstance(value, TableRow)):
 				value = value.get_column(this_col.references.name).value # type: ignore
 
-			storable.append(value) # TODO error if field required and no change
+			storable.append(value)
 
 		return tuple(storable)
 
@@ -924,7 +982,6 @@ class TableRow():
 
 		new: Self = self.new()
 		data = deepcopy(data)
-		print(data)
 
 		for attr in new._columns:
 			col = new.get_column(attr)
@@ -933,7 +990,6 @@ class TableRow():
 			ref = col.references
 			key = str(col) if from_db else col.name
 			value = data.get(key)
-			print(key, value)
 
 			if (ref):
 				other_row: Self = ref.table.row
@@ -945,10 +1001,10 @@ class TableRow():
 					created.set_partial(True)
 
 				col.value = created
-				if (value): del data[key] # PREVENT INF RECURSION
+				if (value is not None): del data[key] # PREVENT INF RECURSION
 				continue
 
-			if (not value): continue
+			if (value is None): continue
 
 			col.value = value
 			del data[key] # PREVENT INF RECURSION
@@ -1017,7 +1073,7 @@ class Table(Generic[TableRowType]):
 			where: Optional[CMP] = None,
 			join_all: bool = False,
 			join_on: Optional[list[Join]] = None,
-			limit: int = 1000,
+			limit: Optional[int] = 1000,
 			order_by: Optional[list[TableColumn[Any] | str]] = None,
 			objectify_results: bool = True) -> DSA:
 		"""
@@ -1072,8 +1128,10 @@ class Table(Generic[TableRowType]):
 			for v in tables_involved:
 				columns.extend(v.row.get_columns())
 
+
 		order_by_strs: list[str] = [ str(v) for v in order_by]
 
+		values: list[Any] = []
 
 		# BUILD str STATEMENT:
 		what_to_select = ", ".join( f"{v} AS \'{v}\'" for v in columns )
@@ -1081,9 +1139,17 @@ class Table(Generic[TableRowType]):
 
 		sql: str = f"SELECT{distinct_statement} {what_to_select} FROM {self}" # BASE
 
-		for join in join_on: sql += f" {join}" # ADD JOINS
+		for join in join_on:
+			safe = join.safe()
 
-		if (where): sql += f" WHERE {where}" # ADD CONDITION
+			sql += f" {safe[0]}" # ADD JOINS
+			values.extend(safe[1])
+
+		if (where):
+			safe = where.safe()
+
+			sql += f" WHERE {safe[0]}" # ADD CONDITION
+			values.extend(safe[1])
 
 		if (order_by_strs):
 			order_by_statement = ", ".join(order_by_strs)
@@ -1094,6 +1160,7 @@ class Table(Generic[TableRowType]):
 
 		query = {
 			"query": sql + ";",
+			"params": values,
 			"expect_response": "fetchall",
 			"debug": ("SELECT", "from " + self.name)
 		}
@@ -1105,7 +1172,8 @@ class Table(Generic[TableRowType]):
 	def insert(
 			self, *rows: TableRow,
 			on_duplicate_key_query: Optional[DSA] = None,
-			on_duplicate_key_update: Optional[bool] = False) -> DSA:
+			on_duplicate_key_update: Optional[bool] = False,
+			quiet_on_duplicate_entry: bool = False) -> DSA:
 
 		""" ### Build `INSERT` STATEMENT. ### """
 		ai_fields = self.row.get_autoincrement_keys()
@@ -1146,6 +1214,11 @@ class Table(Generic[TableRowType]):
 
 		if (len(values) == 1): payload["params"] = values[0]
 		else: payload["many_params"] = values
+
+		if (quiet_on_duplicate_entry):
+			payload["debug_config"] = {
+				"quiet_codes": [ errorcodes.ER_DUP_ENTRY ]
+			}
 
 		for row in rows:
 			row.commit() # CLEAR changes.
@@ -1412,7 +1485,7 @@ class Database():
 
 	def test_connection(self):
 		assert self._connection, "Connection must be initialised first."
-		self._logger.info("TESTING CONNECTION")
+		self._logger.debug("TESTING CONNECTION")
 
 		is_connected: bool = self._connection.is_connected() # PINGS DB
 
@@ -1511,6 +1584,8 @@ class Database():
 		assert self._active_cursor, "There is no active cursor"
 		self.logger.debug(f"{query} < {params} < {many_params}")
 
+		self.logger.add_to_stats("DBQUERY") # type: ignore
+
 		if (many_params): self._active_cursor.executemany(query, many_params)
 		else: self._active_cursor.execute(query, params)
 
@@ -1559,8 +1634,8 @@ class Database():
 
 		assert self.connection, "The database is not connected"
 		if (kwargs):
-			ignored: list[Any] = list(kwargs.keys())
-			self.logger.debug(f"Ignoring {ignored} kwargs..")
+			ignored = set(kwargs.keys()) - {'debug', 'debug_config'}
+			if (ignored): self.logger.debug(f"Ignoring {ignored} kwargs..")
 
 		result: list[Any] = []
 
@@ -1597,7 +1672,8 @@ class Database():
 			self, queries: list[str],
 			paramses: Optional[list[QueryParams | list[QueryParams]]] = None,
 			expect_response: bool = False, buffered: bool = True,
-			objectify_from_table: str = "", **kwargs: Any):
+			objectify_from_table: str = "", 
+			**kwargs: Any):
 		"""
 		Execute multiple SQL statements.
 		If you want to execute one statement for multiple params,
@@ -1613,8 +1689,8 @@ class Database():
 		assert len(queries) == len(paramses)
 		assert self.connection, "The database is not connected"
 		if (kwargs):
-			ignored: list[Any] = list(kwargs.keys())
-			self.logger.debug(f"Ignoring {ignored} kwargs..")
+			ignored = set(kwargs.keys()) - {'debug', 'debug_config'}
+			if (ignored): self.logger.debug(f"Ignoring {ignored} kwargs..")
 
 		result: list[Any]
 

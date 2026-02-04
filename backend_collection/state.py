@@ -1,20 +1,23 @@
 from datetime import datetime
+from os import path
 import json
+
+from backend_collection.constants import DATE_FMT
 
 
 class State(): # give same instance to writer and scheduler
-	STATE_FILE = "state.json"
+	STATE_FILE = path.join("state", "state.json")
 
 	keywords_todo: list[str] = []
 	ids_todo: list[int] = []
 
 	now: datetime
 	time_next_batch: datetime
-	batch: int = 0
+	session: int = 0
 
 	store_names: dict[str, int] = {}
 
-	keys = ["keywords_todo", "ids_todo", "now", "time_next_batch", "store_names"]
+	keys = ["keywords_todo", "now", "time_next_batch", "session", "store_names"]
 
 	def new_batch(self):
 		data_today = {}
@@ -26,6 +29,9 @@ class State(): # give same instance to writer and scheduler
 
 		for k in self.keys:
 			v = getattr(self, k)
+
+			if (isinstance(v, datetime)):
+				v = v.strftime(DATE_FMT)
 
 			data[k] = v
 		
@@ -42,7 +48,19 @@ class State(): # give same instance to writer and scheduler
 		
 		for k in self.keys:
 			v = data.get(k)
-			if (not v): continue
+			
+			if (v is None):
+				try: 
+					curr = getattr(self, k)
+					if (curr is not None): continue
+				except: pass
+
+				setattr(self, k, v)
+				continue
+
+			type_ = self.__annotations__[k]
+			if (type_ == datetime):
+				v = datetime.strptime(v, DATE_FMT)
 
 			setattr(self, k, v)
 

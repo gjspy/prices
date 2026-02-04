@@ -1,7 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor as TPE
-#from urllib import parse as urlparse
 from functools import partial
-from typing import Any, Optional
 from requests import Response
 import requests
 import time
@@ -9,11 +6,12 @@ import json
 import re
 
 
-from backend_collection.types import Number, DSA
-from backend_collection.constants import (
-	safe_deepget, regex, split_packsize_str, standardise_packsize,
-	stringify_query, async_executor)
+from backend_collection.types import Any, Optional, Number, DSA
 from backend_collection.promo_processor import PromoProcessor
+from backend_collection.log_handler import CustomLogger
+from backend_collection.constants import (
+	safe_deepget, regex, standardise_packsize,
+	stringify_query, async_executor)
 
 
 class BaseCollector:
@@ -31,6 +29,14 @@ class BaseCollector:
 
 	_path_results_from_resp: list[Any]
 	_path_promos_from_result: list[Any]
+
+	def __init__(
+			self, logger: CustomLogger, env: DSA,
+			config: DSA, results_per_search: int):
+
+		self._logger = logger
+		self.results_per_search = results_per_search
+		self._compute_cfw_e(env)
 
 	async def __request(self, options: DSA):
 		if (not self._cfwt):
@@ -61,13 +67,14 @@ class BaseCollector:
 			json = d,
 			headers =  self.__cfwa)
 		
+		self._logger.add_to_stats(f"NETWORKREQ{self.store}")
+		
 		result = await async_executor(f)
 		return result
 
 
 	async def _get(
 			self, query_params: dict[str, str] = {}) -> Response:
-		print(stringify_query(query_params,))
 		
 		r = await self.__request({
 			"m": "GET",
@@ -149,7 +156,7 @@ class BaseCollector:
 		raise NotImplementedError
 	
 
-	def _parse_packsize_str(self, packsize: str | None) -> tuple[int, Number, str]:
+	def _parse_packsize_str(self, packsize: Optional[str]) -> tuple[int, Number, str]:
 		"""
 		This method parses an individual PACKSIZE string, to separate values:
 
@@ -163,33 +170,46 @@ class BaseCollector:
 
 			**Invalid inputs do not error, they return (0, 0, "")**
 		"""
-
 		if (not packsize): return (0, 0, "")
-		packsize = packsize.lower() # STANDARD: LOWERCASE
+		packsize = packsize.replace(",", "")
 
-		multi = re.search(regex.PACKSIZE_MULTIPLE, packsize)
+		multi = re.search(regex.PACKSIZE_MULTI, packsize, flags = re.IGNORECASE)
 
 		if (multi):
-			count, size_each, unit = multi.groups()
+			groups = multi.groups()
+
+			data: DSA = {}
+
+			for i, k in enumerate(regex.PACKSIZE_MULTI_GROUPS):
+				if (k == "_"): continue
+				if (data.get(k) is not None): continue
+
+				data[k] = groups[i]
+			
+			count = data.get("c") or 0
+			size_each = data.get("s") or 0
+			unit = data.get("u")
 
 			if (unit):
-				print("unit", unit)
-				# TODO THEY GIVE "2L" OR "8X330".
-				# NO UNIT ON MULTIs. IN ADMIN PANEL, WRITE THEM.
 				size_each, unit = standardise_packsize(size_each, unit)
 				return (int(count), size_each, unit)
 			
 			return (int(count), float(size_each), "")
 
+		match = re.search(regex.PACKSIZE_SINGLE, packsize, flags = re.IGNORECASE)
+		if (not match): return (0, 0, "")
 
-		size, unit = split_packsize_str(packsize)
+		size_, unit_ = match.groups()
+		if (not size_ or not unit_): return (0, 0, "")
+		
+		size, unit = standardise_packsize(size_, unit_)
 		if (size != 0): return (1, size, unit)
 
 		return (0, 0, "")
 
 
 	def parse_data(self, data: DSA) -> list[list[DSA]]:
-		results: list[DSA] | None
+		results: Optional[list[DSA]]
 		results = safe_deepget(data, self._path_results_from_resp)
 
 		if (not results): return []
@@ -197,11 +217,11 @@ class BaseCollector:
 		clean_datas: list[list[DSA]] = []
 
 		for result in results:
-			#try:
+			try:
 				clean_datas.append(self.get_storables_from_result(result))
-			#except Exception as err:
-				#... # TODO LOG, FIGURE LOGGING OUT
-			#	print(err,"err")
+			except:
+				self._logger.exception(
+					f"COULD NOT GATHER PRODUCT DATA. {self.store}.")
 
 		return clean_datas
 
@@ -212,19 +232,14 @@ class BaseCollector:
 			data, self._path_promos_from_result)
 
 		for promo in (promotions or []):
-				processor = self.PromoProcessor(data, promo)
+			processor = self.PromoProcessor(data, promo)
 
-			#try:
+			try:
 				promo = processor.process_promo()
-			#except: pass # TODO log
-			#else: 
+			except Exception as e: 
+				self._logger.error(f"ERROR GETTING PROMO DATA {promo} / {e}")
+			else: 
 				gathered_promos.append(promo)
-		
-		# RUN ENTIRE
-		#processor = self.PromoProcessor(data, {})
-		#other = processor.run_entire_checks()
-
-		#if (other): gathered_promos = [*gathered_promos, *other]
 
 		return gathered_promos
 	
@@ -248,7 +263,6 @@ class BaseCollector:
 			promos: Optional[list[DSA]], 
 			labels: Optional[list[DSA]]) -> list[DSA]:
 		""" Creates `dict` objects ready for databse storage. """
-		print(product_name, promos)
 		
 		product = {
 			"type": "product",
@@ -263,7 +277,7 @@ class BaseCollector:
 
 		image = {
 			"type": "image",
-			"data": { "url": thumb, "store_name": self.store }
+			"data": { "url": thumb }
 		}
 
 		links = [{
@@ -278,8 +292,7 @@ class BaseCollector:
 			"type": "price",
 			"data": {
 				"price_pence": price_pence,
-				"available": is_available,
-				"store_name": self.store
+				"available": is_available
 			}
 		}
 
@@ -287,15 +300,15 @@ class BaseCollector:
 			"type": "rating",
 			"data": {
 				"avg": rating_avg,
-				"count": rating_count,
-				"store_name": self.store
+				"count": rating_count
 			}
 		}
 
 		cat = {
-			"category": category,
-			"department": dept,
-			"store_name": self.store
+			"type": "keywords",
+			"data": {
+				"value": f"{category} {dept}"
+			}
 		}
 
 		promo_objs = [ { "type": "offer", "data": v } for v in (promos or []) ]
@@ -329,8 +342,8 @@ class BaseCollector:
 
 		try:
 			data = self._load_data_from_response(result)
-		except Exception as err:
-			print("error loading JSON from response", err)
+		except:
+			self._logger.exception("COULD NOT LOAD JSON FROM RESP")
 
 		if (debug):
 			with open(
