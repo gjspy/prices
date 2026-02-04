@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/home/user/prices
-ExecStart=/home/user/prices/.venv/bin/python -m /home/user/prices/main.py
+ExecStart=/home/user/prices/.venv/bin/python -m /home/user/prices/backend_collection/main.py
 Restart=always
 Environment=PYTHONUNBUFFERED=1
 
