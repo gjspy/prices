@@ -351,7 +351,7 @@ class BaseCollector:
 			path = os.path.join(self.DEBUG_FILE_DIR,
 				f"{now}_{self.store}_SEARCH_{query}.json" )
 
-			with open(path, "w") as f: json.dump(data, f)
+			with open(path, "w") as f: json.dump(data, f, default = str)
 		
 		if (not data): return []
 
@@ -361,6 +361,6 @@ class BaseCollector:
 			path = os.path.join(self.DEBUG_FILE_DIR,
 				f"{now}_{self.store}_SEARCH_{query}_GATHERED.json")
 			
-			with open(path, "w") as f: json.dump(storables, f)
+			with open(path, "w") as f: json.dump(storables, f, default = str)
 
 		return storables
