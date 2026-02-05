@@ -46,7 +46,7 @@ class regex:
 
 	# MATCHES DIGITS FOLLOWED BY CHAR UNITS.
 	_EOS = r"\)? *$"
-	_CH = r"[,\(\) ]*" # MISC CHARACTERS TO IGNORE
+	_CH = r"[,\(\) ]" # MISC CHARACTERS TO IGNORE
 	_PS_ONE = r"([\d\.]+) ?([A-z]*)" # 
 	PACKSIZE_SINGLE = rf"{_PS_ONE}{_EOS}"
 
@@ -55,7 +55,7 @@ class regex:
 	# ALLOWS FOR CLOSING BRACKET.
 	# MUST BE END OF STR.
 	_PS_MULTI = rf"(\d+) *(?:x|pack|pk) *{_PS_ONE}"
-	PACKSIZE_MULTI = rf"(?:(?:{_PS_MULTI}{_CH}{_PS_ONE})|(?:{_PS_MULTI})|(?:{_PS_ONE}{_CH}{_PS_MULTI})){_EOS}"
+	PACKSIZE_MULTI = rf"(?:(?:{_PS_MULTI}{_CH}+{_PS_ONE})|(?:{_PS_MULTI})|(?:{_PS_ONE}{_CH}+{_PS_MULTI})){_EOS}"
 	PACKSIZE_MULTI_GROUPS = ["c", "s", "u", "_", "_", "c", "s", "u", "_", "_", "c", "s", "u"]
 
 	ALL_NON_ASCII = r"[^\x00-\x7F]"
@@ -250,17 +250,17 @@ def clean_product_name(name: str, brand_name: Optional[str] = None):
 	"""
 
 	new = name.replace(",", "")
-	new = re.sub(regex.PACKSIZE_MULTI, " ", name, flags = re.IGNORECASE)
-	new = re.sub(regex.PACKSIZE_SINGLE, " ", name, flags = re.IGNORECASE)
-	new = re.sub(regex.ALL_NON_ASCII, " ", name)
+	new = re.sub(regex.PACKSIZE_MULTI, " ", new, flags = re.IGNORECASE)
+	new = re.sub(regex.PACKSIZE_SINGLE, " ", new, flags = re.IGNORECASE)
+	new = re.sub(regex.ALL_NON_ASCII, " ", new)
 
 	if (brand_name):
 		# USE re.sub NOT str.replace SO WE CAN re.IGNORECASE!
-		new = re.sub(brand_name, " ", name, flags = re.IGNORECASE)
+		new = re.sub(re.escape(brand_name), " ", new, flags = re.IGNORECASE)
 	
-	new = clean_string(name)
+	new = clean_string(new)
 
-	if (not new or new == " "): return name
+	if ((not new) or new == " "): return name
 	return new
 
 

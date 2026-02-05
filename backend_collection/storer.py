@@ -257,11 +257,11 @@ class Writer():
 
 
 
-	def create_link(self, product_id: int, link: DSA):
+	def create_link(self, product_id: int, link: DSA, store_id: int):
 		db_row = ProductLinks.row.new()
 
 		db_row.product.ref_value(Product).db_id.value = product_id
-		db_row.store.ref_value(Store).db_id.value = self.get_store_id(link["store_name"])
+		db_row.store.ref_value(Store).db_id.value = store_id
 
 		db_row.cin.value = link["cin"]
 
@@ -432,7 +432,7 @@ class Writer():
 
 		if (not product_id):
 			product_id = await self.create_product(product, store_id)
-			for link in links: self.create_link(product_id, link["data"])
+			for link in links: self.create_link(product_id, link["data"], store_id)
 
 		return product_id
 
@@ -557,6 +557,7 @@ class Writer():
 
 		if (to_retry == 0):
 			self._logger.progress(f"Completed Fetch#{fetchid} slow.")
+			return
 
 		self._logger.warning(
 			f"Retrying {to_retry} writes from Fetch#{fetchid}")

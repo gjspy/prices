@@ -128,7 +128,7 @@ class AlgoliaCollector(BaseCollector):
 		"""
 		algolia provides pack size with the PACK_SIZE field
 		AND in the product name now too (sadly.)
-		
+
 		RIP to being atomic and beautiful..
 
 		This method parses all possible methods of finding PACKSIZE and
