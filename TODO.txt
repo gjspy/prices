@@ -114,7 +114,7 @@ NEED TO EXPIRE (SHOWING) OFFERS IF START_DATE IS LONGER THAN 2 WEEKS? BUT NO CUS
 	]
 
 
-
+TODO: quit signal file, check every however long whether to quit
 
 
 
@@ -123,3 +123,10 @@ DEPLOYMENTS:
 	Added ON DUPLICATE KEY UPDATE LAST_INSERT_ID, so retry due to BrandID is not an issue.
 	Fixed Validator.make_valid for datetime.date
 	changed not new_v to new_v is None after make_valid call in TableColumn, allowing 0 to be the value.
+2)
+	Changed DB PROCESS dump behaviour, now Queue returns list of debug params instead of items() due to "cannot pickle Asyncio.Future"
+	Implemented LAST_INSERT_ID to storer so its actually used by everything.
+	Added 2nd debug flag: ONLY_WAIT_FOR_NEXT_BATCH
+	debug flags are in config but not auto-update yet
+	added IMAGE stats.
+	db process log shows queue length in succ/fail message.

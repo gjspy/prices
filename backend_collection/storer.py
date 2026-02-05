@@ -84,7 +84,7 @@ class Writer():
 				requests.request,
 				method = "GET",
 				url = src,
-				headers = { 
+				headers = {
 					"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:148.0) Gecko/20100101 Firefox/148.0",
 					"Host": src.split("/")[2] }
@@ -95,6 +95,8 @@ class Writer():
 				headers = self.__cfwa,
 				json = {"u": src, "s": self.__cfws}
 			)
+
+		self._logger.add_to_stats(f"IMAGE{store_id}")
 
 		result = await async_executor(func)
 		return result
@@ -176,10 +178,17 @@ class Writer():
 		db_row.store.ref_value(Store).db_id.value = store_id
 
 		created = await self._db_thread.query(Offers.insert(
-			db_row, quiet_on_duplicate_entry = True))
-		if (len(created) == 0): return created # ALREADY EXIST. NO FILE.
+			db_row, on_duplicate_key_return_existing_id = True
+		))
 
-		p = path.join(self.OFFERS_DIR, self.OFFERS_NAME_FMT.format(created[0]))
+		lastrowid = created.get("lastrowid")
+		if (lastrowid is None): return
+
+		# ALREADY EXIST, NO NEW FILE.
+		# STILL USE odk_return_existing TO CREATE OfferHolders!
+		if (created.get("rowsaffected") != 1): return lastrowid
+
+		p = path.join(self.OFFERS_DIR, self.OFFERS_NAME_FMT.format(lastrowid))
 
 		s = offer.get("start_date")
 		e = offer.get("end_date")
@@ -190,7 +199,7 @@ class Writer():
 		with open(p, "w") as f:
 			json.dump(offer, f)
 
-		return created
+		return lastrowid
 
 
 
@@ -207,12 +216,14 @@ class Writer():
 
 		resp = await self._db_thread.query(Images.insert(
 			db_row, quiet_on_duplicate_entry = True ))
-		if (len(resp) == 0): return # INSERT FAILED, UNIQUE CONSTRAINT.
+
+		lastrowid = resp.get("lastrowid")
+		if (lastrowid is None): return # INSERT FAILED, UNIQUE CONSTRAINT.
 
 		data = await self.fetch_image_data(image["url"], store_id)
 
 		p = path.join(
-			self.IMAGE_FILES_DIR, self.IMAGE_NAME_FMT.format(resp[0]))
+			self.IMAGE_FILES_DIR, self.IMAGE_NAME_FMT.format(lastrowid))
 
 		with open(p, "wb") as f:
 			f.write(data.content)
@@ -270,10 +281,12 @@ class Writer():
 		brand_id = await self._db_thread.query(Brands.insert(
 			db_row, on_duplicate_key_return_existing_id = True))
 
-		if (len(brand_id) == 0): raise LookupError(
+		key = brand_id.get("lastrowid")
+
+		if (key is None): raise LookupError(
 			f"Could not create brand for {brand_name}, query gave []")
 
-		return brand_id[0]
+		return key
 
 
 
@@ -288,26 +301,34 @@ class Writer():
 		db_row.brand.ref_value(Brand).db_id.value = brand_id
 
 		new_id = await self._db_thread.query(Products.insert(db_row))
+		key = new_id.get("lastrowid")
 
-		if (len(new_id) == 0): raise LookupError(
+		if (key is None): raise LookupError(
 			f"Could not create product for {product}, query gave []")
 
-		return new_id[0]
+		return key
 
 
 
 
 
 	async def get_existing_image(self, product_id: int, url: str):
+		"""
+		Must get existing, as we stop collecting once there is an image
+		with ProductID and IsPreferred. This is not possible to raise through
+		a UNIQUE constraint so we must query for it first.
+		"""
+
 		query = Images.select(
 			[Images.row.db_id],
 			where = (Images.row.src == url) | (
 				(Images.row.product == product_id) & (Images.row.preferred == True)
 			))
-		
+
 		existing = await self._db_thread.query(query)
-		if (len(existing) != 0): return existing[0]
-		return None
+		key = existing.get("lastrowid")
+
+		return key
 
 
 
@@ -317,21 +338,22 @@ class Writer():
 			Queries.get_offer_by_store_data(store_id, offer["store_given_id"]))
 		# QUERY EXISTING BECAUSE WE NEED ITS ID FOR OFFERHOLDER.
 
+		results = existing.get("fetchall")
+
 		existing_id: Optional[int] = None
 
-		if (existing and len(existing) != 0):
-			db_row: Offer = existing[0]
+		if (results and len(results) != 0):
+			db_row: Offer = results[0]
 
 			existing_id = db_row.db_id.plain_value
 			end_date = offer.get("end_date")
 
-			if (end_date is not None and existing[0].end_date.value != end_date):
+			if (end_date is not None and db_row.end_date.value != end_date):
 				db_row.end_date.value = end_date
 				self._db_thread.stage(Offers.update(db_row))
 
 		else:
-			existing = await self.create_offer(store_id, offer)
-			if (len(existing) != 0): existing_id = existing[0]
+			existing_id = await self.create_offer(store_id, offer)
 
 		if (not existing_id): return None
 		self.create_offer_holder(existing_id, product_id)
@@ -345,7 +367,8 @@ class Writer():
 			cin: int, store: int) -> list[ProductLink]:
 
 		query = Queries.get_link_by_ids(upcs, cin, store)
-		return await self._db_thread.query(query)
+		resp = await self._db_thread.query(query)
+		return resp.get("fetchall") or []
 
 
 
@@ -372,7 +395,8 @@ class Writer():
 				(Brands.row.store == store_id)),
 			join_on = [Brands.row.parent.join])
 
-		existing: list[Brand] = await self._db_thread.query(query)
+		resp = await self._db_thread.query(query)
+		existing: list[Brand] = resp.get("fetchall") or []
 
 		if (existing):
 			brand = existing[0]
@@ -518,7 +542,8 @@ class Writer():
 
 		# DONE OMG
 		return True
-	
+
+
 	async def _retrier(
 			self, data: list[list[DSA]],
 			coros: list[asyncio.Task[Any]], fetchid: str):
@@ -535,27 +560,27 @@ class Writer():
 
 		self._logger.warning(
 			f"Retrying {to_retry} writes from Fetch#{fetchid}")
-		
+
 		last = 0
 		for _ in range(to_retry):
 			i = results.index(False, last)
 			last = i
 
 			await self.write_storable_group(data[i], True)
-		
+
 		self._logger.progress(f"Finished retries for Fetch#{fetchid}")
 
 
 
-	
+
 
 	async def write_from_search_results(
 			self, data: list[list[DSA]], fetchid: str, slow: bool = False):
-		
+
 		if (slow):
 			# NO RETRIER FOR slow MODE. ONLY PURPOSE FOR RETRIER IS
 			# OVERLAP CAUSING ERRORS. NO OVERLAP WITH slow.
-	
+
 			for group in data: await self.write_storable_group(group)
 
 			self._logger.progress(f"Completed Fetch#{fetchid} slow.")
@@ -566,7 +591,7 @@ class Writer():
 		for group in data:
 			coros.append(
 				asyncio.create_task(self.write_storable_group(group)))
-		
+
 		# retrier USED FOR OVERLAP. EXAMPLE ISSUE THIS FIXES:
 		# get_product_id -> get_brand_id returns None
 		# so create_brand, but between SELECT and INSERT, another
@@ -574,9 +599,9 @@ class Writer():
 		# RARE CIRCUMSTANCE, but worth having fallback.
 
 		asyncio.create_task(self._retrier(data, coros, fetchid))
-		
 
-		
+
+
 
 
 

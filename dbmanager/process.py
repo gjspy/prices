@@ -65,9 +65,8 @@ class DBThread(Thread):
 	def dump(self):
 		data = ""
 
-		for i in self._staged_queue.items():
-			p = i.get("payload")
-			ds = self.get_debug_str(p)
+		for i in self._staged_queue.debug_values():
+			ds = self.get_debug_str(i)
 
 			data += f"#{i.get("id")} {ds}\n"
 		
@@ -84,13 +83,13 @@ class DBThread(Thread):
 		tot = 0
 		max_id = 0
 
-		for i in self._staged_queue.items():
+		for i in self._staged_queue.debug_values():
 			tot += 1
 
 			id_ = i.get("id") or 0
 			if (id_ > max_id): max_id = id_
 
-			s = self.get_debug_str(i.get("payload"))
+			s = self.get_debug_str(i)
 
 			if (not data.get(s)): data[s] = 0
 			data[s] += 1
@@ -149,18 +148,18 @@ class DBThread(Thread):
 		except Exception as err: return f"couldn't get debug str {err}"
 
 
-	def __execute_item(self, next_data: DSA) -> tuple[bool, str, list[Any]]:
+	def __execute_item(self, next_data: DSA) -> tuple[bool, str, DSA]:
 		
 		payload: Optional[DSA] = next_data.get("payload")
-		if (not payload): return (False, "no payload", [])
+		if (not payload): return (False, "no payload", {})
 
-		result: list[Any] = []
+		result: DSA = {}
 
 		try: result = self._engine.execute_payload(payload)
 		except:
 			# HAS ALREADY BEEN CAUGHT, LOGGED & RETHROWN
 			# NO NEED TO LOG AGAIN.
-			return (False, "error occurred", [])
+			return (False, "error occurred", {})
 
 		debug_str = self.get_debug_str(payload)
 		return (True, debug_str, result)
@@ -205,9 +204,11 @@ class DBThread(Thread):
 			
 		self._staged_queue.remove_first()
 
+		new_l = self._staged_queue.get_length()
+
 		self._logger.info(
 			f"Completed #{next_item.get("id")} ({message}){success_str} "
-			f"Success: {success}")
+			f"Success: {success}. Todo: {new_l}")
 		
 		return True # ACTIVE
 
@@ -248,7 +249,7 @@ class DBThread(Thread):
 		future = self.create_future()
 
 		self.stage(query, future)
-		response: list[Any] = await future
+		response: DSA = await future
 
 		return response
 	
@@ -288,5 +289,5 @@ class DBThread(Thread):
 
 			
 			except Exception as e:
-				self._logger.critical(f"MAIN PROCESS STOPPED, {e}")
+				self._logger.exception(f"MAIN PROCESS STOPPED, {e}")
 				time.sleep(RECONNECTION_WAIT)

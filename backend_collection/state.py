@@ -18,10 +18,6 @@ class State(): # give same instance to writer and scheduler
 	store_names: dict[str, int] = {}
 
 	keys = ["keywords_todo", "now", "time_next_batch", "session", "store_names"]
-
-	def new_batch(self):
-		data_today = {}
-		# set time
 	
 	def dump(self):
 		self.now = datetime.now()

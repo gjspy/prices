@@ -42,13 +42,13 @@ DB_SCHM = env["DB_SCHM"]
 
 from dbmanager import misc
 
-"""
-asda = algolia.AlgoliaCollector(env, config, RESULTS_PER_SEARCH) # good cfw
-tesco = graphql.GQLCollector(env, config, RESULTS_PER_SEARCH) # good cfw
-mor = clusters.ClusterCollector(env, config, RESULTS_PER_SEARCH) # good cfw
-sains = akamai.AKMCollector(env, config, RESULTS_PER_SEARCH) # bad cfw
-ald = aldi.ALDCollector(env, config, 60) # "Page limit must be equal to some of there values: [12,16,24,30,32,48,60]"
-"""
+
+#asda = algolia.AlgoliaCollector(env, config, RESULTS_PER_SEARCH) # good cfw
+#tesco = graphql.GQLCollector(env, config, RESULTS_PER_SEARCH) # good cfw
+mor = clusters.ClusterCollector(logger, env, config, RESULTS_PER_SEARCH) # good cfw
+#sains = akamai.AKMCollector(env, config, RESULTS_PER_SEARCH) # bad cfw
+#ald = aldi.ALDCollector(env, config, 60) # "Page limit must be equal to some of there values: [12,16,24,30,32,48,60]"
+
 #c = (Products.row.brand == 12) | ((Products.row.db_id == 1) & (Products.row.name == "hello"))
 #print(c)
 
@@ -106,9 +106,9 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	succ = db.connect()
 	print(succ, "connected:", db.is_connected)
 
-	DB_PROCESS = DBThread(logger, db, asyncio.get_event_loop(), "state/state.json")
+	DB_PROCESS = DBThread(logger, db, asyncio.get_event_loop(), "state/queue.txt")
 	DB_PROCESS.start()
-	db_row = Brands.row.new()
+	"""db_row = Brands.row.new()
 	db_row.brand_name.value = "Cravendale"
 	db_row.store.value.db_id.value = "2"
 
@@ -116,7 +116,7 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	print(resp)
 
 	await asyncio.sleep(10)
-	raise
+	raise"""
 
 	s = State()
 	s.store_names = {
@@ -128,7 +128,8 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 		StoreNames.aldi: 5
 	}
 
-	w = Writer(env, logger, DB_PROCESS, s)
+	w = Writer(env, logger, DB_PROCESS)
+	w.set_state(s)
 
 	"""c = (ProductLinks.row.upc.in_([5057753934453, 5000436510826, 5057967013944])) | ((ProductLinks.row.cin == 1) & (ProductLinks.row.store == 2))
 	print(c)
@@ -148,13 +149,15 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	#with open("ASDADebugResponse_1770057833j copy.json","r") as f:
 	#with open("TESCODebugResponse_1770120473j.json","r") as f:
 	#with open("ALDIDebugResponse_1770157574j.json","r") as f:
-	with open("SAINSBURYSDebugResponse_1770163260j.json","r") as f:
+	#with open("SAINSBURYSDebugResponse_1770163260j.json","r") as f:
+	with open("MORRISONSDebugResponse_1768144960j.json","r") as f:
 		d = json.load(f)
 
 	#result = tesco.parse_data(d)
 	#result = asda.parse_data(d)
 	#result = ald.parse_data(d)
-	result = sains.parse_data(d)
+	#result = sains.parse_data(d)
+	result = mor.parse_data(d)
 	#result = await mor.search("bread", True)
 	#result = await asda.search("cheese", True)
 	#result = await tesco.search("cheese", True)
@@ -167,14 +170,14 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	last = t
 	for i, v in enumerate(result):
 		#print(i, v)
-		if (i <= 4): continue
+		#if (i <= 4): continue
 
-		await w.write_storable_group(v, 1)#1770155790/60/60/24
+		await w.write_storable_group(v)#1770155790/60/60/24
 
 		this = time.time()
 		print(i, "this took", this - last)
 		last = this
-		break
+		#break
 	
 	print("done omg, all", len(result), "in", time.time() - t)
 
@@ -242,7 +245,7 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 
 
 
-logger.critical("MUST RECREATE TABLES BEFORE DEPLOY, FK DELETED IN Images, NO FKS IN Keywords")
+#logger.critical("MUST RECREATE TABLES BEFORE DEPLOY, FK DELETED IN Images, NO FKS IN Keywords")
 
 
 with sshtunnel.SSHTunnelForwarder(
@@ -254,7 +257,7 @@ with sshtunnel.SSHTunnelForwarder(
 
 	asyncio.run(main(tunnel))
 
-logger.critical("MUST ADD CATEGORIES")
+#logger.critical("MUST ADD CATEGORIES")
 
 
 

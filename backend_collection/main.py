@@ -41,12 +41,14 @@ mor = clusters.ClusterCollector(logger, env, config, RESULTS_PER_SEARCH) # good 
 sns = akamai.AKMCollector(logger, env, config, RESULTS_PER_SEARCH) # bad cfw
 ald = aldi.ALDCollector(logger, env, config, 60) # "Page limit must be equal to some of there values: [12,16,24,30,32,48,60]"
 COLLECTORS = [asd, tsc, mor, sns, ald]
-DEBUG = False
+
+DEBUG = config["DEBUG"] == "True"
+ONLY_WAIT_FOR_NEXT_BATCH = config["ONLY_WAIT_FOR_NEXT_BATCH"] =="True" # DISABLES SALVAGING OF LAST BATCH's KEYWORDS OR RUNNING IMMEDIATELY IF DELAYED.
 
 # LIST MUST BE IN ORDER
 RUNTIMES = [
 	#dtime( 9,00),
-	dtime(16,50),
+	dtime(18,55),
 	#dtime(21,00)
 ]
 
@@ -70,9 +72,13 @@ class Scheduler():
 	async def init_store_data(self):
 		q = Stores.select()
 		data = await self._db_thread.query(q)
+		
+		results = data.get("fetchall")
+		if (not results):
+			raise Exception("No results from Stores query, can't get names.")
 
 		v: Store
-		for v in data:
+		for v in results:
 			store_name = v.name.plain_value
 			store_id = v.db_id.plain_value
 
@@ -214,7 +220,7 @@ class Scheduler():
 
 		time_next = self._state.time_next_batch
 		kwrds_todo = self._state.keywords_todo
-		if (time_next):
+		if (time_next and (not ONLY_WAIT_FOR_NEXT_BATCH)):
 			now = utcnow()
 
 			if (time_next.timestamp() <= now.timestamp()):
@@ -245,8 +251,6 @@ class Scheduler():
 
 
 
-
-print(env)
 
 
 async def main():

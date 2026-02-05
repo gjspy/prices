@@ -1,7 +1,7 @@
 from copy import deepcopy
 import random
 
-from dbmanager.types import Any, Iterable
+from dbmanager.types import Any, Iterable, DSA
 
 ASCENDING_SQL = "ASC"
 DESCENDING_SQL = "DESC"
@@ -41,13 +41,22 @@ class Queue():
 		try: self._queue.pop(0)
 		except: return None
 	
-	def items(self):
+	def debug_values(self):
 		"""
-		Returns a `deepcopy` of all queue items.
-		You can modify the results of this and it will not
-		change queue contents. Use `.pop()`, `.append`, etc.
+		Returns a deep copy of all queue items.
+		Does not include futures.
 		"""
-		return deepcopy(self._queue)
+		d: list[DSA] = []
+
+		for v in self._queue:
+			vv: dict[str, dict[str, str]] = (v.get("data") or {})
+
+			d.append({
+				"id": v["id"],
+				"debug": vv.get("debug")
+			})
+
+		return d
 
 
 
