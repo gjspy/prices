@@ -170,7 +170,7 @@ class CustomLogSS(logging.Handler):
 		self._fp = stats_fp
 
 		with open(stats_fp, "r") as f:
-			self._data = json.load(f)
+			self._data: dict[str, Any] = json.load(f) or {}
 		
 		self._last_dump = datetime.fromtimestamp(1)
 		self._cooldown = 60 # SECONDs

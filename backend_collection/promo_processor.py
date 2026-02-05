@@ -171,7 +171,7 @@ class PromoProcessor:
 		"""
 		for check in self._strapline_checks:
 			try: result = check()
-			except Exception as err: traceback.print_exception(err)
+			except: pass # Exception as err: traceback.print_exception(err)
 			else:
 				if (result): return result
 
@@ -182,7 +182,7 @@ class PromoProcessor:
 
 		if (self.promo_type):
 			try: result = self._process_by_type()
-			except Exception as err: traceback.print_exception(err)
+			except: pass # Exception as err: traceback.print_exception(err)
 			else:
 				if (result): return {**initial_data, **result}
 		

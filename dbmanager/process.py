@@ -61,6 +61,9 @@ class DBThread(Thread):
 	@logger.setter
 	def set_logger(self, new: Logger): self._logger = new
 
+	def get_queue_length(self):
+		return self._staged_queue.get_length()
+
 
 	def dump(self):
 		data = ""

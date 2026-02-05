@@ -1,4 +1,3 @@
-from copy import deepcopy
 import random
 
 from dbmanager.types import Any, Iterable, DSA
@@ -49,11 +48,11 @@ class Queue():
 		d: list[DSA] = []
 
 		for v in self._queue:
-			vv: dict[str, dict[str, str]] = (v.get("data") or {})
+			vv = (v.get("data") or {}).get("payload") or {} # type: ignore
 
 			d.append({
 				"id": v["id"],
-				"debug": vv.get("debug")
+				"debug": vv.get("debug") # type: ignore
 			})
 
 		return d

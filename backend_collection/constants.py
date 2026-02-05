@@ -261,7 +261,7 @@ def clean_product_name(name: str, brand_name: Optional[str] = None):
 	new = clean_string(name)
 
 	if (not new or new == " "): return name
-	return name
+	return new
 
 
 def stringify_query(query_params: dict[str, str | Any], remove_quotes: bool = False):

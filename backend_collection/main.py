@@ -48,12 +48,13 @@ ONLY_WAIT_FOR_NEXT_BATCH = config["ONLY_WAIT_FOR_NEXT_BATCH"] =="True" # DISABLE
 # LIST MUST BE IN ORDER
 RUNTIMES = [
 	#dtime( 9,00),
-	dtime(19,21),
+	dtime(19,47),
 	#dtime(21,00)
 ]
 
 
 COOLDOWN = 1 # SECONDS
+MAX_DB_QUEUE_BEFORE_WAIT = 1000 # ITEMS
 
 
 class Scheduler():
@@ -160,6 +161,20 @@ class Scheduler():
 			await asyncio.sleep(1)
 
 			self._logger.progress(f"Completed all stores for '{kw}'")
+
+			current_len = self._db_thread.get_queue_length()
+
+			if (current_len > MAX_DB_QUEUE_BEFORE_WAIT):
+				self._logger.warning(
+					"Waiting before next keyword. DB Thread has queue"
+					f"of {current_len}, > max [{MAX_DB_QUEUE_BEFORE_WAIT}].")
+				
+				keep_waiting = True
+
+				while keep_waiting:
+					await asyncio.sleep(COOLDOWN)
+					keep_waiting = self._db_thread.get_queue_length()
+
 
 
 
