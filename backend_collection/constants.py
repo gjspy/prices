@@ -248,16 +248,19 @@ def clean_product_name(name: str, brand_name: Optional[str] = None):
 	Also uses an expression to remove any non-ascii characters.
 	Helps combat weird formatting.
 	"""
-	name = name.replace(",", "")
-	name = re.sub(regex.PACKSIZE_MULTI, " ", name, flags = re.IGNORECASE)
-	name = re.sub(regex.PACKSIZE_SINGLE, " ", name, flags = re.IGNORECASE)
-	name = re.sub(regex.ALL_NON_ASCII, " ", name)
+
+	new = name.replace(",", "")
+	new = re.sub(regex.PACKSIZE_MULTI, " ", name, flags = re.IGNORECASE)
+	new = re.sub(regex.PACKSIZE_SINGLE, " ", name, flags = re.IGNORECASE)
+	new = re.sub(regex.ALL_NON_ASCII, " ", name)
 
 	if (brand_name):
 		# USE re.sub NOT str.replace SO WE CAN re.IGNORECASE!
-		name = re.sub(brand_name, " ", name, flags = re.IGNORECASE)
+		new = re.sub(brand_name, " ", name, flags = re.IGNORECASE)
 	
-	name = clean_string(name)
+	new = clean_string(name)
+
+	if (not new or new == " "): return name
 	return name
 
 

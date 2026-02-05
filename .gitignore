@@ -1,6 +1,7 @@
 *_private.*
 storage/*
 state/*
+debug/*
 
 .config
 #*DebugResponse_*.json

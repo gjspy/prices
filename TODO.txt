@@ -130,3 +130,5 @@ DEPLOYMENTS:
 	debug flags are in config but not auto-update yet
 	added IMAGE stats.
 	db process log shows queue length in succ/fail message.
+3)
+	Fixing empty product names (eg entire product = "[brand] [packsize]")

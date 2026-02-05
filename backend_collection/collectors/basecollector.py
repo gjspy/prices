@@ -4,6 +4,7 @@ import requests
 import time
 import json
 import re
+import os
 
 
 from backend_collection.types import Any, Optional, Number, DSA
@@ -11,10 +12,11 @@ from backend_collection.promo_processor import PromoProcessor
 from backend_collection.log_handler import CustomLogger
 from backend_collection.constants import (
 	safe_deepget, regex, standardise_packsize,
-	stringify_query, async_executor)
+	stringify_query, async_executor, DATE_FMT, utcnow)
 
 
 class BaseCollector:
+	DEBUG_FILE_DIR = "debug"
 	_HEADERS: dict[str, str] = {}
 
 	PromoProcessor: type[PromoProcessor]
@@ -333,10 +335,8 @@ class BaseCollector:
 			params = self.get_gettable_search_params(query)
 
 			result = await self._get(params)
-		#data = result.json(kwds={"ensure_ascii": True}) # ensure_ascii so \u00a3 -> £ !!
 
-		if (result == None):
-			raise ValueError("HTTP_METHOD INVALID")
+		if (result == None): raise ValueError("HTTP_METHOD INVALID")
 		
 		data = None
 
@@ -345,13 +345,22 @@ class BaseCollector:
 		except:
 			self._logger.exception("COULD NOT LOAD JSON FROM RESP")
 
+		now = utcnow().strftime(DATE_FMT)
+
 		if (debug):
-			with open(
-				f"{self.store}DebugResponse_{int(time.time())}j.json", "w"
-			) as f: json.dump(data, f)
+			path = os.path.join(self.DEBUG_FILE_DIR,
+				f"{now}_{self.store}_SEARCH_{query}.json" )
+
+			with open(path, "w") as f: json.dump(data, f)
 		
 		if (not data): return []
 
 		storables = self.parse_data(data)
+
+		if (debug):
+			path = os.path.join(self.DEBUG_FILE_DIR,
+				f"{now}_{self.store}_SEARCH_{query}_GATHERED.json")
+			
+			with open(path, "w") as f: json.dump(storables, f)
 
 		return storables
