@@ -97,7 +97,6 @@ print(q)
 
 async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	env["DB_PORT"] = tunnel.local_bind_port # type: ignore
-	print(env["DB_PORT"])
 	
 	db = Database.from_env(env, logger)
 	db.declare_tables(
@@ -109,7 +108,14 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 
 	DB_PROCESS = DBThread(logger, db, asyncio.get_event_loop(), "state/state.json")
 	DB_PROCESS.start()
+	db_row = Brands.row.new()
+	db_row.brand_name.value = "Cravendale"
+	db_row.store.value.db_id.value = "2"
 
+	resp = await DB_PROCESS.query(Brands.insert(db_row, on_duplicate_key_return_existing_id=True))
+	print(resp)
+
+	await asyncio.sleep(10)
 	raise
 
 	s = State()

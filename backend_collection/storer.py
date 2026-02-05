@@ -267,7 +267,8 @@ class Writer():
 		db_row.brand_name.value = brand_name
 		db_row.store.ref_value(Store).db_id.value = store_id
 
-		brand_id = await self._db_thread.query(Brands.insert(db_row))
+		brand_id = await self._db_thread.query(Brands.insert(
+			db_row, on_duplicate_key_return_existing_id = True))
 
 		if (len(brand_id) == 0): raise LookupError(
 			f"Could not create brand for {brand_name}, query gave []")

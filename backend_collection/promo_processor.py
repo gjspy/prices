@@ -57,20 +57,20 @@ class PromoProcessor:
 
 	@property
 	def promo_start_date(self):
-		if (not self.keys.start_date): return None
+		if (self.keys.start_date is None): return None
 
 		v = self.promo_data.get(self.keys.start_date)
-		if (not v): return
+		if (v is None): return
 		return get_dt(v, self.datetime_fmt or "")
 
 
 	
 	@property
 	def promo_end_date(self):
-		if (not self.keys.end_date): return None
+		if (self.keys.end_date is None): return None
 
 		v = self.promo_data.get(self.keys.end_date)
-		if (not v): return
+		if (v is None): return
 		return get_dt(v, self.datetime_fmt or "")
 	
 	@property

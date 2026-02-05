@@ -1,0 +1,1 @@
+SELECT *, COUNT(*) AS C FROM Products GROUP BY PName, PS_Count, PS_SizeEach, BrandID ORDER BY C DESC;

@@ -4,14 +4,11 @@ import sshtunnel # type: ignore
 import platform
 import asyncio
 import time
-import json
-import os
-print(os.getcwd())
 
 from dotenv import dotenv_values
 
 
-from dbmanager.engine import Database, MAX
+from dbmanager.engine import Database
 from dbmanager.process import DBThread
 
 
@@ -49,7 +46,7 @@ DEBUG = False
 # LIST MUST BE IN ORDER
 RUNTIMES = [
 	#dtime( 9,00),
-	dtime(15, 0),
+	dtime(16,50),
 	#dtime(21,00)
 ]
 

@@ -1,0 +1,1 @@
+SELECT UPC, Products.PID, Products.PName, Products.PS_Count, Products.PS_SizeEach, Brands.BName, Brands.StoreID FROM ProductLinks JOIN Products ON ProductLinks.PID = Products.PID JOIN Brands ON Brands.ID = Products.BrandID JOIN Stores ON Stores.ID = Brands.ID ORDER BY UPC DESC;

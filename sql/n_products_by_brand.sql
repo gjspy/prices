@@ -1,0 +1,1 @@
+SELECT *, COUNT(*) AS C FROM Products GROUP BY BrandID;

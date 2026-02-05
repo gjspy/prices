@@ -112,3 +112,14 @@ NEED TO EXPIRE (SHOWING) OFFERS IF START_DATE IS LONGER THAN 2 WEEKS? BUT NO CUS
 			"foreground": "#000000"
 		}
 	]
+
+
+
+
+
+
+DEPLOYMENTS:
+1)
+	Added ON DUPLICATE KEY UPDATE LAST_INSERT_ID, so retry due to BrandID is not an issue.
+	Fixed Validator.make_valid for datetime.date
+	changed not new_v to new_v is None after make_valid call in TableColumn, allowing 0 to be the value.

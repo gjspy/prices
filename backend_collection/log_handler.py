@@ -29,6 +29,7 @@ PROGRESS = 21
 STATS = 5
 
 logging.addLevelName(NOTICE, "NOTICE")
+logging.addLevelName(PROGRESS, "PROGRESS")
 logging.addLevelName(STATS, "STATS")
 
 
@@ -189,7 +190,7 @@ class CustomLogSS(logging.Handler):
 
 		m = record.message
 
-		if (not self._data.get(m)): self._data[m] = 0
+		if (self._data.get(m) is None): self._data[m] = 0
 		self._data[m] += 1
 
 		self.dump()

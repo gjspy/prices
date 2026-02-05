@@ -4,10 +4,10 @@
 -- DROP TABLE Prices;
 -- DROP TABLE ProductLinks;
 -- DROP TABLE Labels;
--- DROP TABLE Products;
--- DROP TABLE Brands;
 -- DROP TABLE Images;
 -- DROP TABLE Keywords;
+-- DROP TABLE Products;
+-- DROP TABLE Brands;
 
 -- DELETE FROM Ratings; DELETE FROM OfferHolders; DELETE FROM Offers; DELETE FROM Prices; DELETE FROM ProductLinks; DELETE FROM Labels;  DELETE FROM Keywords; DELETE FROM Products; DELETE FROM Brands;  -- DELETE FROM Images;
 
