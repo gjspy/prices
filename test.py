@@ -131,8 +131,27 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 		StoreNames.aldi: 5
 	}
 
-	#w = Writer(env, logger, DB_PROCESS)
-	#w.set_state(s)
+	w = Writer(env, logger, DB_PROCESS)
+	w.set_state(s)
+
+	"""await w.get_product_id(
+		{
+			"name": "Sainsbury's British Mature Cheddar Cheese 400g",
+			"brand_name": "Sainsbury's",
+			"packsize_count": 1,
+			"packsize_sizeeach": 400.0,
+			"packsize_unit": "g"
+		}, [
+			{
+				"type": "link",
+				"data": {
+					"upc": "5010044002378",
+					"store_name": "SAINSBURYS",
+					"cin": "7511786"
+				}
+			}
+		]
+	)"""
 
 
 	

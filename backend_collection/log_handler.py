@@ -234,6 +234,4 @@ def get_logger():
 
 	log_listener.start()
 
-	logger.critical("DC AND STATS LOGS DISABLED FOR TESTING")
-
 	return logger

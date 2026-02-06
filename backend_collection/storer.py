@@ -436,7 +436,7 @@ class Writer():
 		existing_links, lock_id = await self.get_existing_links_from_ids(
 			upcs, cin, store_id)
 
-		upcs_with_existing_link: list[int] = []
+		upcs_with_existing_link: list[str] = []
 		product_id: Optional[int] = None
 
 		# GET PID FROM LINKS
@@ -446,7 +446,9 @@ class Writer():
 				product_id = this_pid
 			
 			this_upc = link.upc.plain_value
-			if (this_upc is not None): upcs_with_existing_link.append(this_upc)
+			if (this_upc is not None):
+				upcs_with_existing_link.append(str(this_upc))
+				# MAKE ALL str AS PARAM upcs CAN BE str.
 		
 		# Create new Links even if we have existing_links.
 		# If there are multiple UPCs, we might be able to 'daisy-chain':
@@ -468,7 +470,7 @@ class Writer():
 			if (not link): continue
 
 			upc = link.get("upc")
-			if (upc is not None and upc in upcs_with_existing_link): continue
+			if (upc is not None and str(upc) in upcs_with_existing_link): continue
 			if (upc is None): continue
 
 			rows.append(self.create_link_row(product_id, link, store_id))

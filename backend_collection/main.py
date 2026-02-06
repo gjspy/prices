@@ -48,7 +48,7 @@ ONLY_WAIT_FOR_NEXT_BATCH = config["ONLY_WAIT_FOR_NEXT_BATCH"] == "True" # DISABL
 # LIST MUST BE IN ORDER
 RUNTIMES = [
 	#dtime( 9,00),
-	dtime(19,47),
+	dtime(20, 32),
 	#dtime(21,00)
 ]
 
