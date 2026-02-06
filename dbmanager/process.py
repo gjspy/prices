@@ -226,12 +226,12 @@ class DBThread(Thread):
 
 			if (workable == True): return (future_item, i, False)
 
-			debug = self._staged_queue.get_debug_from_queue_item(future_item)
+			"""debug = self._staged_queue.get_debug_from_queue_item(future_item)
 			debug_str = self.get_debug_str({ "debug": debug }) if debug else ""
 
 			self._logger.info(
 				f"Skipping #{future_item.get("id")} due to lock. "
-				f"({debug_str})" )
+				f"({debug_str})" )"""
 		
 		# NEED TO WAIT AND COME BACK. UNLOCK CMD NOT YET FOUND IN QUEUE.
 		return (None, 0, False) 
