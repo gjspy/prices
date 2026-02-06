@@ -164,7 +164,10 @@ class Queries:
 
 		return ProductLinks.select(
 			[ProductLinks.row.product],
-			where = cin_query)
+			where = cin_query,
+			# ENSURE SAME ORDER EVERY TIME. ALWAYS USE OLDEST Link FIRST:
+			order_by = [ProductLinks.row.db_id.ascending])
+
 
 	@staticmethod
 	def get_offer_by_store_data(store_id: int, store_given_id: int):

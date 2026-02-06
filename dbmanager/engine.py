@@ -1125,10 +1125,10 @@ class Table(Generic[TableRowType]):
 
 		if (join_all): join_on.extend(self.row.get_joins())
 
-		if (not columns):
-			tables_involved: list[Table[Any]] = [
-				self, *( v.joining_table for v in join_on )]
+		tables_involved: list[Table[Any]] = [
+			self, *( v.joining_table for v in join_on )]
 
+		if (not columns):
 			for v in tables_involved:
 				columns.extend(v.row.get_columns())
 
@@ -1166,7 +1166,8 @@ class Table(Generic[TableRowType]):
 			"query": sql + ";",
 			"params": values,
 			"expect_response": ["fetchall"],
-			"debug": ("SELECT", "from " + self.name)
+			"debug": ("SELECT", "from " + self.name),
+			"tables_involved": tables_involved
 		}
 
 		if (objectify_results): query["objectify_from_table"] = self.name
@@ -1252,7 +1253,8 @@ class Table(Generic[TableRowType]):
 		payload: DSA = {
 			"query": sql,
 			"expect_response": ["lastrowid", "rowsaffected"],
-			"debug": ("INSERT", [ type(v).__name__ for v in rows ])
+			"debug": ("INSERT", [ type(v).__name__ for v in rows ]),
+			"tables_involved": [self]
 		}
 
 		if (len(values) == 1): payload["params"] = values[0]
@@ -1301,7 +1303,8 @@ class Table(Generic[TableRowType]):
 		return {
 			"query": q,
 			"params": list( k[1] for k in set_values ),
-			"debug": ("UPDATE", [ self.name ])
+			"debug": ("UPDATE", [ self.name ]),
+			"tables_involved": [self]
 		}
 	
 	def delete(
@@ -1338,7 +1341,8 @@ class Table(Generic[TableRowType]):
 
 		return {
 			"query": f"DELETE FROM {self.name}{where_stmt}",
-			"debug": ("DELETE", [ self.name ])
+			"debug": ("DELETE", [ self.name ]),
+			"tables_involved": [self]
 		}
 
 
@@ -1372,7 +1376,8 @@ class Table(Generic[TableRowType]):
 		return {
 			"queries": sqls,
 			"paramses": valueses,
-			"debug": ("UPDATE", [ type(v).__name__ for v in rows ])
+			"debug": ("UPDATE", [ type(v).__name__ for v in rows ]),
+			"tables_involved": [self]
 		}
 
 
@@ -1689,7 +1694,8 @@ class Database():
 
 		assert self.connection, "The database is not connected"
 		if (kwargs):
-			ignored = set(kwargs.keys()) - {'debug', 'debug_config'}
+			ignored = set(kwargs.keys()) - {
+				'debug', 'debug_config', 'tables_involved'}
 			if (ignored): self.logger.debug(f"Ignoring {ignored} kwargs..")
 
 		self._init_cursor(buffered)
@@ -1749,7 +1755,8 @@ class Database():
 		assert len(queries) == len(paramses)
 		assert self.connection, "The database is not connected"
 		if (kwargs):
-			ignored = set(kwargs.keys()) - {'debug', 'debug_config'}
+			ignored = set(kwargs.keys()) - {
+				'debug', 'debug_config', 'tables_involved'}
 			if (ignored): self.logger.debug(f"Ignoring {ignored} kwargs..")
 
 		result: DSA = {}

@@ -257,7 +257,8 @@ class Writer():
 
 
 
-	def create_link(self, product_id: int, link: DSA, store_id: int):
+	def create_link_row(
+			self, product_id: int, link: DSA, store_id: int) -> ProductLink:
 		db_row = ProductLinks.row.new()
 
 		db_row.product.ref_value(Product).db_id.value = product_id
@@ -268,8 +269,7 @@ class Writer():
 		upc = link.get("upc")
 		if (upc): db_row.upc.value = upc
 
-		# DON'T WANT RESPONSE SO thread.STAGE, NOT QUERY
-		self._db_thread.stage(ProductLinks.insert(db_row))
+		return db_row
 
 
 
@@ -364,11 +364,22 @@ class Writer():
 
 	async def get_existing_links_from_ids(
 			self, upcs: list[int],
-			cin: int, store: int) -> list[ProductLink]:
+			cin: int, store: int) -> tuple[list[ProductLink], int]:
 
 		query = Queries.get_link_by_ids(upcs, cin, store)
-		resp = await self._db_thread.query(query)
-		return resp.get("fetchall") or []
+		resp = await self._db_thread.query_withlock(
+			query, create_lock_on = ProductLinks)
+		
+		results: list[ProductLink] = resp.get("fetchall") or []
+		
+		lock_id: Optional[int] = resp.get("lock_id")
+		if (lock_id is None):
+			self._logger.critical(
+				f"No lock ID but query executed {upcs} {store}-{cin}")
+			
+			lock_id = -1
+
+		return (results, lock_id)
 
 
 
@@ -421,18 +432,66 @@ class Writer():
 			self, product: DSA, links: list[DSA],
 			upcs: list[int], cin: int, store_id: int ) -> int:
 
-		existing_links: list[ProductLink] = await self.get_existing_links_from_ids(upcs, cin, store_id)
+		existing_links: list[ProductLink]; lock_id: int
+		existing_links, lock_id = await self.get_existing_links_from_ids(
+			upcs, cin, store_id)
 
-		product_id = None
+		upcs_with_existing_link: list[int] = []
+		product_id: Optional[int] = None
 
 		# GET PID FROM LINKS
 		for link in existing_links:
-			product_id = link.product.ref_value(Product).db_id.plain_value
-			if (product_id is not None): break
+			this_pid = link.product.ref_value(Product).db_id.plain_value
+			if (product_id is None and this_pid is not None):
+				product_id = this_pid
+			
+			this_upc = link.upc.plain_value
+			if (this_upc is not None): upcs_with_existing_link.append(this_upc)
+		
+		# Create new Links even if we have existing_links.
+		# If there are multiple UPCs, we might be able to 'daisy-chain':
+		# say we got here by get_product_id(upcs = [1,2,3])
+		# we query existing links, get back upcs [1,2].
+		# We now have upc 3, which does not have a Link, but we now know PID!
+		# so we should create the link!
 
-		if (not product_id):
+		product_just_created = False
+
+		if (product_id is None):
+			product_just_created = True
 			product_id = await self.create_product(product, store_id)
-			for link in links: self.create_link(product_id, link["data"], store_id)
+
+		rows: list[ProductLink] = []
+
+		for link in links: # CREATE ROWS DOCUMENTING EVERY UPC WE HAVE.
+			link = link.get("data")
+			if (not link): continue
+
+			upc = link.get("upc")
+			if (upc is not None and upc in upcs_with_existing_link): continue
+			if (upc is None): continue
+
+			rows.append(self.create_link_row(product_id, link, store_id))
+		
+		# NO ROWS MADE TO DOCUMENT UPC (DOESNT EXIST?)
+		# AND PRODUCT WAS JUST MADE, WE NEED TO LINK CIN + STORE.
+		if (len(rows) == 0 and product_just_created):
+			rows.append(self.create_link_row(
+				product_id, links[0]["data"], store_id))
+		
+
+		if (len(rows) == 0): # FOUND PRODUCT ID, NO LINKS TO MAKE.
+			self._db_thread.close_lock(lock_id)
+		
+		else: # LINKS TO MAKE.
+
+			# THIS WILL RAISE ERROR IF A UPC EXISTS ALREADY.
+			# SHOULD NEVER HAPPEN, CAN ONLY IF LOCKS FAIL.
+			await self._db_thread.query_withlock(
+				ProductLinks.insert(*rows),
+				lock_id = lock_id,
+				close_lock_after_query = True)
+
 
 		return product_id
 

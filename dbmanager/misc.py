@@ -21,6 +21,12 @@ class Queue():
 
 		return self._queue[0]
 	
+	def work_ahead(self, n: int):
+		if (len(self._queue) <= n): return None
+
+		return self._queue[n]
+
+	
 	def get_length(self) -> int:
 		return len(self._queue)
 	
@@ -39,6 +45,19 @@ class Queue():
 	def remove_first(self) -> Any:
 		try: self._queue.pop(0)
 		except: return None
+
+	def remove_worked_ahead(self, n: int):
+		try: self._queue.pop(n)
+		except: return
+	
+	def get_debug_from_queue_item(self, item: DSA):
+		d = item.get("data")
+		if (not d): return
+
+		pl = d.get("payload")
+		if (not pl): return
+
+		return pl.get("debug")
 	
 	def debug_values(self):
 		"""
@@ -48,12 +67,9 @@ class Queue():
 		d: list[DSA] = []
 
 		for v in self._queue:
-			vv = (v.get("data") or {}).get("payload") or {} # type: ignore
+			vv = self.get_debug_from_queue_item(v)
 
-			d.append({
-				"id": v["id"],
-				"debug": vv.get("debug") # type: ignore
-			})
+			d.append({ "id": v["id"], "debug": vv })
 
 		return d
 

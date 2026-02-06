@@ -42,10 +42,13 @@ DB_SCHM = env["DB_SCHM"]
 
 from dbmanager import misc
 
+print(hash(Images))
+print(hash(Images))
+
 
 #asda = algolia.AlgoliaCollector(env, config, RESULTS_PER_SEARCH) # good cfw
 #tesco = graphql.GQLCollector(env, config, RESULTS_PER_SEARCH) # good cfw
-mor = clusters.ClusterCollector(logger, env, config, RESULTS_PER_SEARCH) # good cfw
+#mor = clusters.ClusterCollector(logger, env, config, RESULTS_PER_SEARCH) # good cfw
 #sains = akamai.AKMCollector(env, config, RESULTS_PER_SEARCH) # bad cfw
 #ald = aldi.ALDCollector(env, config, 60) # "Page limit must be equal to some of there values: [12,16,24,30,32,48,60]"
 
@@ -128,8 +131,15 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 		StoreNames.aldi: 5
 	}
 
-	w = Writer(env, logger, DB_PROCESS)
-	w.set_state(s)
+	#w = Writer(env, logger, DB_PROCESS)
+	#w.set_state(s)
+
+
+	
+
+
+
+	return
 
 	"""c = (ProductLinks.row.upc.in_([5057753934453, 5000436510826, 5057967013944])) | ((ProductLinks.row.cin == 1) & (ProductLinks.row.store == 2))
 	print(c)
