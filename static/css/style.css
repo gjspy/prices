@@ -24,6 +24,8 @@
 	--li-width: 10rem;
 	--col-gap: 12px;
 	--row-gap: 5px;
+
+	--list-item-h: 5rem;
 }
 
 
@@ -187,7 +189,7 @@ body {
 	width: 100%;
 
 	flex-shrink: 0;
-	flex-grow: 0.5;
+	flex-grow: 0;
 
 	display: flex;
 	flex-direction: row;
@@ -361,7 +363,8 @@ main > section {
 
 
 
-#content.search {
+#content.search,
+#content.list {
 	background-color: var(--background-plainest);
 
 	display: flex;
@@ -369,13 +372,14 @@ main > section {
 }
 
 
-#content.search header h1 {
+#content.search header h1,
+#content.list header h1 {
 	margin: 0 0 1em 1em;
 }
 
-#content.search .contents {
+#content.search .contents,
+#content.list .contents {
 	display: flex;
-	flex-direction: row;
 
 	flex-grow: 1;
 }
@@ -394,6 +398,9 @@ main > section {
 	flex-grow: 1;
 }
 
+#content.list div.list {
+	margin: 0 5vw;
+}
 
 
 
@@ -583,7 +590,13 @@ section:has(div.grid) {
 	background-color: var(--background-plainest);
 }
 
-div.grid {
+div.list {
+	--col-gap: 0;
+	--row-gap: 1em;
+}
+
+div.grid,
+div.list {
 	width: 100%;
 
 	position: relative;
@@ -597,6 +610,14 @@ div.grid ul.grid-items {
 	display: grid;
 
 	column-gap: var(--col-gap);
+	row-gap: var(--row-gap);
+}
+
+div.list ul.list-items {
+	display: grid;
+
+	grid-auto-flow: row;
+	grid-auto-rows: var(--list-item-h);
 	row-gap: var(--row-gap);
 }
 
@@ -617,21 +638,17 @@ div.grid.scroll ul.grid-items {
 }
 
 
-div.grid > button {
-	position: absolute;
 
-	width: 50px;
-	height: 50px;
-
-	padding: 8px;
-}
-
-div.grid .grid-item {
+div.grid .grid-item,
+div.list .list-item {
 	position: relative;
 
 	font-family: Roboto, sans-serif;
 
 	display: flex;
+}
+
+div.grid .grid-item {
 	flex-direction: column;
 }
 
@@ -682,37 +699,78 @@ div.grid .grid-item .img-cont {
 	flex-grow: 0;
 }
 
+
+div.list .list-item:not(:last-of-type)::before {
+	content: '';
+	width: calc(100% - var(--list-item-h));
+	height: 1px;
+
+	display: block;
+
+	position: absolute;
+
+	bottom: calc(var(--row-gap) / -2);
+	right: 0;
+
+	background-color: var(--accent-1);
+}
+
+
+div.list .list-item .img-cont {
+	height: var(--list-item-h);
+
+	position: relative;
+	padding: 0.5em;
+}
+
 div.grid .grid-item .img-cont img {
 	width: 100%;
 }
 
-div.grid .grid-item .img-cont .overlay {
+div.list .list-item .img-cont img {
+	height: 100%;
+}
+
+div.grid .grid-item .img-cont .overlay,
+div.list .list-item .img-cont .overlay {
 	position: absolute;
 	left: 0;
 	top: 0;
 }
 
 
-div.grid .grid-item .text-cont {
+div.grid .grid-item .text-cont,
+div.list .list-item .text-cont {
 	display: flex;
-	flex-direction: column;
 	justify-content: space-between;
-
 	flex-grow: 1;
 }
 
+div.grid .grid-item .text-cont {
+	flex-direction: column;
+}
+
 div.grid .grid-item .data1,
-div.grid .grid-item .data2 .price sub {
+div.grid .grid-item .data2 .price sub,
+div.list .list-item .data1 .brand,
+div.list .list-item .data1 .size,
+div.list .list-item .data2 .price sub {
 	font-size: 0.8em;
 	color: var(--dim-accent);
 }
 
-div.grid .grid-item .data1 {
+div.grid .grid-item .data1,
+div.list .list-item .data1 {
 	display: flex;
 	justify-content: space-between;
 }
 
-div.grid .grid-item span.pname {
+div.list .list-item .data1 {
+	flex-direction: column;
+}
+
+div.grid .grid-item span.pname,
+div.list .list-item span.pname {
 	font-size: 1em;
 }
 
@@ -721,7 +779,8 @@ div.grid .grid-item .data2 {
 }
 
 
-div.grid .grid-item .data2 > div {
+div.grid .grid-item .data2 > div,
+div.list .list-item .data2 > div {
 	width: 100%;
 
 	position: relative;
@@ -735,23 +794,29 @@ div.grid .grid-item .data2 > div {
 	padding-top: 10px;
 }
 
-div.grid .grid-item .data2 .logos {
+div.grid .grid-item .data2 .logos,
+div.list .list-item .data2 .logos {
 	display: flex;
 	flex-direction: row;
 
 	justify-content: center;
 	align-items: center;
 
-	width: 100%;
 	height: 50%;
 }
 
-div.grid .grid-item .data2 svg {
+div.grid .grid-item .data2 .logos {
+	width: 100%;
+}
+
+div.grid .grid-item .data2 svg,
+div.list .list-item .data2 svg {
 	max-height: 50%;
 	max-width: 80%;
 }
 
-div.grid .grid-item .data2 .price {
+div.grid .grid-item .data2 .price,
+div.list .list-item .data2 .price  {
 	line-height: 2;
 	text-align: center;
 
