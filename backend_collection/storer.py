@@ -499,9 +499,11 @@ class Writer():
 			if (str(upc) in upcs_with_existing_link): continue
 
 			this_cinandstore = (str(link["cin"]), store_id)
-			include_cin = this_cinandstore in cinandstore_with_existing_link
+			include_cin = not (
+				this_cinandstore in cinandstore_with_existing_link)
 
-			rows.append(self.create_link_row(product_id, link, store_id, include_cin))
+			rows.append(self.create_link_row(
+				product_id, link, store_id, include_cin))
 
 		# NO ROWS MADE TO DOCUMENT UPC (DOESNT EXIST?)
 		# AND PRODUCT WAS JUST MADE, WE NEED TO LINK CIN + STORE.

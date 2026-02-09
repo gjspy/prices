@@ -175,7 +175,13 @@ class AlgoliaCollector(BaseCollector):
 	def get_storables_from_result(self, result: DSA) -> list[DSA]:
 		brand_name = result.get("BRAND") or ""
 		image_id = result.get("IMAGE_ID") or "" # ALSO UPC
-		if ("_" in image_id): image_id = image_id.split("_")[0]
+		upc = image_id
+
+		if ("_" in image_id):
+			for p in image_id.split("_"):
+				try: p = int(p)
+				except: pass
+				else: upc = p
 
 		name = result.get("NAME") or ""
 
