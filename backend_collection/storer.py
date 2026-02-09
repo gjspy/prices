@@ -559,7 +559,9 @@ class Writer():
 			self._logger.info(f"Got product_id of {store} {cin}: P#{got_pid}")
 
 		except Exception as e:
-			self._logger.error(f"Couldn't get product_id for {store}-{cin} / {type(e)} {e.args}")
+			self._logger.error(
+				f"Couldn't get product_id for {store}-{cin} "
+				f"/ {e.__class__.__name__} {e.args}")
 			return False
 
 
@@ -570,7 +572,8 @@ class Writer():
 
 			self._logger.info(f"Created price entries for P#{got_pid}")
 		except Exception as e:
-			self._logger.error(f"Couldn't create prices for P#{got_pid} / {e}")
+			self._logger.error(f"Couldn't create prices for P#{got_pid} "
+				f"/ {e.__class__.__name__} {e.args}")
 
 
 		# 3) STORE IMAGE
