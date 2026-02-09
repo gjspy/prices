@@ -160,6 +160,9 @@ class AlgoliaCollector(BaseCollector):
 		offer = sale_data.get("OFFER")
 		if (offer == None or offer == "List"): return
 
+		# REDUCTIONS DON'T HAVE PROMO ID, SO JUST USE PRODUCT CIN
+		# AND SET EXPIRY TO TOMORROW, HOPEFULLY IT WILL BE UPDATED.
+
 		return {
 			"offer_type": OFFER_TYPES.simple_reduction,
 			"was_price": convert_str_to_pence(sale_data.get("WASPRICE") or ""),
@@ -172,6 +175,7 @@ class AlgoliaCollector(BaseCollector):
 	def get_storables_from_result(self, result: DSA) -> list[DSA]:
 		brand_name = result.get("BRAND") or ""
 		image_id = result.get("IMAGE_ID") or "" # ALSO UPC
+		if ("_" in image_id): image_id = image_id.split("_")[0]
 
 		name = result.get("NAME") or ""
 

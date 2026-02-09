@@ -47,7 +47,8 @@ class regex:
 	# MATCHES DIGITS FOLLOWED BY CHAR UNITS.
 	_EOS = r"\)? *$"
 	_CH = r"[,\(\) ]" # MISC CHARACTERS TO IGNORE
-	_PS_ONE = r"([\d\.]+) ?([A-z]*)" # 
+	_UOM = r"([A-z]{0,2}|pint|litre|pound)s?" # UNIT OF MEASUREMENT
+	_PS_ONE = rf"([\d\.]+) ?{_UOM}" # 
 	PACKSIZE_SINGLE = rf"{_PS_ONE}{_EOS}"
 
 	# "{a} x {b} {unit}", "{a} x {b}", "{a} pack {b} {unit}", "{a} pack {b}"
@@ -60,6 +61,7 @@ class regex:
 
 	ALL_NON_ASCII = r"[^\x00-\x7F]"
 
+print(regex.PACKSIZE_SINGLE)
 
 class OFFER_TYPES:
 	unknown = 0
@@ -210,20 +212,45 @@ def convert_fracorperc_to_perc(value: str):
 	if ("%" in value):  return int_safe(value.replace("%",""))
 
 
-def standardise_packsize(size: str | Number, unit: str):
-	""" Convert packsize data to standard units (g or ml) """
+def standardise_packsize(size: str | Number, unit: str) -> tuple[float, str]:
+	"""
+	Convert packsize data to standard units
+
+	Not all unit types standardised anymore, as it doesnt make sense to.
+
+	Always returns 2-char str representation of unit
+	"""
 	unit = unit.lower()
 
-	if (type(size) == str):
-		size = size.lower()
+	size = float(size)
 
-		if ("kg" in unit): return (float(size.replace("kg", "")) * 1000, "g")
-		if ("ml" in unit): return (float(size.replace("ml", "")), "ml")
+	if ("kg" in unit): return (size * 1000, "g")
+	if ("ml" in unit): return (size, "ml")
+	if ("cl" in unit): return (size * 10, "ml")
 
-		if ("g" in unit): return (float(size.replace("g", "")), "g")
-		if ("l" in unit): return (float(size.replace("l","")) * 1000, "ml") 
+	if ("mg" in unit): return (size, "mg") # doesn't make sense to / 1000
+
+	"""if ("pint" in unit or "pt" in unit): return (size, "pt")
+	if ("fl" in unit): return (size, "fz") # fluid ounce
+	if ("gal" in unit): return (size, "ga") # gallon"""
+
+	if ("pint" in unit or "pt" in unit): return (round(size * 568, 2), "ml")
+	if ("fl" in unit): return (round(size * 28.4, 2), "ml") # fluid ounce
+	if ("gal" in unit): return (round(size * 4546), "ml") # gallon
+
+	if ("oz" in unit): return (round(size * 28.4, 2), "g")
+	if ("pound" in unit or "lb" in unit): return (round(size * 454), "g")
+
+	if ("g" in unit): return (size, "g")
+	if ("l" in unit): return (size * 1000, "ml")
+
+	if ("mm" in unit): return (size, "mm")
+	if ("cm" in unit): return (size * 10, "mm")
+	if ("m" in unit): return (size * 100, "mm")
+
+	# TODO others like /sheet for paper, /pod for laundry?
 	
-	return (0, "")
+	return (0.0, "")
 
 
 
@@ -234,6 +261,7 @@ def clean_string(value: str):
 	"""
 	value = re.sub(regex.CLEAN_STR, "", value)
 	value =  re.sub(regex.MULTI_SPACES, " ", value)
+	value = re.sub(" +$", "", value)
 
 	return value
 

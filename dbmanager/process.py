@@ -343,15 +343,16 @@ class DBThread(Thread):
 
 		
 
-	def _stage(
-			self, payload: DSA, future: Optional[Future[Any]] = None,
+	def stage_withlock(
+			self,
+			payload: DSA,
+			future: Optional[Future[Any]] = None,
 			create_lock_on: Optional[engine.Table[Any]] = None,
 			lock_id: Optional[int] = None,
 			close_lock_after_query: Optional[bool] = None,
 			urgent: bool = False):
 		"""
 		Add SQL payloads to queue. You may use this method.
-
 		If you want to receive a response, you should use the `query` method.
 
 		Args
@@ -475,7 +476,7 @@ class DBThread(Thread):
 
 		future = self.create_future()
 
-		lock_id = self._stage(
+		lock_id = self.stage_withlock(
 			query, future, create_lock_on, lock_id, close_lock_after_query)
 
 		response: DSA = await future
@@ -503,7 +504,7 @@ class DBThread(Thread):
 		command to run.
 		"""
 
-		self._stage(
+		self.stage_withlock(
 			{"no_sql": True}, # FILLER ENTRY, NO QUERY JUST CLOSE LOCK.
 			lock_id = lock_id,
 			close_lock_after_query = True,

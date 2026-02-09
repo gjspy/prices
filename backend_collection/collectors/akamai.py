@@ -164,6 +164,7 @@ class AKMCollector(BaseCollector):
 		sale_data: DSA = result.get("retail_price") or {}
 		price = sale_data.get("price")
 		if (not price): return []
+		price = round(price * 100)
 
 		promos_data = self.process_promos(result)
 		for promo in promos_data:
@@ -184,8 +185,8 @@ class AKMCollector(BaseCollector):
 			thumb = img,
 			upcs = result.get("eans"),
 			cin = result.get("product_uid"),
-			price_pence = round(price * 100),
-			is_available = sale_data.get("is_available") == True,
+			price_pence = price,
+			is_available = result.get("is_available") == True,
 			rating_avg = rating_data.get("average_rating"),
 			rating_count = rating_data.get("total"),
 			category = None, # NOT WORTH OUR TIME

@@ -7,4 +7,4 @@ LEFT JOIN Stores ON Stores.ID = Brands.StoreID
 
 WHERE UPC='5000246729661' OR PName="Whole Milk Drink 2 Litre" OR PS_SizeEach=2000
 
-ORDER BY Products.PID DESC;
+ORDER BY Products.PID ASC;

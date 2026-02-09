@@ -142,14 +142,18 @@ class Writer():
 
 
 	def store_rating(self, product_id: int, store_id: int, rating: DSA):
-		if (rating.get("avg") is None or rating.get("count") is None): return
+		avg, count = rating.get("avg"), rating.get("count")
+
+		# DON'T HAVE avg == 0, CUS PPL MIGHT UNANIMOUSLY
+		# HATE THAT THING!!
+		if (avg is None or count is None or count == 0): return
 		db_row = Ratings.row.new()
 
 		db_row.product.ref_value(Product).db_id.value = product_id
 		db_row.store.ref_value(Store).db_id.value = store_id
 
-		db_row.avg.value = rating["avg"]
-		db_row.count.value = rating["count"]
+		db_row.avg.value = avg
+		db_row.count.value = count
 
 		self._db_thread.stage(Ratings.insert(db_row, on_duplicate_key_update=True))
 
@@ -173,13 +177,16 @@ class Writer():
 
 
 
-	async def create_offer(self, store_id: int, offer: DSA):
+	async def create_offer(
+			self, store_id: int, offer: DSA, store_given_id: int):
 		db_row = Offers.row.from_dict(offer, False)
+
+		db_row.store_given_id.value = store_given_id
 		db_row.store.ref_value(Store).db_id.value = store_id
 
 		created = await self._db_thread.query(Offers.insert(
-			db_row, on_duplicate_key_return_existing_id = True
-		))
+			db_row, on_duplicate_key_return_existing_id = True,
+		)) # LOCK NOT NEEDED, AS ODK RETURN EXISTING IS SUFFICIENT.
 
 		lastrowid = created.get("lastrowid")
 		if (lastrowid is None): return
@@ -258,16 +265,17 @@ class Writer():
 
 
 	def create_link_row(
-			self, product_id: int, link: DSA, store_id: int) -> ProductLink:
+			self, product_id: int, link: DSA,
+			store_id: int, _include_cin: bool = True) -> ProductLink:
 		db_row = ProductLinks.row.new()
 
 		db_row.product.ref_value(Product).db_id.value = product_id
 		db_row.store.ref_value(Store).db_id.value = store_id
 
-		db_row.cin.value = link["cin"]
+		if (_include_cin): db_row.cin.value = link["cin"]
 
 		upc = link.get("upc")
-		if (upc): db_row.upc.value = upc
+		if (upc is not None): db_row.upc.value = upc
 
 		return db_row
 
@@ -294,10 +302,10 @@ class Writer():
 
 
 
-	async def create_product(self, product: DSA, store_id: int) -> int:
+	async def create_product(self, product: DSA, cin: int, store_id: int) -> int:
 		db_row = Products.row.from_dict(product)
 
-		brand_id = await self.get_brand_id(product["brand_name"], store_id)
+		brand_id = await self.get_brand_id(product["brand_name"], cin, store_id)
 		db_row.brand.ref_value(Brand).db_id.value = brand_id
 
 		new_id = await self._db_thread.query(Products.insert(db_row))
@@ -333,12 +341,21 @@ class Writer():
 
 
 	async def get_offer_id(
-			self, product_id: int, store_id: int, offer: DSA) -> Optional[int]:
-		existing = await self._db_thread.query(
-			Queries.get_offer_by_store_data(store_id, offer["store_given_id"]))
-		# QUERY EXISTING BECAUSE WE NEED ITS ID FOR OFFERHOLDER.
+			self, product_id: int, store_id: int,
+			cin: int, offer: DSA) -> Optional[int]:
+		
+		store_given_id = offer.get("store_given_id")
+		try: store_given_id = int(store_given_id) # type: ignore
+		except: store_given_id = cin
 
-		results = existing.get("fetchall")
+		resp = await self._db_thread.query(
+			Queries.get_offer_by_store_data(store_id, store_given_id))
+
+		# QUERY EXISTING BECAUSE WE NEED ITS ID FOR OFFERHOLDER.
+		# WE NEED OfferIDs TO BE NON-DUPLICATED, SO WE CAN DISPLAY
+		# ALL PRODUCTS IT APPLIES TO.
+
+		results = resp.get("fetchall")
 
 		existing_id: Optional[int] = None
 
@@ -349,11 +366,13 @@ class Writer():
 			end_date = offer.get("end_date")
 
 			if (end_date is not None and db_row.end_date.value != end_date):
+				# UPDATE EXPRING IF ITS NOT MEANT TO!
 				db_row.end_date.value = end_date
 				self._db_thread.stage(Offers.update(db_row))
 
 		else:
-			existing_id = await self.create_offer(store_id, offer)
+			existing_id = await self.create_offer(
+				store_id, offer, store_given_id)
 
 		if (not existing_id): return None
 		self.create_offer_holder(existing_id, product_id)
@@ -385,21 +404,21 @@ class Writer():
 
 	async def get_offer_ids(
 			self, product_id: int,
-			store_id: int, offers: list[DSA]) -> list[int]:
-
-		got: list[int] = []
+			store_id: int, cin: int, offers: list[DSA]):
 
 		for offer in offers:
-			this = await self.get_offer_id(product_id, store_id, offer["data"])
+			this = await self.get_offer_id(product_id, store_id, cin, offer["data"])
 			if (not this): continue
 
-			got.append(this)
-
-		return got
 
 
+	async def get_brand_id(
+			self, brand_name: str, cin: int, store_id: int) -> int:
 
-	async def get_brand_id(self, brand_name: str, store_id: int) -> int:
+		if (not brand_name):
+			new_id = await self.create_brand(str(cin), store_id)
+			return new_id # TODO: another admin task, clean up brand names which were unknown
+
 		query = Brands.select(
 			[Brands.row.db_id, Brands.row.parent],
 			where = ((LOWER(Brands.row.brand_name) == brand_name.lower()) &
@@ -437,6 +456,7 @@ class Writer():
 			upcs, cin, store_id)
 
 		upcs_with_existing_link: list[str] = []
+		cinandstore_with_existing_link: list[tuple[str, int]] = []
 		product_id: Optional[int] = None
 
 		# GET PID FROM LINKS
@@ -449,6 +469,11 @@ class Writer():
 			if (this_upc is not None):
 				upcs_with_existing_link.append(str(this_upc))
 				# MAKE ALL str AS PARAM upcs CAN BE str.
+			
+			this_cin = link.cin.plain_value
+			this_store = link.store.ref_value(Store).db_id.plain_value
+			if (this_cin is not None and this_store is not None):
+				cinandstore_with_existing_link.append((str(cin), this_store))
 		
 		# Create new Links even if we have existing_links.
 		# If there are multiple UPCs, we might be able to 'daisy-chain':
@@ -470,10 +495,13 @@ class Writer():
 			if (not link): continue
 
 			upc = link.get("upc")
-			if (upc is not None and str(upc) in upcs_with_existing_link): continue
 			if (upc is None): continue
+			if (str(upc) in upcs_with_existing_link): continue
 
-			rows.append(self.create_link_row(product_id, link, store_id))
+			this_cinandstore = (str(link[upc]), store_id)
+			include_cin = this_cinandstore in cinandstore_with_existing_link
+
+			rows.append(self.create_link_row(product_id, link, store_id, include_cin))
 		
 		# NO ROWS MADE TO DOCUMENT UPC (DOESNT EXIST?)
 		# AND PRODUCT WAS JUST MADE, WE NEED TO LINK CIN + STORE.
@@ -556,7 +584,7 @@ class Writer():
 		try:
 			offers = self._get_data_of_type(data, "offer")
 			if (offers):
-				await self.get_offer_ids(got_pid, store_id, offers)
+				await self.get_offer_ids(got_pid, store_id, cin, offers)
 				self._logger.info(f"Created offers for P#{got_pid}")
 
 			else: self._logger.debug(f"No offers for P#{got_pid}")

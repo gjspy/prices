@@ -306,19 +306,20 @@ class BaseCollector:
 			}
 		}
 
-		cat = {
+		kwrd = category if (category is not None) else ""
+		if (dept is not None): kwrd += f" {dept}"
+
+		kwrds = [{
 			"type": "keywords",
-			"data": {
-				"value": f"{category} {dept}"
-			}
-		}
+			"data": { "value": kwrd }
+		}] if (kwrd) else []
 
 		promo_objs = [ { "type": "offer", "data": v } for v in (promos or []) ]
 		label_objs = [ { "type": "label", "data": v } for v in (labels or []) ]
 
 		return [
-			product, image, price, rating, cat,
-			*links, *promo_objs, *label_objs
+			product, image, price, rating,
+			*links, *promo_objs, *label_objs, *kwrds
 		]
 
 
