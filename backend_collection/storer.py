@@ -502,7 +502,7 @@ class Writer():
 			include_cin = this_cinandstore in cinandstore_with_existing_link
 
 			rows.append(self.create_link_row(product_id, link, store_id, include_cin))
-		
+
 		# NO ROWS MADE TO DOCUMENT UPC (DOESNT EXIST?)
 		# AND PRODUCT WAS JUST MADE, WE NEED TO LINK CIN + STORE.
 		if (len(rows) == 0 and product_just_created):
@@ -559,7 +559,7 @@ class Writer():
 			self._logger.info(f"Got product_id of {store} {cin}: P#{got_pid}")
 
 		except Exception as e:
-			self._logger.error(f"Couldn't get product_id for {store}-{cin} / {e}")
+			self._logger.error(f"Couldn't get product_id for {store}-{cin} / {type(e)} {e.args}")
 			return False
 
 

@@ -18,6 +18,7 @@ RECONNECTION_WAIT = 5
 DUMP_INTERVAL = 30 # SECONDS
 NOTICE_INTERVAL = 60 * 60 # SECONDS
 WAIT_BEFORE_FIRST_NOTICE = 5 * 60 # SECONDS
+MAX_CYCLES_BEFORE_CLOSE_LOCK = 10 # = 10 SECONDS DELAY
 
 class DBThread(Thread):
 	"""## Subclassed threading.Thread only for DB process. ##"""
@@ -338,6 +339,16 @@ class DBThread(Thread):
 			del self._locked_tables[table]
 		
 		del self._lock_data[lock_id]
+	
+	def __reset_locks(self):
+		""" ONLY USED IN EMERGENCY """
+
+		self._logger.critical("CLEARED LOCKS.")
+
+		self._lock_data = {}
+		self._locked_tables = {}
+		# KEEP ID, OTHERWISE WOULD CAUSE MORE ISSUE WITH
+		# OTHER STAGED LOCKS.
 
 
 
@@ -526,9 +537,17 @@ class DBThread(Thread):
 		last_dump = datetime.fromtimestamp(0)
 		last_notice = datetime.now() - timedelta(
 			seconds = NOTICE_INTERVAL - WAIT_BEFORE_FIRST_NOTICE)
+		
+		cycles_idle = 0
 
 		while True:
-			if (not self._active): time.sleep(AVG_WORK_SPEED) # PREVENT RAPID-FIRE
+			if (self._active): cycles_idle = 0
+			else:
+				time.sleep(AVG_WORK_SPEED) # PREVENT RAPID-FIRE
+				cycles_idle += 1
+			
+			if (cycles_idle > MAX_CYCLES_BEFORE_CLOSE_LOCK):
+				self.__reset_locks()
 
 			try:
 				if (not self._engine.is_connected): self._engine.connect()

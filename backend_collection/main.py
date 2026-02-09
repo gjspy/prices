@@ -241,7 +241,7 @@ class Scheduler():
 			if (time_next.timestamp() <= now.timestamp()):
 				self._logger.warning(
 					f"Starting new batch, as time is {now.strftime(DATE_FMT)} "
-					f"as was meant to start at {time_next.strftime}")
+					f"as was meant to start at {time_next.strftime(DATE_FMT)}")
 
 				await self.new_batch() # WAIT!!!!!
 
