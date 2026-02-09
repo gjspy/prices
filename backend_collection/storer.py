@@ -346,7 +346,10 @@ class Writer():
 		
 		store_given_id = offer.get("store_given_id")
 		try: store_given_id = int(store_given_id) # type: ignore
-		except: store_given_id = cin
+		except:
+			offer["original_sgi"] = store_given_id
+			store_given_id = cin
+			offer["store_given_id"] = store_given_id
 
 		resp = await self._db_thread.query(
 			Queries.get_offer_by_store_data(store_id, store_given_id))
@@ -456,7 +459,6 @@ class Writer():
 			upcs, cin, store_id)
 
 		upcs_with_existing_link: list[str] = []
-		cinandstore_with_existing_link: list[tuple[str, int]] = []
 		product_id: Optional[int] = None
 
 		# GET PID FROM LINKS
@@ -469,11 +471,6 @@ class Writer():
 			if (this_upc is not None):
 				upcs_with_existing_link.append(str(this_upc))
 				# MAKE ALL str AS PARAM upcs CAN BE str.
-			
-			this_cin = link.cin.plain_value
-			this_store = link.store.ref_value(Store).db_id.plain_value
-			if (this_cin is not None and this_store is not None):
-				cinandstore_with_existing_link.append((str(cin), this_store))
 		
 		# Create new Links even if we have existing_links.
 		# If there are multiple UPCs, we might be able to 'daisy-chain':
@@ -498,23 +495,19 @@ class Writer():
 			if (upc is None): continue
 			if (str(upc) in upcs_with_existing_link): continue
 
-			this_cinandstore = (str(link["cin"]), store_id)
-			include_cin = not (
-				this_cinandstore in cinandstore_with_existing_link)
-
 			rows.append(self.create_link_row(
-				product_id, link, store_id, include_cin))
+				product_id, link, store_id))
 
 		# NO ROWS MADE TO DOCUMENT UPC (DOESNT EXIST?)
 		# AND PRODUCT WAS JUST MADE, WE NEED TO LINK CIN + STORE.
 		if (len(rows) == 0 and product_just_created):
 			rows.append(self.create_link_row(
 				product_id, links[0]["data"], store_id))
-		
+
 
 		if (len(rows) == 0): # FOUND PRODUCT ID, NO LINKS TO MAKE.
 			self._db_thread.close_lock(lock_id)
-		
+
 		else: # LINKS TO MAKE.
 
 			# THIS WILL RAISE ERROR IF A UPC EXISTS ALREADY.

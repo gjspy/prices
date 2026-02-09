@@ -48,7 +48,7 @@ ONLY_WAIT_FOR_NEXT_BATCH = config["ONLY_WAIT_FOR_NEXT_BATCH"] == "True" # DISABL
 # LIST MUST BE IN ORDER
 RUNTIMES = [
 	#dtime( 9,00),
-	dtime(12,20),
+	dtime(17,00),
 	#dtime(21,00)
 ]
 
@@ -160,7 +160,7 @@ class Scheduler():
 
 			await asyncio.sleep(1)
 
-			self._logger.progress(f"Completed all stores for '{kw}'")
+			self._logger.notice(f"Completed all stores for '{kw}'")
 
 			current_len = self._db_thread.get_queue_length()
 
@@ -192,7 +192,7 @@ class Scheduler():
 			self._logger.notice(
 				f"New batch starting soon. Time is {now.strftime(DATE_FMT)} "
 				f"and next batch to run {next_runtime.strftime(DATE_FMT)}. "
-				f"Waiting {int(seconds):,} seconds. ({seconds // 60:.2f} minutes)")
+				f"Waiting {int(seconds):,} seconds. ({seconds / 60:.2f} minutes)")
 
 			try: await asyncio.sleep(seconds)
 			except asyncio.exceptions.CancelledError: return True

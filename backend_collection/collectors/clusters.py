@@ -24,6 +24,7 @@ class MORPromoProcessor(PromoProcessor):
 	# DATA DOES NOT SPECIFY WITH WHOM THE PRICE IS MATCHED
 	# MORRISONS WEBSITE: "essentials price matched to Aldi and Lidl"
 	pricematching_store = "UnspecificAldiLidl"
+	membership_price_promo_keyword = "more card"
 
 	def __init__(self, result: DSA, specific_promo: DSA):
 		super().__init__(result, specific_promo)

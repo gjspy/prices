@@ -1,4 +1,5 @@
 from datetime import time as dtime, datetime
+from copy import deepcopy
 import requests
 import dotenv
 import queue
@@ -154,13 +155,11 @@ class CustomLogDC(logging.Handler):
 		self._last_dump = n
 
 		msg = ""
-		n = 0
-		for this in self._msges:
+
+		for this in deepcopy(self._msges):
 			if (len(msg) + len(this) > 2000): break
 			msg += this + "\n"
-			n += 1
-		
-		self._msges = self._msges[n+1:]
+			self._msges.remove(this)
 
 		requests.post(
 			url = self._hook,
@@ -202,7 +201,7 @@ class CustomLogSS(logging.Handler):
 
 	def dump(self):
 		n = datetime.now()
-		
+
 		if ((n - self._last_dump).total_seconds() < self._cooldown): return
 		self._last_dump = n
 
