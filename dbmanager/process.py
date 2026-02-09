@@ -343,7 +343,8 @@ class DBThread(Thread):
 	def __reset_locks(self):
 		""" ONLY USED IN EMERGENCY """
 
-		self._logger.critical("CLEARED LOCKS.")
+		if (self._lock_data != {} or self._locked_tables != {}):
+			self._logger.critical("CLEARED LOCKS.")
 
 		self._lock_data = {}
 		self._locked_tables = {}
