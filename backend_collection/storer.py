@@ -486,7 +486,7 @@ class Writer():
 
 		if (product_id is None):
 			product_just_created = True
-			product_id = await self.create_product(product, store_id)
+			product_id = await self.create_product(product, cin, store_id)
 
 		rows: list[ProductLink] = []
 
