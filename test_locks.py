@@ -1,45 +1,21 @@
 from dotenv import dotenv_values
+from os import path
 import asyncio
 
-import json
-import copy
-import time
-
-from backend_collection.collectors import algolia, graphql, clusters, akamai, aldi
-from backend_collection.constants import regex, StoreNames, clean_string
-from backend_collection.storer import Writer
-from backend_collection.state import State
-from backend_collection.dbclasses import (
+from backend.dbclasses import (
 	Products, ProductLinks, PriceEntries, Ratings, Images,
 	Brands, Stores, Offers, OfferHolders, Keywords, Labels, Store, Brand, Product, ProductLink)
-from dbmanager.engine import Database, LOWER, NOT
+from dbmanager.engine import Database
 from dbmanager.process import DBThread
-
-from backend_collection.types import DSA
-import os
-import re
 
 config = dotenv_values(".config")
 env = dotenv_values(".env")
-RESULTS_PER_SEARCH = 100
 
-import sshtunnel
+import sshtunnel # type: ignore
 
-from backend_collection.log_handler import get_logger
-logger = get_logger()
+from backend.log_handler import get_logger
+logger = get_logger("collectiontest", path.join("state/teststate.json"))
 
-SSH_USER = env["SSH_USER"]
-SSH_HOST = env["SSH_HOST"]
-SSH_PORT = env["SSH_PORT"]
-SSH_KEY = env["SSH_KEYY"]
-DB_HOST = env["DB_HOST"]
-DB_PORT = env["DB_PORT"]
-DB_USER = env["DB_USER"]
-DB_PASS = env["DB_PASS"]
-DB_SCHM = env["DB_SCHM"]
-
-print(hash(Images))
-print(hash(Images))
 
 
 async def example_1(DB_PROCESS: DBThread):
@@ -467,13 +443,29 @@ async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	logger.progress("disconnect")
 
 
+ssh_port = env["SSH_PORT"]
+ssh_host = env["SSH_HOST"]
+ssh_user = env["SSH_USER"]
+ssh_keyy = env["SSH_KEYY"]
+db__host = env["DB_HOST"]
+db__port = env["DB_PORT"]
 
+assert (
+	ssh_port and ssh_host and ssh_user and
+	ssh_keyy and db__host and db__port )
+
+ssh_port = int(ssh_port)
+db__port = int(db__port)
 
 with sshtunnel.SSHTunnelForwarder(
-		(SSH_HOST, int(SSH_PORT)), ssh_username = SSH_USER, ssh_pkey = SSH_KEY,
-		remote_bind_address = (DB_HOST, int(DB_PORT))) as tunnel:
+		ssh_address_or_host = (ssh_host, ssh_port),
+		ssh_username = ssh_user,
+		ssh_pkey = ssh_keyy,
+		remote_bind_address = (db__host, db__port) ) as tunnel:
 
 	assert tunnel
-	print("tunnel active: ", tunnel and tunnel.is_active)
+	logger.debug(f"SSH TUNNEL ACTIVE: {tunnel.is_active}")
 
-	asyncio.run(main(tunnel))
+	env["DB_PORT"] = tunnel.local_bind_port # type: ignore
+
+	asyncio.run(main(tunnel)) # MUST DO THIS INSIDE "WITH" TO MAINTAIN TUNNEL

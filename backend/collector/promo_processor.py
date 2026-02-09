@@ -1,8 +1,8 @@
 import traceback
 import re
 
-from backend_collection.types import  Any, Callable, Optional, DSA
-from backend_collection.constants import (
+from backend.types import  Any, Callable, Optional, DSA
+from backend.constants import (
 	regex, convert_str_to_pence, OFFER_TYPES, get_dt)
 
 

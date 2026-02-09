@@ -1,10 +1,10 @@
-from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.log_handler import CustomLogger
-from backend_collection.types import DSA, Optional
-from backend_collection.constants import (
+from backend.collector.modules.basecollector import BaseCollector
+from backend.log_handler import CustomLogger
+from backend.types import DSA, Optional
+from backend.constants import (
 	safe_deepget, convert_str_to_pence, clean_product_name,
 	regex, OFFER_TYPES, StoreNames, convert_fracorperc_to_perc, clean_string)
-from backend_collection.promo_processor import InterfacePromoKeys, PromoProcessor
+from backend.collector.promo_processor import InterfacePromoKeys, PromoProcessor
 
 import re
 

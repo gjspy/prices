@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta
 from copy import deepcopy
 
-from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.log_handler import CustomLogger
-from backend_collection.types import DSA
-from backend_collection.constants import (
+from backend.collector.modules.basecollector import BaseCollector
+from backend.log_handler import CustomLogger
+from backend.types import DSA
+from backend.constants import (
 	safe_deepget, int_safe, convert_str_to_pence,
 	clean_product_name, StoreNames, OFFER_TYPES)
-from backend_collection.promo_processor import PromoProcessor, InterfacePromoKeys
+from backend.collector.promo_processor import PromoProcessor, InterfacePromoKeys
 
 class ASDPromoKeys(InterfacePromoKeys):
 	promo_id = "ID"

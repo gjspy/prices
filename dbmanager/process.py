@@ -325,6 +325,10 @@ class DBThread(Thread):
 		id_ = self._locks_created
 		self._locks_created += 1
 
+		if (self._locked_tables.get(table) is not None):
+			self.logger.error(f"There is already a lock on this table, {table}")
+			return None # TODO WHAT?
+
 		self._locked_tables[table] = id_
 		self._lock_data[id_] = table
 

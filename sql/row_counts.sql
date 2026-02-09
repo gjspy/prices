@@ -1,5 +1,6 @@
 SELECT table_name AS "Table",
-       FORMAT(TABLE_ROWS, "N0") AS "N_Rows"
+       FORMAT(TABLE_ROWS, "N0") AS "N_Rows",
+       CURRENT_TIMESTAMP AS TimeNow
 FROM information_schema.tables
 WHERE table_schema="pricedb"
 GROUP BY table_name

@@ -2,13 +2,13 @@ from copy import deepcopy
 from uuid import uuid4
 import re
 
-from backend_collection.collectors.basecollector import BaseCollector
-from backend_collection.log_handler import CustomLogger
-from backend_collection.types import DSA, Optional
-from backend_collection.constants import (
+from backend.collector.modules.basecollector import BaseCollector
+from backend.log_handler import CustomLogger
+from backend.types import DSA, Optional
+from backend.constants import (
 	safe_deepget, int_safe, convert_str_to_pence, 
 	clean_product_name, standardise_packsize, regex, OFFER_TYPES, StoreNames)
-from backend_collection.promo_processor import InterfacePromoKeys, PromoProcessor
+from backend.collector.promo_processor import InterfacePromoKeys, PromoProcessor
 
 
 class TSCPromoKeys(InterfacePromoKeys):

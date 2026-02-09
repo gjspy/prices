@@ -4,8 +4,8 @@ import asyncio
 import json
 import time
 
-from backend_collection.collectors import algolia, graphql, clusters, akamai
-#from backend_collection.constants import StoreNames
+from backend.collector.modules import algolia, graphql, clusters, akamai
+#from backend.collector.constants import StoreNames
 
 import os
 
@@ -107,7 +107,7 @@ ALDI REQUESTS DONT SHOW IN FIREFOX DEV TOOLS? LOOK AT CHROME.
 ONCE SCRAPED DATA, BEFORE STORING IN DB, HAVE dataType CHECKER WHICH FLAGS INCORRECT VALUES.
 THIS CAN BE IN ACCORDANCE TO DB API DECLARATIONS
 
-should i implement collector to handle request of individual item?
+should i implement backend.collector to handle request of individual item?
 streamline where data is stored (talking about having endpoint as a param. if class isnt reused, put endpoint ehre. so then headers, endpoint, EVERYTHIng should be in here. not store name though.)
 relationships: ean to multiple products but also multiple products of same store? does 100% happen (sainsburys returns eans: [""]). hwo would i decide which to show?
 

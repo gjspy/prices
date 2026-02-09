@@ -3,17 +3,16 @@ from copy import deepcopy
 import requests
 import dotenv
 import queue
+import time
 import json
 import os
 
-#from backend_collection.types import Any
-from typing import Any, Callable
+#from backend.collector.types import Any
+from typing import Any
 
 import logging
 import logging.handlers
-from logging import CRITICAL, ERROR, WARNING, INFO, DEBUG
-
-STATS_FP = os.path.join("state", "stats.json")
+from logging import CRITICAL, ERROR, WARNING, INFO, DEBUG # type: ignore
 
 LOG_FORMAT = "%(asctime)s - %(levelname)-8s IN %(threadName)-20s :  %(message)s"
 LOG_DATE_FORMAT = "%d-%m-%y %H:%M:%S"
@@ -87,9 +86,9 @@ LOG_FORMATTER = CustomLogFMT()
 
 # FILE LOGGING
 class CustomLogRF(logging.handlers.TimedRotatingFileHandler):
-	def __init__(self, level: int | str = 0):
+	def __init__(self, name: str, level: int | str = 0):
 		super().__init__(
-			filename = "collection.log", # FILENAME
+			filename = f"{name}.log", # FILENAME
 			when = "midnight", # SWITCH ACTION, HAVE TO SAY THIS AS WELL.
 			utc = True, # TIMEZONE
 			atTime = dtime(23, 55), # TIME TO SWITCH.
@@ -142,7 +141,8 @@ class CustomLogDC(logging.Handler):
 		self._notif = env["DC_NOTIF_ROLE_ID"]
 
 		self._last_dump = datetime.fromtimestamp(1)
-		self._cooldown = 10 # SECONDs
+		self._cooldown = 30 # SECONDs
+		self._is_waiting = False
 
 		self._msges: list[str] = []
 
@@ -150,9 +150,16 @@ class CustomLogDC(logging.Handler):
 		assert self._hook
 
 		n = datetime.now()
+		diff = (n - self._last_dump).total_seconds() - self._cooldown
 
-		if ((n - self._last_dump).total_seconds() < self._cooldown): return
-		self._last_dump = n
+		if (diff > 0):
+			if (self._is_waiting): return
+			self._is_waiting = True
+
+			time.sleep(diff)
+
+		self._last_dump = datetime.now()
+		self._is_waiting = False
 
 		msg = ""
 
@@ -197,13 +204,21 @@ class CustomLogSS(logging.Handler):
 		
 		self._last_dump = datetime.fromtimestamp(1)
 		self._cooldown = 5 # SECONDs
+		self._is_waiting = False
 
 
 	def dump(self):
 		n = datetime.now()
+		diff = (n - self._last_dump).total_seconds() - self._cooldown
 
-		if ((n - self._last_dump).total_seconds() < self._cooldown): return
-		self._last_dump = n
+		if (diff > 0):
+			if (self._is_waiting): return
+			self._is_waiting = True
+
+			time.sleep(diff)
+
+		self._last_dump = datetime.now()
+		self._is_waiting = False
 
 		with open(self._fp, "w") as f:
 			json.dump(self._data, f)
@@ -221,20 +236,10 @@ class CustomLogSS(logging.Handler):
 
 
 
-log_queue = queue.Queue(-1) # type: ignore
-queued_handler = logging.handlers.QueueHandler(log_queue) # type: ignore
-
-
-_file_dump = CustomLogRF(DEBUG)
-_console = CustomLogST(0)
-_dc_hook = CustomLogDC(NOTICE)
-_stats_log = CustomLogSS(STATS, STATS_FP)
-
-
 __has_got = False
 
 
-def get_logger():
+def get_logger(name: str, stats_fp: str):
 	global __has_got
 
 	if (__has_got):
@@ -242,7 +247,17 @@ def get_logger():
 
 	__has_got = True
 
-	logger: CustomLogger = logging.getLogger("gather-logger") # type: ignore
+
+	log_queue: queue.Queue[Any] = queue.Queue(-1)
+	queued_handler = logging.handlers.QueueHandler(log_queue)
+
+
+	_file_dump = CustomLogRF(name, DEBUG)
+	_console = CustomLogST(0)
+	_dc_hook = CustomLogDC(NOTICE)
+	_stats_log = CustomLogSS(STATS, stats_fp)
+
+	logger: CustomLogger = logging.getLogger(name) # type: ignore
 	logger.setLevel(STATS)
 
 	logger.addHandler(_console)

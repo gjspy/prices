@@ -2,7 +2,7 @@ from datetime import datetime
 from os import path
 import json
 
-from backend_collection.constants import DATE_FMT
+from backend.constants import DATE_FMT
 
 
 class State(): # give same instance to writer and scheduler

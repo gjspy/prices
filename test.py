@@ -5,17 +5,17 @@ import json
 import copy
 import time
 
-from backend_collection.collectors import algolia, graphql, clusters, akamai, aldi
-from backend_collection.constants import regex, StoreNames, clean_string
-from backend_collection.storer import Writer
-from backend_collection.state import State
-from backend_collection.dbclasses import (
+from backend.collector.modules import algolia, graphql, clusters, akamai, aldi
+from backend.constants import regex, StoreNames, clean_string
+from backend.collector.storer import Writer
+from backend.collector.state import State
+from backend.dbclasses import (
 	Products, ProductLinks, PriceEntries, Ratings, Images,
 	Brands, Stores, Offers, OfferHolders, Keywords, Labels, Store, Brand, Product, ProductLink)
 from dbmanager.engine import Database, LOWER, NOT
 from dbmanager.process import DBThread
 
-from backend_collection.types import DSA
+from backend.types import DSA
 import os
 import re
 
@@ -23,12 +23,10 @@ config = dotenv_values(".config")
 env = dotenv_values(".env")
 RESULTS_PER_SEARCH = 100
 
-print(os.getcwd())
+import sshtunnel # type: ignore
 
-import sshtunnel
-
-from backend_collection.log_handler import get_logger
-logger = get_logger()
+from backend.log_handler import get_logger
+logger = get_logger("collectiontest", "state\\teststate.json")
 
 SSH_USER = env["SSH_USER"]
 SSH_HOST = env["SSH_HOST"]
@@ -41,16 +39,16 @@ DB_PASS = env["DB_PASS"]
 DB_SCHM = env["DB_SCHM"]
 
 from dbmanager import misc
-
+"""
 print(hash(Images))
-print(hash(Images))
+print(hash(Images))"""
 
 
-#asda = algolia.AlgoliaCollector(env, config, RESULTS_PER_SEARCH) # good cfw
-#tesco = graphql.GQLCollector(env, config, RESULTS_PER_SEARCH) # good cfw
-#mor = clusters.ClusterCollector(logger, env, config, RESULTS_PER_SEARCH) # good cfw
-#sains = akamai.AKMCollector(env, config, RESULTS_PER_SEARCH) # bad cfw
-#ald = aldi.ALDCollector(env, config, 60) # "Page limit must be equal to some of there values: [12,16,24,30,32,48,60]"
+asda = algolia.AlgoliaCollector(logger, env, config, RESULTS_PER_SEARCH) # good cfw
+tesco = graphql.GQLCollector(logger, env, config, RESULTS_PER_SEARCH) # good cfw
+mor = clusters.ClusterCollector(logger, env, config, RESULTS_PER_SEARCH) # good cfw
+sains = akamai.AKMCollector(logger, env, config, RESULTS_PER_SEARCH) # bad cfw
+ald = aldi.ALDCollector(logger, env, config, 60) # "Page limit must be equal to some of there values: [12,16,24,30,32,48,60]"
 
 #c = (Products.row.brand == 12) | ((Products.row.db_id == 1) & (Products.row.name == "hello"))
 #print(c)
@@ -98,6 +96,25 @@ print(q)
 #print(id(Brands.row.parent.references), id(Brand.parent.references),id(Brands.row.new().parent.references))
 #print(id(ProductLinks.row.store.references), id(ProductLink.store.references),id(ProductLinks.row.new().store.references))
 
+
+
+
+
+
+with open(r"C:\PermanentThings\RPI_SCP\Backups\Backup39\260209T171424_SAINSBURYS_SEARCH_beef.json","r") as f:
+	d = json.load(f)
+
+#result = tesco.parse_data(d)
+#result = asda.parse_data(d)
+#result = ald.parse_data(d)
+result = sains.parse_data(d)
+#result = mor.parse_data(d)
+
+
+
+
+
+raise
 async def main(tunnel: sshtunnel.SSHTunnelForwarder):
 	env["DB_PORT"] = tunnel.local_bind_port # type: ignore
 	
@@ -363,7 +380,7 @@ ALDI REQUESTS DONT SHOW IN FIREFOX DEV TOOLS? LOOK AT CHROME.
 ONCE SCRAPED DATA, BEFORE STORING IN DB, HAVE dataType CHECKER WHICH FLAGS INCORRECT VALUES.
 THIS CAN BE IN ACCORDANCE TO DB API DECLARATIONS
 
-should i implement collector to handle request of individual item?
+should i implement backend.collector to handle request of individual item?
 streamline where data is stored (talking about having endpoint as a param. if class isnt reused, put endpoint ehre. so then headers, endpoint, EVERYTHIng should be in here. not store name though.)
 relationships: ean to multiple products but also multiple products of same store? does 100% happen (sainsburys returns eans: [""]). hwo would i decide which to show?
 

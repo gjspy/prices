@@ -6,23 +6,23 @@ import asyncio
 import json
 
 
-from backend_collection.types import DSA, Optional, Any
-from backend_collection.log_handler import CustomLogger
-from backend_collection.constants import (
+from backend.types import DSA, Optional, Any
+from backend.log_handler import CustomLogger
+from backend.constants import (
 	StoreNames, async_executor, LABEL_TYPES, utcnow, DATE_FMT )
 
 from dbmanager.process import DBThread # ONLY FOR TYPE. DO NOT CREATE A THREAD HERE. ONLY ONE MAY EXIST.
 from dbmanager.engine import LOWER
 
-from backend_collection.dbclasses import (
+from backend.dbclasses import (
 	Products, ProductLinks, PriceEntries, Ratings, Images,
 	Brands, Offers, OfferHolders, Labels, Keywords,
 
 	# TableRows ONLY IMPROTED FOR TYPEHINTS.
 	ProductLink, Brand, Store, Product, Offer
 )
-from backend_collection.dbclasses import Queries
-from backend_collection.state import State
+from backend.dbclasses import Queries
+from backend.collector.state import State
 
 
 class Writer():
@@ -458,7 +458,7 @@ class Writer():
 		existing_links, lock_id = await self.get_existing_links_from_ids(
 			upcs, cin, store_id)
 
-		upcs_with_existing_link: list[str] = []
+		upcs_with_existing_link: list[int] = []
 		product_id: Optional[int] = None
 
 		# GET PID FROM LINKS
@@ -469,8 +469,9 @@ class Writer():
 			
 			this_upc = link.upc.plain_value
 			if (this_upc is not None):
-				upcs_with_existing_link.append(str(this_upc))
-				# MAKE ALL str AS PARAM upcs CAN BE str.
+				upcs_with_existing_link.append(this_upc)
+				# ALL MUST BE INT. Cannot generalise str,
+				# as str(123) != str("0123") !!!
 		
 		# Create new Links even if we have existing_links.
 		# If there are multiple UPCs, we might be able to 'daisy-chain':
@@ -493,10 +494,16 @@ class Writer():
 
 			upc = link.get("upc")
 			if (upc is None): continue
-			if (str(upc) in upcs_with_existing_link): continue
+
+			try: upc = int(upc)
+			except: continue
+
+			if (upc in upcs_with_existing_link): continue
 
 			rows.append(self.create_link_row(
 				product_id, link, store_id))
+			
+			upcs_with_existing_link.append(upc)
 
 		# NO ROWS MADE TO DOCUMENT UPC (DOESNT EXIST?)
 		# AND PRODUCT WAS JUST MADE, WE NEED TO LINK CIN + STORE.

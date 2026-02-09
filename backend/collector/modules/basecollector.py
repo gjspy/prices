@@ -7,10 +7,10 @@ import re
 import os
 
 
-from backend_collection.types import Any, Optional, Number, DSA
-from backend_collection.promo_processor import PromoProcessor
-from backend_collection.log_handler import CustomLogger
-from backend_collection.constants import (
+from backend.types import Any, Optional, Number, DSA
+from backend.collector.promo_processor import PromoProcessor
+from backend.log_handler import CustomLogger
+from backend.constants import (
 	safe_deepget, regex, standardise_packsize,
 	stringify_query, async_executor, DATE_FMT, utcnow)
 
@@ -223,7 +223,9 @@ class BaseCollector:
 				clean_datas.append(self.get_storables_from_result(result))
 			except:
 				self._logger.exception(
-					f"COULD NOT GATHER PRODUCT DATA. {self.store}.")
+					f"COULD NOT GATHER PRODUCT DATA. {self.store}. "
+					f"Continuing with parse_data for {self.store}, "
+					"this has been caught.")
 
 		return clean_datas
 

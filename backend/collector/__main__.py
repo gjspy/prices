@@ -12,27 +12,27 @@ from dbmanager.engine import Database
 from dbmanager.process import DBThread
 
 
-from backend_collection.collectors import (
+from collector.modules import (
 	akamai, aldi, algolia, clusters, graphql)
 
-from backend_collection.dbclasses import (
+from backend.dbclasses import (
 	Products, ProductLinks, PriceEntries, Ratings, Images,
 	Brands, Stores, Offers, OfferHolders, Labels, Keywords,
 
 	Store)
 
-from backend_collection.log_handler import get_logger, CustomLogger
-from backend_collection.storer import Writer
-from backend_collection.state import State
+from backend.log_handler import get_logger, CustomLogger
+from collector.storer import Writer
+from collector.state import State
 
-from backend_collection.constants import utcnow, DATE_FMT
+from backend.constants import utcnow, DATE_FMT
 
 
 RESULTS_PER_SEARCH = 100
 config = dotenv_values(".config")
 env = dotenv_values(".env")
 
-logger = get_logger()
+logger = get_logger("collection", path.join("state", "stats.json"))
 
 
 asd = algolia.AlgoliaCollector(logger, env, config, RESULTS_PER_SEARCH) # good cfw
@@ -43,13 +43,14 @@ ald = aldi.ALDCollector(logger, env, config, 60) # "Page limit must be equal to 
 COLLECTORS = [asd, tsc, mor, sns, ald]
 
 DEBUG = config["DEBUG"] == "True"
-ONLY_WAIT_FOR_NEXT_BATCH = config["ONLY_WAIT_FOR_NEXT_BATCH"] == "True" # DISABLES SALVAGING OF LAST BATCH's KEYWORDS OR RUNNING IMMEDIATELY IF DELAYED.
+# DISABLES SALVAGING OF LAST BATCH's KEYWORDS OR RUNNING IMMEDIATELY IF DELAYED.
+ONLY_WAIT_FOR_NEXT_BATCH = config["ONLY_WAIT_FOR_NEXT_BATCH"] == "True" 
 
 # LIST MUST BE IN ORDER
 RUNTIMES = [
-	#dtime( 9,00),
-	dtime(17,00),
-	#dtime(21,00)
+	dtime( 4,00),
+	dtime(12,00),
+	dtime(20,00)
 ]
 
 
@@ -136,8 +137,18 @@ class Scheduler():
 		"""
 
 		for i in range(len(keywords)):
-			kw = keywords[i]
+			ql = self._db_thread.get_queue_length()
 
+			if (ql > MAX_DB_QUEUE_BEFORE_WAIT):
+				self._logger.warning(
+					"Waiting before next keyword. DB Thread has queue "
+					f"of {ql}, > max [{MAX_DB_QUEUE_BEFORE_WAIT}].")
+				
+				while ql > (MAX_DB_QUEUE_BEFORE_WAIT / 2):
+					await asyncio.sleep(COOLDOWN)
+					ql = self._db_thread.get_queue_length()
+
+			kw = keywords[i]
 			self._logger.progress(f"Starting fetch for keyword {kw}")
 
 			for store in COLLECTORS:
@@ -161,19 +172,6 @@ class Scheduler():
 			await asyncio.sleep(1)
 
 			self._logger.notice(f"Completed all stores for '{kw}'")
-
-			current_len = self._db_thread.get_queue_length()
-
-			if (current_len > MAX_DB_QUEUE_BEFORE_WAIT):
-				self._logger.warning(
-					"Waiting before next keyword. DB Thread has queue"
-					f"of {current_len}, > max [{MAX_DB_QUEUE_BEFORE_WAIT}].")
-				
-				keep_waiting = True
-
-				while keep_waiting:
-					await asyncio.sleep(COOLDOWN)
-					keep_waiting = self._db_thread.get_queue_length()
 
 
 

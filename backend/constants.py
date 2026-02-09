@@ -6,7 +6,7 @@ from threading import Thread
 
 import re
 
-from backend_collection.types import (
+from backend.types import (
 	Number, SDG_Key, DSA,
 
 	Any, Callable, Iterable, Optional)
@@ -48,7 +48,7 @@ class regex:
 	_EOS = r"\)? *$"
 	_CH = r"[,\(\) ]" # MISC CHARACTERS TO IGNORE
 	_UOM = r"([A-z]{0,2}|pint|litre|pound)s?" # UNIT OF MEASUREMENT
-	_PS_ONE = rf"([\d\.]+) ?{_UOM}" # 
+	_PS_ONE = rf"(\d+\.?\d*) ?{_UOM}" # 
 	PACKSIZE_SINGLE = rf"{_PS_ONE}{_EOS}"
 
 	# "{a} x {b} {unit}", "{a} x {b}", "{a} pack {b} {unit}", "{a} pack {b}"
