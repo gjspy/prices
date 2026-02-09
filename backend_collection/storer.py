@@ -498,7 +498,7 @@ class Writer():
 			if (upc is None): continue
 			if (str(upc) in upcs_with_existing_link): continue
 
-			this_cinandstore = (str(link[upc]), store_id)
+			this_cinandstore = (str(link["cin"]), store_id)
 			include_cin = this_cinandstore in cinandstore_with_existing_link
 
 			rows.append(self.create_link_row(product_id, link, store_id, include_cin))
@@ -592,7 +592,8 @@ class Writer():
 
 			else: self._logger.debug(f"No offers for P#{got_pid}")
 		except Exception as e:
-			self._logger.error(f"Couldn't create offers for P#{got_pid} / {e}")
+			self._logger.error(f"Couldn't create offers for P#{got_pid} "
+				f"/ {e.__class__.__name__} {e.args}")
 
 
 		# 5) STORE LABELS
@@ -604,7 +605,8 @@ class Writer():
 
 			else: self._logger.debug(f"No labels for P#{got_pid}")
 		except Exception as e:
-			self._logger.error(f"Couldn't create labels for P#{got_pid} / {e}")
+			self._logger.error(f"Couldn't create labels for P#{got_pid} "
+				f"/ {e.__class__.__name__} {e.args}")
 
 
 		# 6) STORE RATING
@@ -616,7 +618,8 @@ class Writer():
 
 			else: self._logger.debug(f"No rating for P#{got_pid}")
 		except Exception as e:
-			self._logger.error(f"Couldn't create rating for P#{got_pid} / {e}")
+			self._logger.error(f"Couldn't create rating for P#{got_pid} "
+				f"/ {e.__class__.__name__} {e.args}")
 
 		# 7) STORE KEYWORDS
 		try:
@@ -627,7 +630,8 @@ class Writer():
 
 			else: self._logger.debug(f"No rating for P#{got_pid}")
 		except Exception as e:
-			self._logger.error(f"Couldn't create keyword for P#{got_pid} / {e}")
+			self._logger.error(f"Couldn't create keyword for P#{got_pid} "
+				f"/ {e.__class__.__name__} {e.args}")
 
 
 		self._logger.info(f"Completed storage of P#{got_pid} ({store}-{cin})")
