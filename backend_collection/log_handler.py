@@ -140,21 +140,45 @@ class CustomLogDC(logging.Handler):
 		self._hook = env["DC_ONE_HOOK"]
 		self._notif = env["DC_NOTIF_ROLE_ID"]
 
+		self._last_dump = datetime.fromtimestamp(1)
+		self._cooldown = 10 # SECONDs
+
+		self._msges: list[str] = []
+
+	def dump(self):
+		assert self._hook
+
+		n = datetime.now()
+
+		if ((n - self._last_dump).total_seconds() < self._cooldown): return
+		self._last_dump = n
+
+		msg = ""
+		n = 0
+		for this in self._msges:
+			if (len(msg) + len(this) > 2000): break
+			msg += this + "\n"
+			n += 1
+		
+		self._msges = self._msges[n+1:]
+
+		requests.post(
+			url = self._hook,
+			data = {"content": msg}
+		)
 
 
 	def emit(self, record: logging.LogRecord):
-		assert self._hook, self._notif
+		assert self._notif
 		if (record.levelno < self.level): return
 
 		msg = self.format(record)
 
 		if (record.levelno >= CRITICAL):
 			msg = f"{msg} <@&{self._notif}>"
-
-		requests.post(
-			url = self._hook,
-			data = {"content": msg[:2000]}
-		)
+		
+		self._msges.append(msg)
+		self.dump()
 
 
 
@@ -173,13 +197,14 @@ class CustomLogSS(logging.Handler):
 			self._data: dict[str, Any] = json.load(f) or {}
 		
 		self._last_dump = datetime.fromtimestamp(1)
-		self._cooldown = 60 # SECONDs
+		self._cooldown = 5 # SECONDs
 
 
 	def dump(self):
 		n = datetime.now()
-
+		
 		if ((n - self._last_dump).total_seconds() < self._cooldown): return
+		self._last_dump = n
 
 		with open(self._fp, "w") as f:
 			json.dump(self._data, f)

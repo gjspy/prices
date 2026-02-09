@@ -611,9 +611,9 @@ class Writer():
 
 		# 6) STORE RATING
 		try:
-			rating = self._get_data_of_type(data, "rating")[0]["data"]
+			rating = self._get_data_of_type(data, "rating")
 			if (rating):
-				self.store_rating(got_pid, store_id, rating)
+				self.store_rating(got_pid, store_id, rating[0]["data"])
 				self._logger.info(f"Created rating for P#{got_pid}")
 
 			else: self._logger.debug(f"No rating for P#{got_pid}")
@@ -623,9 +623,9 @@ class Writer():
 
 		# 7) STORE KEYWORDS
 		try:
-			keyword = self._get_data_of_type(data, "keywords")[0]["data"]
+			keyword = self._get_data_of_type(data, "keywords")
 			if (keyword):
-				self.store_keywords(got_pid, store_id, keyword)
+				self.store_keywords(got_pid, store_id, keyword[0]["data"])
 				self._logger.info(f"Created keyword for P#{got_pid}")
 
 			else: self._logger.debug(f"No rating for P#{got_pid}")
