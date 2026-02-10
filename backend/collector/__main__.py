@@ -1,31 +1,25 @@
 from datetime import datetime, time as dtime, timedelta, timezone
+from dotenv import dotenv_values
 from os import path
 import sshtunnel # type: ignore
 import platform
 import asyncio
 import time
 
-from dotenv import dotenv_values
 
 
-from dbmanager.engine import Database
 from dbmanager.process import DBThread
+from dbmanager.engine import Database
 
 
-from collector.modules import (
-	akamai, aldi, algolia, clusters, graphql)
-
-from backend.dbclasses import (
-	Products, ProductLinks, PriceEntries, Ratings, Images,
-	Brands, Stores, Offers, OfferHolders, Labels, Keywords,
-
-	Store)
-
-from backend.log_handler import get_logger, CustomLogger
+from collector.modules import akamai, aldi, algolia, clusters, graphql
 from collector.storer import Writer
 from collector.state import State
 
+from backend.dbclasses import Stores, Store
+from backend.log_handler import get_logger, CustomLogger
 from backend.constants import utcnow, DATE_FMT
+
 
 
 RESULTS_PER_SEARCH = 100
@@ -48,9 +42,10 @@ ONLY_WAIT_FOR_NEXT_BATCH = config["ONLY_WAIT_FOR_NEXT_BATCH"] == "True"
 
 # LIST MUST BE IN ORDER
 RUNTIMES = [
-	dtime( 4,00),
-	dtime(12,00),
-	dtime(20,00)
+	#dtime( 4,00),
+	#dtime(12,00),
+	#dtime(20,00)
+	dtime(18,45)
 ]
 
 
@@ -268,9 +263,6 @@ class Scheduler():
 
 async def main():
 	db = Database.from_env(env, logger)
-	db.declare_tables(
-		Products, ProductLinks, PriceEntries, Ratings, Images, Brands, Stores,
-		Offers, OfferHolders, Labels, Keywords)
 
 	succ = db.connect()
 	logger.info(f"DB Connected {succ} {db.is_connected}")

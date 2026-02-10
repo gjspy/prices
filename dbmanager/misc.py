@@ -1,6 +1,9 @@
+from concurrent.futures import ThreadPoolExecutor as TPE
+from asyncio import get_running_loop
+from functools import partial
 import random
 
-from dbmanager.types import Any, Iterable, DSA
+from dbmanager.types import Any, Iterable, DSA, Callable
 
 ASCENDING_SQL = "ASC"
 DESCENDING_SQL = "DESC"
@@ -76,10 +79,6 @@ class Queue():
 
 
 
-
-
-
-
 def flatten(ls: Iterable[list[Any]]) -> list[Any]:
 	return [vv for v in ls for vv in v]
 
@@ -91,3 +90,11 @@ def uid(l: int = 12):
 		id_ = "".join(random.choice(CHARS_URLSAFE) for _ in range(l))
 	
 	return id_
+
+
+async def async_executor(func: Callable[[Any], Any], *args: Any, **kwargs: Any):
+	loop = get_running_loop()
+
+	p = partial(func, *args, **kwargs)
+
+	return await loop.run_in_executor(None, p)

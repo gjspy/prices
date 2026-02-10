@@ -2,6 +2,7 @@ from datetime import time as dtime, datetime
 from copy import deepcopy
 import requests
 import dotenv
+import atexit
 import queue
 import time
 import json
@@ -150,13 +151,13 @@ class CustomLogDC(logging.Handler):
 		assert self._hook
 
 		n = datetime.now()
-		diff = (n - self._last_dump).total_seconds() - self._cooldown
+		elapsed = (n - self._last_dump).total_seconds() - self._cooldown
 
-		if (diff > 0):
+		if (elapsed < self._cooldown):
 			if (self._is_waiting): return
 			self._is_waiting = True
 
-			time.sleep(diff)
+			time.sleep(elapsed - self._cooldown)
 
 		self._last_dump = datetime.now()
 		self._is_waiting = False
@@ -209,13 +210,13 @@ class CustomLogSS(logging.Handler):
 
 	def dump(self):
 		n = datetime.now()
-		diff = (n - self._last_dump).total_seconds() - self._cooldown
+		elapsed = (n - self._last_dump).total_seconds()
 
-		if (diff > 0):
+		if (elapsed < self._cooldown):
 			if (self._is_waiting): return
 			self._is_waiting = True
 
-			time.sleep(diff)
+			time.sleep(elapsed - self._cooldown)
 
 		self._last_dump = datetime.now()
 		self._is_waiting = False

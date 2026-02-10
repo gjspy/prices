@@ -42,11 +42,11 @@ from copy import deepcopy
 
 
 from dbmanager.types import (
-	Generic, Any, Optional, Literal, TypeVar, Self, Callable,
+	Generic, Any, Optional, Literal, TypeVar, Self, Callable, Coroutine,
 
 	DSS, DSA, QueryParams )
 
-from dbmanager.misc import ASCENDING_SQL, DESCENDING_SQL, uid
+from dbmanager.misc import ASCENDING_SQL, DESCENDING_SQL, uid, async_executor
 
 # USE TypeVar TO GIVE NICE TYPING FOR SUBCLASSES.
 TableRowType = TypeVar("TableRowType", bound = "TableRow") 
@@ -193,7 +193,7 @@ class Validator():
 		"TINYINT", "TINYINT UNSIGNED", "SMALLINT", "SMALLINT UNSIGNED",
 		"MEDIUMINT", "MEDIUMINT UNSIGNED", "INT", "INT UNSIGNED",
 		"BIGINT", "BIGINT UNSIGNED", "FLOAT", "FLOAT UNSIGNED", "BOOL",
-		"TIMESTAMP", "DATE", "DATETIME"]
+		"TIMESTAMP", "DATE", "DATETIME", "_ANY"]
 
 	def is_valid(self):
 		try: return getattr(self, self.db_type)()
@@ -235,6 +235,7 @@ class CMP():
 		self.b = b
 		self.symbol = symbol
 
+
 	def _convert_to_str(
 			self, v: Any, only_str: bool = True) -> str | tuple[str, tuple[Any, ...]]:
 
@@ -242,19 +243,28 @@ class CMP():
 		if (isinstance(v, datetime) and only_str):
 			v = v.strftime(SQL_DATETIME_FMT) 
 
-		if (isinstance(v, TableColumn)): return str(v) if (only_str) else (f"{v}", tuple()) # type: ignore
+		if (isinstance(v, TableColumn)):
+			if (only_str): return str(v) # type: ignore
+			else: return (f"{v}", tuple()) # type: ignore
+
 		if (isinstance(v, CMP)):
 			if (only_str): return str(v)
 			return v.safe()
 
 		return f"'{v}'" if (only_str) else (self._placeholder, tuple())
 
+
+	def _fmt_str(self, a: Any, b: Any) -> str:
+		return f"({a}{self.symbol}{b})"
+
+
 	def __str__(self):
 		a = self._convert_to_str(self.a)
 		b = self._convert_to_str(self.b)
 
-		return f"({a}{self.symbol}{b})"
-	
+		return self._fmt_str(a, b)
+
+
 	def safe(self) -> tuple[str, tuple[Any, ...]]:
 		a = self._convert_to_str(self.a, False)
 		b = self._convert_to_str(self.b, False)
@@ -266,11 +276,21 @@ class CMP():
 		values.extend(b[1])
 		if (b[0] == self._placeholder): values.append(self.b)
 
-		return (f"({a[0]}{self.symbol}{b[0]})", tuple(values))
+		return (self._fmt_str(a[0], b[0]), tuple(values))
+	
+	def as_column(self, name: str):
+		"""
+		Create DerivedColumn from METHOD or CMP subclass.
+
+		Args
+		--------
+		name: str
+			Name to `SELECT [...] AS ''`. Must be SQL and Python compliant,
+			this will be the name of the `TableRow` attribute to access its
+			results. (attr is lowercased.)
 		
-
-
-
+		"""
+		return DerivedColumn(self, name)
 
 	# BITWISE OPERATIONS BEING OVERWRITTEN!
 	# DO THIS SO CAN WRITE Table1.uid == Table2.uid & Table1.name != "Jim"
@@ -282,6 +302,18 @@ class CMP():
 
 	def __invert__(self):
 		return NOT(self)
+
+
+
+class IN(CMP):
+	def safe(self):
+		assert isinstance(self.b, list), "IN params must be list"
+		self.b: list[Any]
+
+		ph = ((self._placeholder + ", ") * len(self.b))[:-2]
+		return (f"({self.a}{self.symbol}({ph}))", tuple(self.b))
+
+
 
 class METHOD(CMP):
 	method = ""
@@ -309,6 +341,8 @@ class METHOD(CMP):
 	def __ne__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
 		return CMP(self, value, "<>")
 
+
+
 class NOT(METHOD): method = "NOT"
 class UPPER(METHOD): method = "UPPER"
 class LOWER(METHOD): method = "LOWER"
@@ -316,13 +350,20 @@ class MAX(METHOD): method = "MAX"
 class MIN(METHOD): method = "MIN"
 
 
-class IN(CMP):
-	def safe(self):
-		assert isinstance(self.b, list), "IN params must be list"
-		self.b: list[Any]
 
-		ph = ((self._placeholder + ", ") * len(self.b))[:-2]
-		return (f"({self.a}{self.symbol}({ph}))", tuple(self.b))
+class MATCH(CMP):
+	def __init__(self, col: "TableColumn[Any]", against: str):
+		self.a = col
+		self.b = against
+		self.symbol = ""
+	
+	def _fmt_str(self, a: Any, b: Any) -> str:
+		return f"MATCH({a}) AGAINST ({b})"
+
+
+
+
+
 
 
 
@@ -383,6 +424,25 @@ class Join():
 
 
 
+class DerivedColumn():
+	def __init__(self, method: CMP | METHOD, name: str):
+		self._str, self._values = method.safe()
+		self._name = name
+	
+
+	@property
+	def select_name(self) -> str:
+		return self._name
+	
+	@property
+	def params(self):
+		return self._values
+	
+	def __str__(self) -> str:
+		return self._str
+	
+
+	
 
 
 
@@ -747,6 +807,10 @@ class TableColumn(Generic[T]):
 			return self._db_field
 
 		return f"{self.table.identifier}.{self._db_field}"
+	
+	@property
+	def select_name(self) -> str:
+		return str(self)
 
 
 
@@ -763,7 +827,8 @@ class TableRow():
 
 	def __init__(
 			self, table: "Table[Any]", _is_template: bool = True,
-			_old_cols: Optional[list[TableColumn[Any]]] = None):
+			_old_cols: Optional[list[TableColumn[Any]]] = None,
+			_is_derived: bool = False):
 		self._table = table
 		self._columns: list[str] = []
 		self._db_fields: list[str] = []
@@ -773,6 +838,8 @@ class TableRow():
 
 		self._is_template: bool = _is_template # False FROM Table.row.new()
 		self._partial: bool = False
+
+		if (_is_derived): return
 
 		# old_cols PRESENT IN Table.row.new(), TO PRESERVE REFERENCES.
 		if (_old_cols):
@@ -1033,6 +1100,31 @@ class TableRow():
 		new.commit()
 
 		return new
+	
+
+	@classmethod
+	def collect_derived_columns(cls, derived_columns: list[str], data: DSA):
+		row = cls(None, True, _is_derived = True) # type: ignore
+		# MAKE row A TEMPLATE, SO USER CAN'T SET VALUES.
+
+		for name in derived_columns:
+			attr_name = name.lower()
+			col = TableColumn(
+				name, "_ANY", str, _attr_name = attr_name,
+				_row_instantiated = True, _row_template = True)
+
+			col._set_value(data.get(name), False) # type: ignore
+
+			setattr(row, attr_name, col)
+
+			row._columns.append(attr_name)
+			row._db_fields.append(name) 
+			row._db_field_to_col[name] = attr_name
+
+
+		return row
+		
+
 
 
 
@@ -1072,12 +1164,14 @@ class Table(Generic[TableRowType]):
 
 	def select(
 			self,
-			columns: Optional[list[TableColumn[Any] | METHOD]] = None,
+			columns: Optional[list[TableColumn[Any] | DerivedColumn]] = None,
 			distinct: bool = False,
 			where: Optional[CMP] = None,
 			join_all: bool = False,
 			join_on: Optional[list[Join]] = None,
 			limit: Optional[int] = 1000,
+			limit_offset: Optional[int] = 0,
+			page: Optional[int] = 0,
 			order_by: Optional[list[TableColumn[Any] | str]] = None,
 			objectify_results: bool = True) -> DSA:
 		"""
@@ -1085,7 +1179,7 @@ class Table(Generic[TableRowType]):
 
 		Args
 		--------
-		columns: list[TableColumn]
+		columns: list[TableColumn | DerivedColumn]
 			List of columns to select, default All.
 
 		distinct: bool = False
@@ -1104,6 +1198,13 @@ class Table(Generic[TableRowType]):
 
 		limit: int
 			Maximum rows to return. Default = 1000
+		
+		limit_offset: int
+			Optional Number of items to offset LIMIT by. Provide this OR page.
+		
+		page: int
+			Optional page number, will be used to calculate `limit_offset` based
+			on your `limit` provided. Page 0 is first (no offset)
 
 		order_by: list[str | TableColumn]
 			Which columns to order by. May be `TableColumn`,
@@ -1136,9 +1237,16 @@ class Table(Generic[TableRowType]):
 		order_by_strs: list[str] = [ str(v) for v in order_by]
 
 		values: list[Any] = []
+		derived: list[str] = []
+
+		for c in columns:
+			if (not isinstance(c, DerivedColumn)): continue
+
+			values.extend(c.params)
+			derived.append(c.select_name)
 
 		# BUILD str STATEMENT:
-		what_to_select = ", ".join( f"{v} AS \'{v}\'" for v in columns )
+		what_to_select = ", ".join( f"{v} AS \'{v.select_name}\'" for v in columns )
 		distinct_statement = " DISTINCT" if distinct else ""
 
 		sql: str = f"SELECT{distinct_statement} {what_to_select} FROM {self}" # BASE
@@ -1161,16 +1269,21 @@ class Table(Generic[TableRowType]):
 			sql += f" ORDER BY {order_by_statement}" # ADD ORDER BY
 
 		if (limit): sql += f" LIMIT {limit}" # ADD LIMIT
+		if (page):
+			assert limit, "You must provide page size (limit)"
+			limit_offset = limit * page
+		if (limit_offset): sql += f" OFFSET {limit_offset}"
 
-		query = {
+		query: DSA = {
 			"query": sql + ";",
 			"params": values,
 			"expect_response": ["fetchall"],
 			"debug": ("SELECT", "from " + self.name),
+			"derived_columns": derived,
 			"tables_involved": tables_involved
 		}
 
-		if (objectify_results): query["objectify_from_table"] = self.name
+		if (objectify_results): query["objectify_from_table"] = self
 		return query
 
 
@@ -1473,7 +1586,6 @@ class Database():
 		self._logger: Logger
 		self._time_idle: int
 		self._is_connected: bool
-		self._tables: dict[str, Table[Any]]
 
 		# CONFIG = SETUP OF ACTIVE DB / CONNECTION
 		# SET ONCE HERE, NEVER CHANGE.
@@ -1494,7 +1606,6 @@ class Database():
 		self._logger = logger
 		self._time_idle = 0
 		self._is_connected = False
-		self._tables = {}
 
 		# DON'T HAVE SETTERS FOR _active_cursor BECAUSE I WANT ITS CREATION
 		# TO BE EXPLICIT WITH ._init_cursor(), PLUS WANT THIS CURSOR TO ONLY
@@ -1526,8 +1637,7 @@ class Database():
 	def reset_time_idle(self): self._time_idle = 0
 
 	def declare_tables(self, *tables: Table[Any]):
-		for table in tables:
-			self._tables[table.name] = table
+		self.logger.critical("METHOD DEPRECATED, DOES NOTHING!")
 
 
 
@@ -1647,7 +1757,8 @@ class Database():
 			many_params: Optional[list[QueryParams]] = None,
 			expect_response: Optional[list[str]] = None,
 			buffered: bool = True,
-			objectify_from_table: str = "",
+			objectify_from_table: Optional[Table[Any]] = None,
+			derived_columns: Optional[list[str]] = None,
 			**kwargs: Any) -> DSA:
 		"""
 		Execute SQL Statement
@@ -1685,11 +1796,22 @@ class Database():
 		objectify_from_table: bool
 			Whether to use the database's `table_row_models` to return
 			the response as objects [True], or just return the `dict` as
-			provided from cursor.fetchall()
+			provided from cursor.fetchall().
+		
+		Returns
+		--------
+		`dict` where each key is an `expect_response` keyword, eg `fetchall`.
+		`fetchall` = list[TableRow] if `objectify_results`.
+
+		`list[{"tablename": TableRow, "derived": TableRow}]`
+		if `objectify_results` and derived columns are involved.
+
+		`list[dict]` if not `objectify_results`.
 		"""
 		if (not params): params = ()
 		if (not many_params): many_params = []
 		if (not expect_response): expect_response = []
+		if (not derived_columns): derived_columns = []
 
 
 		assert self.connection, "The database is not connected"
@@ -1721,7 +1843,8 @@ class Database():
 			rows = result.get("fetchall")
 
 			if (rows): result["fetchall"] = self.objectify_results(
-					rows, objectify_from_table, column_names)
+					rows, objectify_from_table,
+					column_names, derived_columns)
 
 		self.connection.commit()
 		self.close_cursor()
@@ -1735,10 +1858,13 @@ class Database():
 
 	@db_error_catcher_rethrows
 	def execute_multiple(
-			self, queries: list[str],
+			self,
+			queries: list[str],
 			paramses: Optional[list[QueryParams | list[QueryParams]]] = None,
-			expect_response: bool = False, buffered: bool = True,
-			objectify_from_table: str = "", 
+			expect_response: bool = False,
+			buffered: bool = True,
+			objectify_from_table: Optional[Table[Any]] = None, 
+			derived_columns: Optional[list[str]] = None,
 			**kwargs: Any) -> DSA:
 		"""
 		Execute multiple SQL statements.
@@ -1751,6 +1877,7 @@ class Database():
 		params in your payload.
 		"""
 		if (not paramses): paramses = []
+		if (not derived_columns): derived_columns = []
 
 		assert len(queries) == len(paramses)
 		assert self.connection, "The database is not connected"
@@ -1788,7 +1915,8 @@ class Database():
 			got = result.get("fetchall")
 
 			if (got): result["fetchall"] = self.objectify_results(
-				got, objectify_from_table, column_names)
+				got, objectify_from_table,
+				column_names, derived_columns)
 
 		self.connection.commit()
 		self.close_cursor()
@@ -1802,42 +1930,63 @@ class Database():
 
 		routine: Callable[..., Any]
 
-		if (payload.get("queries")):
-			routine = self.execute_multiple
-		else:
-			routine = self.execute
+		if (payload.get("queries")): routine = self.execute_multiple
+		else: routine = self.execute
 
 		return routine(**payload)
 
 
+	async def execute_payload_async(
+			self, payload: DSA) -> Coroutine[Any, Any, DSA]:
+		""" Execute SQL Statement from `dict` payload. """
+
+		routine: Callable[..., Any]
+
+		if (payload.get("queries")): routine = self.execute_multiple
+		else: routine = self.execute
+
+		return (await async_executor(routine, **payload))
 
 
 
 	def objectify_result(
-			self, ms_result: MySQLRowType, table_name: str,
-			fetched_column_names: list[str]) -> TableRow:
+			self,
+			ms_result: MySQLRowType,
+			table: Table[Any],
+			fetched_column_names: list[str],
+			derived_column_names: list[str]) -> TableRow | dict[str, TableRow]:
 		""" ### Convert one dictionary result to the object of its table. """
-		table: Optional[Table[Any]] = self._tables.get(table_name)
 
-		assert table, f"objectify: no model for table_name {table_name}"
 		assert len(ms_result) == len(fetched_column_names), \
 			f"length of results not equal to amount of column names"
 
 		result = dict(
 			(fetched_column_names[i], ms_result[i])
 			for i in range(len(fetched_column_names)) )
+		
+		row: TableRow = table.row.from_dict(result, True)
 
-		return table.row.from_dict(result, True)
+		if (not derived_column_names): return row
+
+		return {
+			row._table.name: row, # type: ignore
+			"derived": TableRow.collect_derived_columns(
+				derived_column_names, result)
+		}
 
 
 
 	def objectify_results(
-			self, results: list[MySQLRowType],
-			table_name: str, column_names: list[str]) -> list[TableRow]:
+			self,
+			results: list[MySQLRowType],
+			table: Table[Any],
+			column_names: list[str],
+			derived_column_names: list[str]
+			) -> list[TableRow | dict[str, TableRow]]:
 		""" ### Objectify a list of results easily. """
 
 		return [
-			self.objectify_result(v, table_name, column_names)
+			self.objectify_result(v, table, column_names, derived_column_names)
 			for v in results ]
 
 	@classmethod

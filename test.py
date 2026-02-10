@@ -12,8 +12,10 @@ from backend.collector.state import State
 from backend.dbclasses import (
 	Products, ProductLinks, PriceEntries, Ratings, Images,
 	Brands, Stores, Offers, OfferHolders, Keywords, Labels, Store, Brand, Product, ProductLink)
-from dbmanager.engine import Database, LOWER, NOT
+from dbmanager.engine import Database, LOWER, NOT, MATCH
 from dbmanager.process import DBThread
+
+import sshtunnel # type: ignore
 
 from backend.types import DSA
 import os
@@ -21,12 +23,78 @@ import re
 
 config = dotenv_values(".config")
 env = dotenv_values(".env")
-RESULTS_PER_SEARCH = 100
+
+
+from backend.log_handler import get_logger, logging
+logger = get_logger("collectiontest", "state\\teststate.json")
+
+
+
+
+
+
+
+ssh_port = env["SSH_PORT"]
+ssh_host = env["SSH_HOST"]
+ssh_user = env["SSH_USER"]
+ssh_keyy = env["SSH_KEYY"]
+db__host = env["DB_HOST"]
+db__port = env["DB_PORT"]
+
+assert (
+	ssh_port and ssh_host and ssh_user and
+	ssh_keyy and db__host and db__port )
+
+ssh_port = int(ssh_port)
+db__port = int(db__port)
+
+
+async def main(db: Database):
+	a = MATCH(Products.row.name, "Mature cheddar cheese")
+	b = a.as_column("Score")
+	q = Products.select([Products.row.db_id, Products.row.name, b], where = a)
+
+	print(q)
+
+	
+	resp = await db.execute_payload_async(q)
+
+	print(len(resp["fetchall"])) # TODO: better logging for TPE make it named.
+	for data in resp["fetchall"]:
+		print(data["derived"].score.value, data["Products"].name.value)
+
+
+with sshtunnel.SSHTunnelForwarder(
+		ssh_address_or_host = (ssh_host, ssh_port),
+		ssh_username = ssh_user,
+		ssh_pkey = ssh_keyy,
+		remote_bind_address = (db__host, db__port) ) as tunnel:
+	print("HELLO")
+
+	assert tunnel
+
+	env["DB_PORT"] = tunnel.local_bind_port # type: ignore
+
+	db = Database.from_env(env, logger)
+	db.connect()
+
+	try: asyncio.run(main(db)) # MUST DO THIS INSIDE "WITH" TO MAINTAIN TUNNEL
+	except Exception as err:
+		db.disconnect()
+		raise err
+
+	db.disconnect()
+	print("hi")
+
+
+
+
+
+quit()
 
 import sshtunnel # type: ignore
 
-from backend.log_handler import get_logger
-logger = get_logger("collectiontest", "state\\teststate.json")
+
 
 SSH_USER = env["SSH_USER"]
 SSH_HOST = env["SSH_HOST"]
@@ -42,6 +110,13 @@ from dbmanager import misc
 """
 print(hash(Images))
 print(hash(Images))"""
+
+
+
+
+
+
+raise
 
 
 asda = algolia.AlgoliaCollector(logger, env, config, RESULTS_PER_SEARCH) # good cfw

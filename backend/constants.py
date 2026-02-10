@@ -61,7 +61,6 @@ class regex:
 
 	ALL_NON_ASCII = r"[^\x00-\x7F]"
 
-print(regex.PACKSIZE_SINGLE)
 
 class OFFER_TYPES:
 	unknown = 0
