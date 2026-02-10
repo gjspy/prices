@@ -157,7 +157,7 @@ class CustomLogDC(logging.Handler):
 			if (self._is_waiting): return
 			self._is_waiting = True
 
-			time.sleep(elapsed - self._cooldown)
+			time.sleep(self._cooldown - elapsed)
 
 		self._last_dump = datetime.now()
 		self._is_waiting = False
@@ -216,7 +216,7 @@ class CustomLogSS(logging.Handler):
 			if (self._is_waiting): return
 			self._is_waiting = True
 
-			time.sleep(elapsed - self._cooldown)
+			time.sleep(self._cooldown - elapsed)
 
 		self._last_dump = datetime.now()
 		self._is_waiting = False

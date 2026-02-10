@@ -45,7 +45,7 @@ RUNTIMES = [
 	#dtime( 4,00),
 	#dtime(12,00),
 	#dtime(20,00)
-	dtime(18,45)
+	dtime(18,48)
 ]
 
 
