@@ -12,9 +12,9 @@ from dbmanager.process import DBThread
 from dbmanager.engine import Database
 
 
-from collector.modules import akamai, aldi, algolia, clusters, graphql
-from collector.storer import Writer
-from collector.state import State
+from backend.collector.modules import akamai, aldi, algolia, clusters, graphql
+from backend.collector.storer import Writer
+from backend.collector.state import State
 
 from backend.dbclasses import Stores, Store
 from backend.log_handler import get_logger, CustomLogger
