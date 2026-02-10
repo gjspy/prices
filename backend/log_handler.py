@@ -1,5 +1,6 @@
 from datetime import time as dtime, datetime
 from copy import deepcopy
+import threading
 import requests
 import dotenv
 import atexit
@@ -8,8 +9,7 @@ import time
 import json
 import os
 
-#from backend.collector.types import Any
-from typing import Any
+from typing import Any, Optional
 
 import logging
 import logging.handlers
@@ -130,44 +130,99 @@ class CustomLogST(logging.StreamHandler[Any]):
 		super().emit(record)
 
 
-# DISCORD WEBHOOK LOGGING
-class CustomLogDC(logging.Handler):
-	def __init__(self, level: int | str = 0) -> None:
-		super().__init__(level)
 
+
+
+class CooldownBasedLogger(logging.Handler):
+	def __init__(self, level: int | str = 0):
+		super().__init__(level)
 		self.setFormatter(LOG_FORMATTER)
+
+		self._cooldown = 10
+		self._last_dump = 0
+		
+		self._msges: list[str] = []
+		self._lock = threading.Lock()
+		self._timer: Optional[threading.Timer] = None
+	
+	def get_msg_from(self, record: logging.LogRecord) -> Optional[str]:
+		""" FOR SUBCLASSES! """
+
+		return self.format(record)
+
+	def emit(self, record: logging.LogRecord):
+		if (record.levelno < self.level): return
+
+		msg = self.get_msg_from(record)
+		if (msg is None): return
+
+		with self._lock:
+			self._msges.append(msg)
+
+			if (self._timer is None): self._schedule_dump()
+	
+	def close(self):
+		if (self._timer): self._timer.cancel()
+		self._dump()
+		super().close()
+
+
+	def _schedule_dump(self):
+		now = time.time()
+		elapsed = now - self._last_dump
+		delay = max(1, self._cooldown - elapsed) # ALWAYS WAIT ATLEAST 1s
+
+		self._timer = threading.Timer(delay, self._dump)
+		self._timer.daemon = True
+		self._timer.start()
+
+
+	def _dump(self):
+		with self._lock:
+			self._last_dump = time.time()
+			self._timer = None
+
+			if (not self._msges): return
+
+			msgs = self._msges
+			self._msges = []
+		
+		self.dump_action(msgs)
+
+	
+	def dump_action(self, msgs: list[str]) -> None:
+		raise NotImplementedError
+
+		
+
+
+# DISCORD WEBHOOK LOGGING
+class CustomLogDC(CooldownBasedLogger):
+	def __init__(self, level: int | str = 0):
+		super().__init__(level)
 
 		env = dotenv.dotenv_values()
 		self._hook = env["DC_ONE_HOOK"]
 		self._notif = env["DC_NOTIF_ROLE_ID"]
 
-		self._last_dump = datetime.fromtimestamp(1)
-		self._cooldown = 30 # SECONDs
-		self._is_waiting = False
+		self._cooldown = 10
+	
+	def get_msg_from(self, record: logging.LogRecord):
+		msg = self.format(record)
 
-		self._msges: list[str] = []
-
-	def dump(self):
+		if (record.levelno >= CRITICAL):
+			msg = f"{msg} <@&{self._notif}>"
+		
+		return msg
+	
+	def dump_action(self, msgs: list[str]):
 		assert self._hook
 
-		n = datetime.now()
-		elapsed = (n - self._last_dump).total_seconds() - self._cooldown
+		msg = msgs.pop(0)[:2000]
 
-		if (elapsed < self._cooldown):
-			if (self._is_waiting): return
-			self._is_waiting = True
-
-			time.sleep(self._cooldown - elapsed)
-
-		self._last_dump = datetime.now()
-		self._is_waiting = False
-
-		msg = ""
-
-		for this in deepcopy(self._msges):
+		for this in msgs:
 			if (len(msg) + len(this) > 2000): break
-			msg += this + "\n"
-			self._msges.remove(this)
+			msg += "\n" + this
 
 		requests.post(
 			url = self._hook,
@@ -175,65 +230,30 @@ class CustomLogDC(logging.Handler):
 		)
 
 
-	def emit(self, record: logging.LogRecord):
-		assert self._notif
-		if (record.levelno < self.level): return
-
-		msg = self.format(record)
-
-		if (record.levelno >= CRITICAL):
-			msg = f"{msg} <@&{self._notif}>"
-		
-		self._msges.append(msg)
-		self.dump()
-
-
-
 # STATS LOGGING
-class CustomLogSS(logging.Handler):
-	formatter = LOG_FORMATTER
-
-	def __init__(self, level: int | str = 0, stats_fp: str = "") -> None:
-		assert stats_fp
-
+class CustomLogSS(CooldownBasedLogger):
+	def __init__(self, stats_fp: str, level: int | str = 0, ):
 		super().__init__(level)
+
+		self._cooldown = 5
 
 		self._fp = stats_fp
 
 		with open(stats_fp, "r") as f:
 			self._data: dict[str, Any] = json.load(f) or {}
+	
+	def get_msg_from(self, record: logging.LogRecord):
+		if (record.levelno != STATS): return None
+
+		return record.message
+
+	def dump_action(self, msgs: list[str]):
+		for m in msgs:
+			if (self._data.get(m) is None): self._data[m] = 0
+			self._data[m] += 1
 		
-		self._last_dump = datetime.fromtimestamp(1)
-		self._cooldown = 5 # SECONDs
-		self._is_waiting = False
-
-
-	def dump(self):
-		n = datetime.now()
-		elapsed = (n - self._last_dump).total_seconds()
-
-		if (elapsed < self._cooldown):
-			if (self._is_waiting): return
-			self._is_waiting = True
-
-			time.sleep(self._cooldown - elapsed)
-
-		self._last_dump = datetime.now()
-		self._is_waiting = False
-
 		with open(self._fp, "w") as f:
 			json.dump(self._data, f)
-
-
-	def emit(self, record: logging.LogRecord):
-		if (record.levelno != STATS): return
-
-		m = record.message
-
-		if (self._data.get(m) is None): self._data[m] = 0
-		self._data[m] += 1
-
-		self.dump()
 
 
 
@@ -256,7 +276,7 @@ def get_logger(name: str, stats_fp: str):
 	_file_dump = CustomLogRF(name, DEBUG)
 	_console = CustomLogST(0)
 	_dc_hook = CustomLogDC(NOTICE)
-	_stats_log = CustomLogSS(STATS, stats_fp)
+	_stats_log = CustomLogSS(stats_fp, STATS)
 
 	logger: CustomLogger = logging.getLogger(name) # type: ignore
 	logger.setLevel(STATS)
