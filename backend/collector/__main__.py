@@ -245,8 +245,7 @@ class Scheduler():
 				await self.scrape(kwrds_todo) # WAIT FOR IT TO FINISH, INCASE
 				# OVERLAPS WITH NEXT BATCH WE WANT
 
-		else:
-			self._state.time_next_batch = self.get_nearest_runtime()
+		self._state.time_next_batch = self.get_nearest_runtime()
 
 
 		while True:
