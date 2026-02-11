@@ -42,10 +42,9 @@ ONLY_WAIT_FOR_NEXT_BATCH = config["ONLY_WAIT_FOR_NEXT_BATCH"] == "True"
 
 # LIST MUST BE IN ORDER
 RUNTIMES = [
-	#dtime( 4,00),
-	#dtime(12,00),
-	#dtime(20,00)
-	dtime(13,42)
+	dtime( 1,00),
+	dtime( 5,00),
+	dtime(12,00)
 ]
 
 
@@ -135,7 +134,7 @@ class Scheduler():
 			ql = self._db_thread.get_queue_length()
 
 			if (ql > MAX_DB_QUEUE_BEFORE_WAIT):
-				self._logger.warning(
+				self._logger.progress(
 					"Waiting before next keyword. DB Thread has queue "
 					f"of {ql}, > max [{MAX_DB_QUEUE_BEFORE_WAIT}].")
 				

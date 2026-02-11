@@ -1,8 +1,8 @@
-SELECT table_name AS "Table",
-table_schema AS "Schema",
+SELECT TABLE_NAME AS "Table",
+TABLE_SCHEMA AS "Schema",
        FORMAT(TABLE_ROWS, "N0") AS "N_Rows",
        CURRENT_TIMESTAMP AS TimeNow
 FROM information_schema.tables
-WHERE table_schema IN ("pricedb", "pricedb2")
-GROUP BY table_name, table_schema
+WHERE TABLE_SCHEMA IN ("pricedb2")
+GROUP BY TABLE_NAME, TABLE_SCHEMA
 ORDER BY TABLE_ROWS DESC;

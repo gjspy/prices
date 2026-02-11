@@ -25,12 +25,12 @@ config = dotenv_values(".config")
 env = dotenv_values(".env")
 
 
-from backend.log_handler import get_logger, logging
+from backend.log_handler import get_logger
 logger = get_logger("collectiontest", "state\\teststate.json")
 
 
 
-
+from backend.api.processors import dataprocessor
 
 
 
@@ -50,18 +50,33 @@ db__port = int(db__port)
 
 
 async def main(db: Database):
-	a = MATCH(Products.row.name, "Mature cheddar cheese")
+	"""a = MATCH(Products.row.name, "Mature cheddar cheese")
 	b = a.as_column("Score")
-	q = Products.select([Products.row.db_id, Products.row.name, b], where = a)
+	q = Products.select([Products.row.db_id, Products.row.name, b], where = a)"""
+	"""q = dataprocessor.build_search_query("mature cheddar cheese", 0, "str")
 
 	print(q)
 
-	
+	n = time.time()
 	resp = await db.execute_payload_async(q)
-
-	print(len(resp["fetchall"])) # TODO: better logging for TPE make it named.
+	print(time.time() - n) # 0.147 avg with NO OBJECTIFY, 0.266 with objecitfy."""
+	"""print(len(resp["fetchall"])) # TODO: better logging for TPE make it named.
 	for data in resp["fetchall"]:
-		print(data["derived"].score.value, data["Products"].name.value)
+		print(data)"""
+
+	r = await dataprocessor.search(db, {
+		0: StoreNames.unknown,
+		1: StoreNames.tesco,
+		2: StoreNames.asda,
+		3: StoreNames.morrisons,
+		4: StoreNames.sainsburys,
+		5: StoreNames.aldi
+	}, "cathedral city cheese", 0, "")
+
+	for res in r:
+		print(res)
+
+	
 
 
 with sshtunnel.SSHTunnelForwarder(

@@ -1,3 +1,4 @@
+USE pricedb;
 -- DROP TABLE Ratings;
 -- DROP TABLE OfferHolders;
 -- DROP TABLE Offers;

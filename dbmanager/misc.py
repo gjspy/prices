@@ -92,9 +92,9 @@ def uid(l: int = 12):
 	return id_
 
 
-async def async_executor(func: Callable[[Any], Any], *args: Any, **kwargs: Any):
+def async_executor(func: Callable[[Any], Any], *args: Any, **kwargs: Any):
 	loop = get_running_loop()
 
 	p = partial(func, *args, **kwargs)
 
-	return await loop.run_in_executor(None, p)
+	return loop.run_in_executor(None, p)

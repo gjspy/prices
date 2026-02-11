@@ -211,7 +211,10 @@ class Writer():
 
 
 	async def _store_image(self, product_id: int, store_id: int, image: DSA):
-		existing_id = await self.get_existing_image(product_id, image["url"])
+		url = image.get("url")
+		if (url is None or url == ""): return
+
+		existing_id = await self.get_existing_image(product_id, url)
 		if (existing_id): return
 
 		db_row = Images.row.new()
@@ -219,7 +222,7 @@ class Writer():
 		db_row.product.ref_value(Product).db_id.value = product_id
 		db_row.store.ref_value(Store).db_id.value = store_id
 
-		db_row.src.value = image["url"]
+		db_row.src.value = url
 
 		resp = await self._db_thread.query(Images.insert(
 			db_row, quiet_on_duplicate_entry = True ))
@@ -227,7 +230,7 @@ class Writer():
 		lastrowid = resp.get("lastrowid")
 		if (lastrowid is None): return # INSERT FAILED, UNIQUE CONSTRAINT.
 
-		data = await self.fetch_image_data(image["url"], store_id)
+		data = await self.fetch_image_data(url, store_id)
 
 		p = path.join(
 			self.IMAGE_FILES_DIR, self.IMAGE_NAME_FMT.format(lastrowid))
@@ -326,6 +329,7 @@ class Writer():
 		with ProductID and IsPreferred. This is not possible to raise through
 		a UNIQUE constraint so we must query for it first.
 		"""
+		
 
 		query = Images.select(
 			[Images.row.db_id],

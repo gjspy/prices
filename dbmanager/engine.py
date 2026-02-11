@@ -36,13 +36,14 @@ from mysql.connector.types import RowType as MySQLRowType
 from mysql.connector.pooling import PooledMySQLConnection
 
 from datetime import datetime, timezone, date
+from asyncio import Future
 from functools import wraps
 from logging import Logger
 from copy import deepcopy
 
 
 from dbmanager.types import (
-	Generic, Any, Optional, Literal, TypeVar, Self, Callable, Coroutine,
+	Generic, Any, Optional, Literal, TypeVar, Self, Callable,
 
 	DSS, DSA, QueryParams )
 
@@ -144,7 +145,7 @@ def db_error_catcher_rethrows(func: EH) -> Callable[[Any], EH]:
 
 
 
-
+JOIN_TYPE = Literal["INNER", "LEFT", "RIGHT", "CROSS"]
 
 class Validator():
 	def __init__(self, db_type: str | tuple[str, int], value: Any):
@@ -219,9 +220,163 @@ class Validator():
 
 
 
+class Join():
+	"""
+	Use this class to define a JOIN statement.
+
+	This may be created manually, but also happens automatically when
+	`join_all` is true in `Table.select()`
+	"""
+
+	def __init__(
+			self, joining_table: "Table[Any]",
+			condition: "CMP | str", join_type: JOIN_TYPE = "LEFT"):
+		"""
+		Define a JOIN statement.
+
+		Args
+		--------
+		joining_table: Table
+			type object of the TableRow of the table
+			you're joining into this statement.
+
+		condition: CMP | str
+			Query str to define how the joined table relates to this.
+			Usually linking primary / foreign keys.
+
+		join_type: str
+			Optional, can be INNER, LEFT, RIGHT, CROSS.
+			Default is LEFT
+		"""
+
+		self.join_type = join_type
+		self.joining_table = joining_table
+		self.condition = condition
+	
+
+	@property
+	def joined_identifier(self):
+		return self.joining_table.id_statement()
+
+	def __str__(self):
+		join_type: str = self.join_type
+		if (join_type): join_type += " "
+
+		return f"{join_type}JOIN {self.joined_identifier} ON {self.condition}"
+	
+	def safe(self):
+		if (isinstance(self.condition, str)): return (str(self), tuple())
+
+		join_type: str = self.join_type
+		if (join_type): join_type += " "
+
+		a = self.condition.safe()
+
+		return (
+			f"{join_type}JOIN {self.joined_identifier} ON {a[0]}",
+			a[1] )
 
 
-class CMP():
+class JoinInlineTable(Join):
+	def __init__(
+			self,
+			inline_payload: DSA,
+			aliased_table: "Table[Any]",
+			condition: "CMP | str",
+			join_type: JOIN_TYPE = "LEFT"):
+
+		self.join_type = join_type
+		self.condition = condition
+
+		self.table = aliased_table
+
+		self._query = inline_payload["query"].replace(";", "")
+		self._values = inline_payload["params"]
+	
+	@property
+	def joined_identifier(self):
+		return f"({self._query}) {self.table.alias}"
+
+	def safe(self):
+		q, values = super().safe()
+
+		return (q, (*self._values, *values))
+
+
+class ComparisonMethods():
+	
+	
+	def in_(self, objects: list[Any]) -> "CMP":
+		return IN(self, objects, " IN ")
+
+	def like_(self, value: str) -> "CMP":
+		return CMP(self, value, " LIKE ")
+
+	def __eq__(self, value: object) -> "CMP": # type: ignore
+		return CMP(self, value, "=")
+
+	def __ne__(self, value: object) -> "CMP": # type: ignore
+		return CMP(self, value, "<>")
+
+	def __lt__(self, value: object) -> "CMP":
+		return CMP(self, value, "<")
+
+	def __le__(self, value: object) -> "CMP":
+		return CMP(self, value, "<=")
+
+	def __gt__(self, value: object) -> "CMP":
+		return CMP(self, value, ">")
+
+	def __ge__(self, value: object) -> "CMP":
+		return CMP(self, value, ">=")
+
+
+	# BITWISE OPERATIONS BEING OVERWRITTEN!
+	# DO THIS SO CAN WRITE (Table1.uid == Table2.uid) & (Table1.name != "Jim")
+	def __and__(self, value: object):
+		return CMP(self, value, " AND ")
+
+	def __or__(self, value: object):
+		return CMP(self, value, " OR ")
+
+	def __invert__(self):
+		return NOT(self)
+	
+	def __add__(self, value: Any):
+		return CMP(self, value, " + ")
+
+	def __sub__(self, value: Any):
+		return CMP(self, value, " - ")
+	
+
+	def __ordered_stmt(self, stmt: str) -> str:
+		print(self, type(self), isinstance(self, ColumnType))
+		if (isinstance(self, ColumnType)): return f"{self.select_name} {stmt}"
+		if (isinstance(self, CMP)): return f"{self.safe()[0]} {stmt}"
+		return f"{self} {stmt}"
+
+
+	@property
+	def ascending(self) -> str:
+		""" Returns ORDER_BY query for this column, ascending. """
+		return self.__ordered_stmt(ASCENDING_SQL)
+
+
+	@property
+	def descending(self) -> str:
+		""" Returns ORDER_BY query for this column, descending. """
+		return self.__ordered_stmt(DESCENDING_SQL)
+
+	
+	@property
+	def select_name(self) -> str:
+		return str(self)
+
+
+
+
+
+class CMP(ComparisonMethods):
 	"""
 	Class used to help define query statements.
 
@@ -237,15 +392,16 @@ class CMP():
 
 
 	def _convert_to_str(
-			self, v: Any, only_str: bool = True) -> str | tuple[str, tuple[Any, ...]]:
+			self, v: Any, only_str: bool = True
+			) -> str | tuple[str, tuple[Any, ...]]:
 
 		# WANT TO 'QUOTE' IT, NO RETURN.
 		if (isinstance(v, datetime) and only_str):
 			v = v.strftime(SQL_DATETIME_FMT) 
 
-		if (isinstance(v, TableColumn)):
-			if (only_str): return str(v) # type: ignore
-			else: return (f"{v}", tuple()) # type: ignore
+		if (isinstance(v, ColumnType)):
+			if (only_str): return str(v)
+			else: return (v.select_name, v.params)
 
 		if (isinstance(v, CMP)):
 			if (only_str): return str(v)
@@ -292,18 +448,6 @@ class CMP():
 		"""
 		return DerivedColumn(self, name)
 
-	# BITWISE OPERATIONS BEING OVERWRITTEN!
-	# DO THIS SO CAN WRITE Table1.uid == Table2.uid & Table1.name != "Jim"
-	def __and__(self, value: object):
-		return CMP(self, value, " AND ")
-
-	def __or__(self, value: object):
-		return CMP(self, value, " OR ")
-
-	def __invert__(self):
-		return NOT(self)
-
-
 
 class IN(CMP):
 	def safe(self):
@@ -313,6 +457,15 @@ class IN(CMP):
 		ph = ((self._placeholder + ", ") * len(self.b))[:-2]
 		return (f"({self.a}{self.symbol}({ph}))", tuple(self.b))
 
+
+class MATCH(CMP):
+	def __init__(self, col: "TableColumn[Any]", against: str):
+		self.a = col
+		self.b = against
+		self.symbol = ""
+	
+	def _fmt_str(self, a: Any, b: Any) -> str:
+		return f"MATCH({a}) AGAINST ({b})"
 
 
 class METHOD(CMP):
@@ -335,13 +488,6 @@ class METHOD(CMP):
 
 		return (f"{self.method}({a[0]})", tuple(values))
 
-	def __eq__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
-		return CMP(self, value, "=")
-
-	def __ne__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
-		return CMP(self, value, "<>")
-
-
 
 class NOT(METHOD): method = "NOT"
 class UPPER(METHOD): method = "UPPER"
@@ -351,14 +497,6 @@ class MIN(METHOD): method = "MIN"
 
 
 
-class MATCH(CMP):
-	def __init__(self, col: "TableColumn[Any]", against: str):
-		self.a = col
-		self.b = against
-		self.symbol = ""
-	
-	def _fmt_str(self, a: Any, b: Any) -> str:
-		return f"MATCH({a}) AGAINST ({b})"
 
 
 
@@ -368,63 +506,22 @@ class MATCH(CMP):
 
 
 
-class Join():
+
+
+class ColumnType():
 	"""
-	Use this class to define a JOIN statement.
-
-	This may be created manually, but also happens automatically when
-	`join_all` is true in `Table.select()`
+	This class purely for typing, to check if value is any typ of column.
 	"""
 
-	def __init__(
-			self, joining_table: "Table[Any]",
-			condition: CMP | str, join_type: str = "LEFT"):
-		"""
-		Define a JOIN statement.
+	@property
+	def select_name(self) -> str: return ''
 
-		Args
-		--------
-		joining_table: Table
-			type object of the TableRow of the table
-			you're joining into this statement.
-
-		condition: CMP | str
-			Query str to define how the joined table relates to this.
-			Usually linking primary / foreign keys.
-
-		join_type: str
-			Optional, can be INNER, LEFT, RIGHT, CROSS.
-			Default is LEFT
-		"""
-
-		self.join_type = join_type
-		self.joining_table = joining_table
-		self.condition = condition
+	@property
+	def params(self) -> tuple[Any, ...]: return tuple()
 
 
 
-	def __str__(self):
-		join_type: str = self.join_type
-		if (join_type): join_type += " "
-
-		return f"{join_type}JOIN {self.joining_table.id_statement()} ON {self.condition}"
-	
-	def safe(self):
-		if (isinstance(self.condition, str)): return (str(self), tuple())
-
-		join_type: str = self.join_type
-		if (join_type): join_type += " "
-
-		a = self.condition.safe()
-
-		return (
-			f"{join_type}JOIN {self.joining_table.id_statement()} ON {a[0]}",
-			a[1] )
-
-
-
-
-class DerivedColumn():
+class DerivedColumn(ComparisonMethods, ColumnType):
 	def __init__(self, method: CMP | METHOD, name: str):
 		self._str, self._values = method.safe()
 		self._name = name
@@ -455,7 +552,7 @@ class DerivedColumn():
 
 # row_instantiated = False always, unless TableColumn accessed by Table.row.new().TableColumn
 
-class TableColumn(Generic[T]):
+class TableColumn(ComparisonMethods, ColumnType, Generic[T]):
 	"""
 	Class to describe a field/column of a database.
 
@@ -763,54 +860,20 @@ class TableColumn(Generic[T]):
 		"""
 
 		self._value_changed = False
-
-
-
-
-
-	def in_(self, objects: list[Any]) -> CMP:
-		return IN(self, objects, " IN ")
-
-	def like_(self, objects: list[Any]) -> CMP:
-		return CMP(self, objects, " LIKE ")
-
-	def __eq__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
-		return CMP(self, value, "=")
-
-	def __ne__(self, value: object) -> CMP: # type: ignore[incompatibleMethodOverride]
-		return CMP(self, value, "<>")
-
-	def __lt__(self, value: object) -> CMP:
-		return CMP(self, value, "<")
-
-	def __le__(self, value: object) -> CMP:
-		return CMP(self, value, "<=")
-
-	def __gt__(self, value: object) -> CMP:
-		return CMP(self, value, ">")
-
-	def __ge__(self, value: object) -> CMP:
-		return CMP(self, value, ">=")
-
+	
 	@property
-	def ascending(self) -> str:
-		""" Returns ORDER_BY query for this column, ascending. """
-		return str(self) + " " + ASCENDING_SQL
+	def select_name(self):
+		return f"{self.table.rigid_identifier}.{self._db_field}"
 
-	@property
-	def descending(self) -> str:
-		""" Returns ORDER_BY query for this column, descending. """
-		return str(self) + " " + DESCENDING_SQL
 
 	def __str__(self) -> str:
 		if (not self.table): # ROW NOT INSTANTIATED, WHY ARE YOU HERE?
 			return self._db_field
 
 		return f"{self.table.identifier}.{self._db_field}"
-	
-	@property
-	def select_name(self) -> str:
-		return str(self)
+
+
+
 
 
 
@@ -1142,9 +1205,11 @@ class Table(Generic[TableRowType]):
 	automatically if a TableRow self-references, but can also be useful manually.
 	"""
 	def __init__(
-			self, db_name: str, row_model: type[TableRowType], _alias: str = ""):
+			self, db_name: str, row_model: type[TableRowType], _alias: str = "",
+			_partial_alias: bool = False):
 		self._db_name = db_name
 		self._alias = _alias
+		self._partial_alias = _partial_alias
 
 		self._row_model = row_model
 		self._row = row_model(self)
@@ -1164,7 +1229,7 @@ class Table(Generic[TableRowType]):
 
 	def select(
 			self,
-			columns: Optional[list[TableColumn[Any] | DerivedColumn]] = None,
+			columns: Optional[list[ColumnType]] = None,
 			distinct: bool = False,
 			where: Optional[CMP] = None,
 			join_all: bool = False,
@@ -1172,8 +1237,10 @@ class Table(Generic[TableRowType]):
 			limit: Optional[int] = 1000,
 			limit_offset: Optional[int] = 0,
 			page: Optional[int] = 0,
-			order_by: Optional[list[TableColumn[Any] | str]] = None,
-			objectify_results: bool = True) -> DSA:
+			order_by: Optional[list[ColumnType | str | CMP]] = None,
+			group_by: Optional[list[ColumnType | str | CMP]] = None,
+			objectify_results: bool = True,
+			is_inline: bool = False) -> DSA:
 		"""
 		### Build `SELECT` STATEMENT. ###
 
@@ -1206,10 +1273,13 @@ class Table(Generic[TableRowType]):
 			Optional page number, will be used to calculate `limit_offset` based
 			on your `limit` provided. Page 0 is first (no offset)
 
-		order_by: list[str | TableColumn]
+		order_by: list[str | Column]
 			Which columns to order by. May be `TableColumn`,
 			`TableColumn.ascending`, `TableColumn.descending` or any manually
 			created string.
+		
+		group_by: list[str | Column]
+			Same as order_by.
 
 		Example:
 		--------
@@ -1227,29 +1297,36 @@ class Table(Generic[TableRowType]):
 		if (join_all): join_on.extend(self.row.get_joins())
 
 		tables_involved: list[Table[Any]] = [
-			self, *( v.joining_table for v in join_on )]
+			self, *( v.joining_table for v in join_on if (not isinstance(v, JoinInlineTable)))]
 
 		if (not columns):
 			for v in tables_involved:
 				columns.extend(v.row.get_columns())
 
 
-		order_by_strs: list[str] = [ str(v) for v in order_by]
-
 		values: list[Any] = []
 		derived: list[str] = []
 
+		# BUILD str STATEMENT:
+		what_to_select = ""
+
 		for c in columns:
-			if (not isinstance(c, DerivedColumn)): continue
+			is_tc = isinstance(c, TableColumn)
+	
+			if (is_inline):
+				if (is_tc): what_to_select += f"{c} AS \'{c.field}\', "
+				else: what_to_select +=f"{c} AS \'{c.select_name}\', "
+			else: what_to_select += f"{c} AS \'{c.select_name}\', "
+
+			if (is_tc): continue
 
 			values.extend(c.params)
 			derived.append(c.select_name)
 
-		# BUILD str STATEMENT:
-		what_to_select = ", ".join( f"{v} AS \'{v.select_name}\'" for v in columns )
 		distinct_statement = " DISTINCT" if distinct else ""
 
-		sql: str = f"SELECT{distinct_statement} {what_to_select} FROM {self}" # BASE
+		# BASE
+		sql: str = f"SELECT{distinct_statement} {what_to_select[:-2]} FROM {self}" 
 
 		for join in join_on:
 			safe = join.safe()
@@ -1262,9 +1339,14 @@ class Table(Generic[TableRowType]):
 
 			sql += f" WHERE {safe[0]}" # ADD CONDITION
 			values.extend(safe[1])
+		
+		if (group_by):
+			group_by_statement = ", ".join(str(v) for v in group_by)
 
-		if (order_by_strs):
-			order_by_statement = ", ".join(order_by_strs)
+			sql += f" GROUP BY {group_by_statement}" # ADD GROUP BY
+
+		if (order_by):
+			order_by_statement = ", ".join(str(v) for v in order_by)
 
 			sql += f" ORDER BY {order_by_statement}" # ADD ORDER BY
 
@@ -1508,19 +1590,24 @@ class Table(Generic[TableRowType]):
 
 	# NAMING FUNCTIONS
 
-	def as_alias(self, alias: str):
+	def as_alias(self, alias: str, partial_alias: bool = False):
 		"""
 		Create new instance of Table with alias.
 
 		Happens automatically when a TableRow self-references, but may also
 		be useful manually.
+
+		Partial alias is for creating SELECT.
+			- True: Table.COL AS 'Alias.COL'
+			- False: Alias.COL AS 'Alias.COL'
+
 		"""
 
 		if (self._alias):
 			raise AttributeError("This table has already been aliased.")
 
 		cloned = self.__class__.__new__(self.__class__)
-		cloned.__init__(self._db_name, self._row_model, alias)
+		cloned.__init__(self._db_name, self._row_model, alias, partial_alias)
 
 		return cloned
 
@@ -1540,7 +1627,15 @@ class Table(Generic[TableRowType]):
 	@property
 	def identifier(self) -> str:
 		"""
-		`str` identifier of the table. alias if exists, else name.
+		`str` identifier of the table.
+		alias if exists (AND NOT PARTIAL ALIAS), else name.
+		"""
+		return self._alias if (self._alias and not self._partial_alias) else str(self)
+	
+	@property
+	def rigid_identifier(self) -> str:
+		"""
+		`str` identifier of the table. alias if exists (ALWAYS), else name.
 		"""
 		return self._alias if self._alias else str(self)
 
@@ -1936,8 +2031,8 @@ class Database():
 		return routine(**payload)
 
 
-	async def execute_payload_async(
-			self, payload: DSA) -> Coroutine[Any, Any, DSA]:
+	def execute_payload_async(
+			self, payload: DSA) -> Future[DSA]:
 		""" Execute SQL Statement from `dict` payload. """
 
 		routine: Callable[..., Any]
@@ -1945,7 +2040,7 @@ class Database():
 		if (payload.get("queries")): routine = self.execute_multiple
 		else: routine = self.execute
 
-		return (await async_executor(routine, **payload))
+		return async_executor(routine, **payload)
 
 
 

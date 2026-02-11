@@ -16,7 +16,7 @@ AVG_WORK_SPEED = 1 # SECONDS
 RECONNECTION_WAIT = 5
 
 DUMP_INTERVAL = 30 # SECONDS
-NOTICE_INTERVAL = 60 * 60 # SECONDS
+NOTICE_INTERVAL = 30 * 60 # SECONDS
 WAIT_BEFORE_FIRST_NOTICE = 5 * 60 # SECONDS
 MAX_CYCLES_BEFORE_CLOSE_LOCK = 10 # = 10 SECONDS DELAY
 
@@ -87,7 +87,7 @@ class DBThread(Thread):
 			self.logger.error(f"COULD NOT DUMP QUEUE STATE {e}")
 
 
-	def notice(self):
+	def notice(self, last_notice_was0: bool):
 		data: DSI = {}
 		tot = 0
 		max_id = 0
@@ -104,9 +104,13 @@ class DBThread(Thread):
 			data[s] += 1
 		
 		v = ",".join(f"{c}x {v}" for v,c in data.items())
+
+		if (tot == 0 and last_notice_was0): return True
 		
 		self.logger.notice( # type: ignore
 			f"{tot} TOTAL ITEMS IN QUEUE NOW, {max_id} MAX ID.\n" + v )
+		
+		return tot == 0
 		
 
 
@@ -542,6 +546,7 @@ class DBThread(Thread):
 		last_dump = datetime.fromtimestamp(0)
 		last_notice = datetime.now() - timedelta(
 			seconds = NOTICE_INTERVAL - WAIT_BEFORE_FIRST_NOTICE)
+		last_notice_was0 = False
 		
 		cycles_idle = 0
 
@@ -565,7 +570,7 @@ class DBThread(Thread):
 					last_dump = n
 				
 				if ((n - last_notice).total_seconds() > NOTICE_INTERVAL):
-					self.notice()
+					last_notice_was0 = self.notice(last_notice_was0)
 					last_notice = n
 
 			

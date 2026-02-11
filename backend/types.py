@@ -6,6 +6,7 @@ type DSA = dict[str, Any] # most generic dict
 type DAA = dict[Any, Any]
 type DSS = dict[str, str]
 type DSI = dict[str, int]
+type DIS = dict[int, str]
 
 # psuedonyms used for readability
 type Result = DSA
