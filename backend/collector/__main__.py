@@ -227,7 +227,7 @@ class Scheduler():
 		self._logger.info("Scheduler has started.")
 
 		time_next = self._state.time_next_batch
-		kwrds_todo = self._state.keywords_todo
+		kwrds_todo = self._state.keywords_todo or []
 		if (time_next and (not ONLY_WAIT_FOR_NEXT_BATCH)):
 			now = utcnow()
 
@@ -238,7 +238,7 @@ class Scheduler():
 
 				await self.new_batch() # WAIT!!!!!
 
-			elif (kwrds_todo):
+			elif (len(kwrds_todo) > 1):
 				self._logger.warning(
 					"We have time to wait before next batch. Going to restart "
 					f"previous batch, to collect {len(kwrds_todo)} keywords.")

@@ -346,7 +346,7 @@ class BaseCollector:
 		try:
 			data = self._load_data_from_response(result)
 		except:
-			self._logger.exception("COULD NOT LOAD JSON FROM RESP")
+			self._logger.exception(f"COULD NOT LOAD JSON FROM RESP {self.store}")
 
 		now = utcnow().strftime(DATE_FMT)
 
