@@ -5,13 +5,15 @@ from backend.dbclasses import (
 	Products, ProductLinks, PriceEntries, Ratings, Images,
 	Brands, Stores, Offers, OfferHolders, Labels, Keywords,
 
-	Store, Product, Brand, PriceEntry)
+	Store, Product, Brand, PriceEntry, Image)
 
 from backend.api.constants import SortOption
 from backend.constants import DATE_FMT
-from backend.types import Optional, DSA, DIS, Any
+from backend.types import Optional, DSA, DIS, DII, Any
 
 SEARCH_N_RESULTS = 20
+
+FAVOURITE_STORES_FOR_IMAGES = [] # TODO?
 
 
 
@@ -109,9 +111,41 @@ def build_prices_query(product_ids: list[int], include_fetch_date: bool = False)
 	return outer
 
 
+def build_images_query(product_ids: list[int]):
+	q = Images.select(
+		[
+			Images.row.db_id,
+			Images.row.product,
+			Images.row.preferred
+		],
+		where = Images.row.product.in_(product_ids)
+	)
+
+	return q
+
+
+def choose_images_per_pid(images: list[Image], product_ids: list[int]):
+	response: DII = {}
+	is_preferred: dict[int, Optional[bool]] = {}
+
+	for image in images:
+		pid = image.product.ref_value(Product).db_id.plain_value
+		if (pid is None): continue
+
+		current = response.get(pid)
+		if (current is not None and is_preferred.get(pid)): continue
+		
+		response[pid] = image.db_id.plain_value # type: ignore
+		is_preferred[pid] = image.preferred.plain_value
+
+	return response
+
+
+	
+
+
 async def search(db: Database, sid_to_name: DIS, query: str, page: int, sort_mode: SortOption) -> list[DSA]:
 	q = build_search_query(query, page, sort_mode)
-	print(q)
 
 	r = await db.execute_payload_async(q)
 	products: Optional[list[dict[str, Product]]] = r.get("fetchall")
@@ -132,10 +166,20 @@ async def search(db: Database, sid_to_name: DIS, query: str, page: int, sort_mod
 
 	if (len(product_ids) == 0): return [] # TODO: log, query error
 
-	q2 = build_prices_query(product_ids, False)
-
+	q2 = build_images_query(product_ids)
+	
 	r2 = await db.execute_payload_async(q2)
-	prices: Optional[list[PriceEntry]] = r2.get("fetchall")
+	images: Optional[list[Image]] = r2.get("fetchall")
+
+	image_datas = ( choose_images_per_pid(images, product_ids)
+		if (images) else {} )
+	
+	for i,v in image_datas.items(): product_data[i]["i"].append(v)
+
+	q3 = build_prices_query(product_ids, False)
+
+	r3 = await db.execute_payload_async(q3)
+	prices: Optional[list[PriceEntry]] = r3.get("fetchall")
 	
 	if (not prices): return list(product_data.values())
 	
@@ -148,11 +192,3 @@ async def search(db: Database, sid_to_name: DIS, query: str, page: int, sort_mod
 		product_data[pid]["p"].append(data)
 	
 	return list(product_data.values())
-
-
-
-
-
-
-
-print(build_prices_query([1,2,3]))

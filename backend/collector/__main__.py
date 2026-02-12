@@ -99,6 +99,7 @@ class Scheduler():
 			if (diff <= 0): continue
 
 			next_time = runtime
+			break
 
 		if (next_time):
 			return datetime(

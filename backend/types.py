@@ -7,6 +7,7 @@ type DAA = dict[Any, Any]
 type DSS = dict[str, str]
 type DSI = dict[str, int]
 type DIS = dict[int, str]
+type DII = dict[int, int]
 
 # psuedonyms used for readability
 type Result = DSA

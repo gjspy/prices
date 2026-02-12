@@ -76,7 +76,7 @@ async def main(db: Database):
 	for res in r:
 		print(res)
 
-	
+
 
 
 with sshtunnel.SSHTunnelForwarder(

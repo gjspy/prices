@@ -329,7 +329,6 @@ class Writer():
 		with ProductID and IsPreferred. This is not possible to raise through
 		a UNIQUE constraint so we must query for it first.
 		"""
-		
 
 		query = Images.select(
 			[Images.row.db_id],

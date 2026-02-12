@@ -674,7 +674,8 @@ class TableColumn(ComparisonMethods, ColumnType, Generic[T]):
 				"reference, not .plain_value")
 
 		return v
-	
+
+
 	def ref_value(self, as_: type[TableRowType]) -> TableRowType:
 		"""
 		This attribute returns self.value as usual. Only exists to help with

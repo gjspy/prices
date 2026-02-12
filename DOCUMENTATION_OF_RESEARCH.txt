@@ -72,3 +72,4 @@ do this at 9am and 9pm.
 TALK ABOUT HOW I MADE IT QUICKER (FROM 100/min TO 300/min, BY LOCKS)
 
 USING inplace params prevents SQL injection
+DC logging
