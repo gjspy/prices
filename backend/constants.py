@@ -218,6 +218,8 @@ def standardise_packsize(size: str | Number, unit: str) -> tuple[float, str]:
 	Not all unit types standardised anymore, as it doesnt make sense to.
 
 	Always returns 2-char str representation of unit
+
+	DB ROW IS VARCHAR(2) SO WE CANNOT RETURN A UNIT LONGER THAN 2 CHARS FROM HERE.
 	"""
 	unit = unit.lower()
 
